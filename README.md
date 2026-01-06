@@ -23,6 +23,9 @@ Defaults from `docker-compose.yml`:
 - Root password: `root`
 - Port: `3306`
 
+Optional (if enabled in `docker-compose.yml`):
+- phpMyAdmin: `http://localhost:8081` (server: `mysql`)
+
 ### 2) Configuration (the `local` profile)
 The repo keeps a base config without secrets: `backend/src/main/resources/application.properties`.
 
@@ -56,6 +59,11 @@ The app starts on `http://localhost:8080`.
 
 ## Test endpoint
 - `GET /api/health` -> `{"status":"UP"}` (no auth required)
+
+## Guest session (anonymous)
+Creates/refreshes an anonymous guest session backed by DB + an HttpOnly cookie:
+- `POST /api/guest/session` -> sets `guestSessionId` cookie
+- `DELETE /api/guest/session` -> clears cookie (and revokes the session server-side)
 
 All other endpoints (as they are added) are protected by Spring Security (HTTP Basic).
 If no user is configured, Spring generates a password and prints it in the startup logs.
