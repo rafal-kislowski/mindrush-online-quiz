@@ -64,9 +64,25 @@ The app starts on `http://localhost:8080`.
 Creates/refreshes an anonymous guest session backed by DB + an HttpOnly cookie:
 - `POST /api/guest/session` -> sets `guestSessionId` cookie
 - `DELETE /api/guest/session` -> clears cookie (and revokes the session server-side)
+- `GET /api/guest/session` -> returns current session info (including generated `displayName`)
+
+Notes:
+- Guest `displayName` is generated server-side (safe characters, no user input).
 
 All other endpoints (as they are added) are protected by Spring Security (HTTP Basic).
 If no user is configured, Spring generates a password and prints it in the startup logs.
+
+## Lobby (guest)
+Simple guest lobbies (no login required), identified by a 6-character code.
+
+- `POST /api/lobbies` -> creates a lobby (requires a valid `guestSessionId` cookie)
+  - optional JSON body: `{ "password": "secret123" }`
+- `GET /api/lobbies/{code}` -> fetches lobby state
+- `POST /api/lobbies/{code}/join` -> joins a lobby (requires a valid `guestSessionId` cookie)
+  - optional JSON body (when password is set): `{ "password": "secret123" }`
+
+Guest lobby limits:
+- Max players: `2`
 
 ## Tests
 
