@@ -3,6 +3,7 @@ package pl.mindrush.backend.guest;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -33,6 +34,16 @@ public class GuestSessionController {
                         "expiresAt", session.getExpiresAt().toString(),
                         "serverTime", Instant.now().toString()
                 ));
+    }
+
+    @GetMapping
+    public ResponseEntity<Map<String, Object>> getSession(HttpServletRequest request) {
+        GuestSession session = service.requireValidSession(request);
+        return ResponseEntity.ok(Map.of(
+                "status", "OK",
+                "displayName", session.getDisplayName(),
+                "expiresAt", session.getExpiresAt().toString()
+        ));
     }
 
     @DeleteMapping

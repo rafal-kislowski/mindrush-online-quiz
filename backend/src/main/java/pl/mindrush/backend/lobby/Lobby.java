@@ -1,0 +1,88 @@
+package pl.mindrush.backend.lobby;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = "lobbies")
+public class Lobby {
+
+    @Id
+    @Column(name = "id", length = 36, nullable = false, updatable = false)
+    private String id;
+
+    @Column(name = "code", length = 6, nullable = false, unique = true, updatable = false)
+    private String code;
+
+    @Column(name = "owner_guest_session_id", length = 36, nullable = false, updatable = false)
+    private String ownerGuestSessionId;
+
+    @Column(name = "password_hash")
+    private String passwordHash;
+
+    @Column(name = "max_players", nullable = false, updatable = false)
+    private int maxPlayers;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 16, nullable = false)
+    private LobbyStatus status;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    public static Lobby createNew(String code, String ownerGuestSessionId, int maxPlayers, String passwordHash, Instant now) {
+        Lobby lobby = new Lobby();
+        lobby.id = UUID.randomUUID().toString();
+        lobby.code = code;
+        lobby.ownerGuestSessionId = ownerGuestSessionId;
+        lobby.maxPlayers = maxPlayers;
+        lobby.passwordHash = passwordHash;
+        lobby.status = LobbyStatus.OPEN;
+        lobby.createdAt = now;
+        return lobby;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public String getOwnerGuestSessionId() {
+        return ownerGuestSessionId;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public int getMaxPlayers() {
+        return maxPlayers;
+    }
+
+    public LobbyStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(LobbyStatus status) {
+        this.status = status;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public boolean hasPassword() {
+        return passwordHash != null && !passwordHash.isBlank();
+    }
+}
+

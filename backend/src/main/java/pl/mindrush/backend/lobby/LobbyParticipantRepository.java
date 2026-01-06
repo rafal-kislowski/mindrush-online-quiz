@@ -1,0 +1,12 @@
+package pl.mindrush.backend.lobby;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+
+public interface LobbyParticipantRepository extends JpaRepository<LobbyParticipant, Long> {
+    long countByLobbyId(String lobbyId);
+    boolean existsByLobbyIdAndGuestSessionId(String lobbyId, String guestSessionId);
+    List<LobbyParticipant> findAllByLobbyIdOrderByJoinedAtAsc(String lobbyId);
+}
+

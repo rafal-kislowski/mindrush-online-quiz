@@ -18,6 +18,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/guest/session").permitAll()
                         .requestMatchers(HttpMethod.DELETE, "/api/guest/session").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/guest/session").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/lobbies/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/lobbies").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/lobbies/*/join").permitAll()
                         .anyRequest().authenticated()
                 )
 

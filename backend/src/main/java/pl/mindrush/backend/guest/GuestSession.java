@@ -25,6 +25,9 @@ public class GuestSession {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
+    @Column(name = "display_name", length = 32)
+    private String displayName;
+
     @Column(name = "revoked", nullable = false)
     private boolean revoked;
 
@@ -58,6 +61,14 @@ public class GuestSession {
 
     public void setExpiresAt(Instant expiresAt) {
         this.expiresAt = expiresAt;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
     }
 
     public boolean isRevoked() {

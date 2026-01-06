@@ -7,15 +7,21 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import jakarta.servlet.http.Cookie;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.emptyOrNullString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
@@ -46,13 +52,24 @@ class GuestSessionControllerTest {
     }
 
     @Test
-    void post_withExistingCookie_reusesSameSession() throws Exception {
-        MvcResult first = mockMvc.perform(post("/api/guest/session"))
-                .andExpect(status().isCreated())
-                .andReturn();
+    void get_requiresValidSession() throws Exception {
+        mockMvc.perform(get("/api/guest/session"))
+                .andExpect(status().isUnauthorized());
+    }
 
-        String sessionId = cookieValueFromSetCookie(first.getResponse().getHeader(HttpHeaders.SET_COOKIE), "guestSessionId")
-                .orElseThrow();
+    @Test
+    void post_thenGet_returnsGeneratedDisplayName() throws Exception {
+        String sessionId = createGuestSessionId();
+
+        mockMvc.perform(get("/api/guest/session").cookie(new Cookie("guestSessionId", sessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.displayName", not(emptyOrNullString())))
+                .andExpect(jsonPath("$.expiresAt", not(emptyOrNullString())));
+    }
+
+    @Test
+    void post_withExistingCookie_reusesSameSession() throws Exception {
+        String sessionId = createGuestSessionId();
 
         assertThat(repository.count()).isEqualTo(1);
 
@@ -65,12 +82,7 @@ class GuestSessionControllerTest {
 
     @Test
     void delete_revokesSessionAndClearsCookie() throws Exception {
-        MvcResult first = mockMvc.perform(post("/api/guest/session"))
-                .andExpect(status().isCreated())
-                .andReturn();
-
-        String sessionId = cookieValueFromSetCookie(first.getResponse().getHeader(HttpHeaders.SET_COOKIE), "guestSessionId")
-                .orElseThrow();
+        String sessionId = createGuestSessionId();
 
         mockMvc.perform(delete("/api/guest/session").cookie(new Cookie("guestSessionId", sessionId)))
                 .andExpect(status().isNoContent())
@@ -79,6 +91,14 @@ class GuestSessionControllerTest {
 
         GuestSession session = repository.findById(sessionId).orElseThrow();
         assertThat(session.isRevoked()).isTrue();
+    }
+
+    private String createGuestSessionId() throws Exception {
+        ResultActions res = mockMvc.perform(post("/api/guest/session"))
+                .andExpect(status().isCreated());
+
+        String setCookie = res.andReturn().getResponse().getHeader(HttpHeaders.SET_COOKIE);
+        return cookieValueFromSetCookie(setCookie, "guestSessionId").orElseThrow();
     }
 
     private static Optional<String> cookieValueFromSetCookie(String setCookie, String cookieName) {
