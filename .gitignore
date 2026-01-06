@@ -1,19 +1,34 @@
-# IntelliJ
+# =========================
+# IDE
+# =========================
 .idea/
 *.iml
 
-# Maven
+# =========================
+# Build artifacts
+# =========================
 **/target/
 
+# =========================
 # Logs
+# =========================
 *.log
 
-# Node (frontend - later)
-frontend/node_modules/
-frontend/dist/
+# =========================
+# Local references
+# =========================
+/local-reference/
 
-# Env / secrets
+# =========================
+# Environment / secrets
+# =========================
 .env
 *.local
 application-local.properties
 application-local.yml
+
+# =========================
+# Frontend (future)
+# =========================
+frontend/node_modules/
+frontend/dist/

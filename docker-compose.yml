@@ -1,8 +1,9 @@
+version: "3.9"
+
 services:
   mysql:
     image: mysql:8.4
     container_name: mindrush-mysql
-    restart: unless-stopped
     environment:
       MYSQL_DATABASE: mindrush
       MYSQL_USER: mindrush
@@ -12,6 +13,17 @@ services:
       - "3306:3306"
     volumes:
       - mindrush_mysql_data:/var/lib/mysql
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: mindrush-phpmyadmin
+    depends_on:
+      - mysql
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+    ports:
+      - "8081:80"
 
 volumes:
   mindrush_mysql_data:
