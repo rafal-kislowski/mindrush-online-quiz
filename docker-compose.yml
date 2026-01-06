@@ -1,0 +1,17 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: mindrush-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: mindrush
+      MYSQL_USER: mindrush
+      MYSQL_PASSWORD: mindrush
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - mindrush_mysql_data:/var/lib/mysql
+
+volumes:
+  mindrush_mysql_data:

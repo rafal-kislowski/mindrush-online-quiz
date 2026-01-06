@@ -1,0 +1,19 @@
+# IntelliJ
+.idea/
+*.iml
+
+# Maven
+**/target/
+
+# Logs
+*.log
+
+# Node (frontend - later)
+frontend/node_modules/
+frontend/dist/
+
+# Env / secrets
+.env
+*.local
+application-local.properties
+application-local.yml
