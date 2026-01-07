@@ -98,6 +98,10 @@ public class LobbyService {
         GuestSession guestSession = guestSessionService.requireValidSession(request);
         Lobby lobby = lobbyRepository.findByCode(code).orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Lobby not found"));
 
+        if (lobby.getStatus() == LobbyStatus.IN_GAME) {
+            throw new ResponseStatusException(CONFLICT, "Cannot leave while game is in progress");
+        }
+
         participantRepository.deleteByLobbyIdAndGuestSessionId(lobby.getId(), guestSession.getId());
 
         long remaining = participantRepository.countByLobbyId(lobby.getId());

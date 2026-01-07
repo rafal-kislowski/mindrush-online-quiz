@@ -90,6 +90,7 @@ Notes:
 - `close` prevents new players from joining (status becomes `CLOSED`).
 - If the owner leaves and another player remains, ownership is transferred to the remaining player.
 - If the last player leaves, the lobby is deleted.
+- Leaving the lobby is blocked while a game is in progress (`IN_GAME`).
 
 ## Quizzes (read-only)
 Public, read-only quiz endpoints (no auth required):

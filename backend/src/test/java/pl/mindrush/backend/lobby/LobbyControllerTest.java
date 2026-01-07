@@ -23,7 +23,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
-        "spring.jpa.hibernate.ddl-auto=create-drop"
+        "spring.jpa.hibernate.ddl-auto=create-drop",
+        "app.seed.enabled=true"
 })
 @AutoConfigureMockMvc
 class LobbyControllerTest {
@@ -276,12 +277,59 @@ class LobbyControllerTest {
                 .andExpect(jsonPath("$.status").value("CLOSED"));
     }
 
+    @Test
+    void leave_duringGame_isBlocked() throws Exception {
+        String ownerSessionId = createGuestSession();
+        String secondSessionId = createGuestSession();
+
+        MvcResult created = mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String code = jsonValue(created.getResponse().getContentAsString(), "\"code\":\"", "\"").orElseThrow();
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", secondSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
+
+        Long quizId = firstQuizId();
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/game/start")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quizId\":" + quizId + "}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/leave")
+                        .cookie(new Cookie("guestSessionId", secondSessionId)))
+                .andExpect(status().isConflict());
+    }
+
     private String createGuestSession() throws Exception {
         MvcResult res = mockMvc.perform(post("/api/guest/session"))
                 .andExpect(status().isCreated())
                 .andReturn();
         String setCookie = res.getResponse().getHeader(HttpHeaders.SET_COOKIE);
         return cookieValueFromSetCookie(setCookie, "guestSessionId").orElseThrow();
+    }
+
+    private Long firstQuizId() throws Exception {
+        MvcResult list = mockMvc.perform(get("/api/quizzes").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andReturn();
+        String body = list.getResponse().getContentAsString();
+        int idx = body.indexOf("\"id\":");
+        if (idx < 0) throw new IllegalStateException("No quiz id in response");
+        int start = idx + "\"id\":".length();
+        while (start < body.length() && Character.isWhitespace(body.charAt(start))) start++;
+        int end = start;
+        while (end < body.length() && Character.isDigit(body.charAt(end))) end++;
+        return Long.parseLong(body.substring(start, end));
     }
 
     private static Optional<String> cookieValueFromSetCookie(String setCookie, String cookieName) {
