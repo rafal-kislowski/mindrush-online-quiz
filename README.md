@@ -80,9 +80,16 @@ Simple guest lobbies (no login required), identified by a 6-character code.
 - `GET /api/lobbies/{code}` -> fetches lobby state
 - `POST /api/lobbies/{code}/join` -> joins a lobby (requires a valid `guestSessionId` cookie)
   - optional JSON body (when password is set): `{ "password": "secret123" }`
+- `POST /api/lobbies/{code}/leave` -> leaves a lobby (requires a valid `guestSessionId` cookie)
+- `POST /api/lobbies/{code}/close` -> closes a lobby for new joins (owner only)
 
 Guest lobby limits:
 - Max players: `2`
+
+Notes:
+- `close` prevents new players from joining (status becomes `CLOSED`).
+- If the owner leaves and another player remains, ownership is transferred to the remaining player.
+- If the last player leaves, the lobby is deleted.
 
 ## Tests
 
