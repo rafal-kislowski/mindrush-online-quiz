@@ -114,6 +114,9 @@ Endpoints (requires a valid `guestSessionId` cookie and being in the lobby):
 Notes:
 - Both players get the same question; answer options are shuffled per player.
 - The response includes per-player correctness only in `REVEAL` stage (after everyone answers).
+- Guest games are time-boxed: `QUESTION` defaults to 10s and `REVEAL` to 3s (configurable via `game.guest.question-duration` / `game.guest.reveal-duration`). The response exposes `stageEndsAt` for countdowns.
+- If a player doesn't answer before `stageEndsAt`, the server records it as a wrong answer and the game continues normally.
+- Auto-advance is driven by polling `GET /state` (no WebSocket/scheduler yet).
 - Lobby status becomes `IN_GAME` while a game is active, then returns to `OPEN` after the game ends.
 
 ## Tests

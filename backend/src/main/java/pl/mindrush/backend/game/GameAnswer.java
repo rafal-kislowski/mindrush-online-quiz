@@ -37,7 +37,7 @@ public class GameAnswer {
     @Column(name = "guest_session_id", length = 36, nullable = false, updatable = false)
     private String guestSessionId;
 
-    @Column(name = "selected_option_id", nullable = false, updatable = false)
+    @Column(name = "selected_option_id")
     private Long selectedOptionId;
 
     @Column(name = "correct", nullable = false, updatable = false)
@@ -88,4 +88,3 @@ public class GameAnswer {
         return answeredAt;
     }
 }
-

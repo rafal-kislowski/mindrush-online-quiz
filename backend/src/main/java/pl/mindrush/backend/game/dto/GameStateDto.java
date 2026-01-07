@@ -9,8 +9,8 @@ public record GameStateDto(
         int questionIndex,
         int totalQuestions,
         String stage,
+        String stageEndsAt,
         GameQuestionDto question,
         List<GamePlayerDto> players
 ) {
 }
-

@@ -7,4 +7,3 @@ public record GamePlayerDto(
         long score
 ) {
 }
-

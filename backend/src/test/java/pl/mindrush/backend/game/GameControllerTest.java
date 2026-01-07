@@ -7,14 +7,22 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import pl.mindrush.backend.guest.GuestSessionRepository;
 import pl.mindrush.backend.lobby.LobbyParticipantRepository;
 import pl.mindrush.backend.lobby.LobbyRepository;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
 
@@ -29,10 +37,52 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "app.seed.enabled=true"
 })
 @AutoConfigureMockMvc
+@Import(GameControllerTest.ClockTestConfig.class)
 class GameControllerTest {
+
+    @TestConfiguration
+    static class ClockTestConfig {
+        @Bean
+        @Primary
+        MutableClock testClock() {
+            return new MutableClock(Instant.parse("2026-01-01T00:00:00Z"), ZoneId.of("UTC"));
+        }
+    }
+
+    static final class MutableClock extends Clock {
+        private Instant instant;
+        private final ZoneId zone;
+
+        private MutableClock(Instant instant, ZoneId zone) {
+            this.instant = instant;
+            this.zone = zone;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return zone;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return new MutableClock(instant, zone);
+        }
+
+        @Override
+        public synchronized Instant instant() {
+            return instant;
+        }
+
+        synchronized void advance(Duration duration) {
+            instant = instant.plus(duration);
+        }
+    }
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private MutableClock clock;
 
     @Autowired
     private GuestSessionRepository guestSessionRepository;
@@ -126,6 +176,57 @@ class GameControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.stage").value("FINISHED"))
                 .andExpect(jsonPath("$.lobbyStatus").value("OPEN"));
+    }
+
+    @Test
+    void timeout_countsNoAnswerAsWrong_andAutoAdvances() throws Exception {
+        String ownerSessionId = createGuestSession();
+        String secondSessionId = createGuestSession();
+
+        String lobbyCode = createLobby(ownerSessionId);
+        joinLobby(lobbyCode, secondSessionId);
+
+        Long quizId = firstQuizId();
+
+        mockMvc.perform(post("/api/lobbies/" + lobbyCode + "/game/start")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quizId\":" + quizId + "}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.stage").value("QUESTION"));
+
+        MvcResult state = mockMvc.perform(get("/api/lobbies/" + lobbyCode + "/game/state")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        Number qIdNum = JsonPath.read(state.getResponse().getContentAsString(), "$.question.id");
+        long qId = qIdNum.longValue();
+        List<Integer> ownerOptions = JsonPath.read(state.getResponse().getContentAsString(), "$.question.options[*].id");
+
+        mockMvc.perform(post("/api/lobbies/" + lobbyCode + "/game/answer")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"questionId\":" + qId + ",\"optionId\":" + ownerOptions.get(0) + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stage").value("QUESTION"));
+
+        clock.advance(Duration.ofSeconds(11));
+
+        mockMvc.perform(get("/api/lobbies/" + lobbyCode + "/game/state")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stage").value("REVEAL"))
+                .andExpect(jsonPath("$.players[0].correct").exists())
+                .andExpect(jsonPath("$.players[1].correct").exists());
+
+        clock.advance(Duration.ofSeconds(4));
+
+        mockMvc.perform(get("/api/lobbies/" + lobbyCode + "/game/state")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stage").value("QUESTION"))
+                .andExpect(jsonPath("$.questionIndex").value(2));
     }
 
     private Long firstQuizId() throws Exception {

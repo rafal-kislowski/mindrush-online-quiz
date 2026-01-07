@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -28,6 +29,13 @@ public class GameSession {
     @Column(name = "status", length = 16, nullable = false)
     private GameStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "stage", length = 16, nullable = false)
+    private GameStage stage;
+
+    @Column(name = "stage_ends_at", nullable = false)
+    private Instant stageEndsAt;
+
     @Column(name = "current_question_index", nullable = false)
     private int currentQuestionIndex;
 
@@ -43,12 +51,14 @@ public class GameSession {
     protected GameSession() {
     }
 
-    public static GameSession startNew(String lobbyId, Long quizId, Instant now) {
+    public static GameSession startNew(String lobbyId, Long quizId, Instant now, Duration questionDuration) {
         GameSession session = new GameSession();
         session.id = UUID.randomUUID().toString();
         session.lobbyId = lobbyId;
         session.quizId = quizId;
         session.status = GameStatus.IN_PROGRESS;
+        session.stage = GameStage.QUESTION;
+        session.stageEndsAt = now.plus(questionDuration);
         session.currentQuestionIndex = 0;
         session.createdAt = now;
         session.startedAt = now;
@@ -76,6 +86,22 @@ public class GameSession {
         this.status = status;
     }
 
+    public GameStage getStage() {
+        return stage;
+    }
+
+    public void setStage(GameStage stage) {
+        this.stage = stage;
+    }
+
+    public Instant getStageEndsAt() {
+        return stageEndsAt;
+    }
+
+    public void setStageEndsAt(Instant stageEndsAt) {
+        this.stageEndsAt = stageEndsAt;
+    }
+
     public int getCurrentQuestionIndex() {
         return currentQuestionIndex;
     }
@@ -100,4 +126,3 @@ public class GameSession {
         this.endedAt = endedAt;
     }
 }
-
