@@ -126,6 +126,10 @@ public class LobbyService {
             throw new ResponseStatusException(FORBIDDEN, "Only the lobby owner can close the lobby");
         }
 
+        if (lobby.getStatus() == LobbyStatus.IN_GAME) {
+            throw new ResponseStatusException(CONFLICT, "Game is in progress");
+        }
+
         if (lobby.getStatus() != LobbyStatus.CLOSED) {
             lobby.setStatus(LobbyStatus.CLOSED);
             lobbyRepository.save(lobby);
