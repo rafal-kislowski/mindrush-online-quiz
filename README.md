@@ -100,6 +100,21 @@ Public, read-only quiz endpoints (no auth required):
 Optional dev seed data:
 - set `app.seed.enabled=true` (e.g. in `application-local.properties`)
 
+## Game (lobby)
+Minimal game flow on top of lobbies (intended to be used with real-time updates later; for now you can poll `/state`).
+
+Endpoints (requires a valid `guestSessionId` cookie and being in the lobby):
+- `POST /api/lobbies/{code}/game/start` -> starts a game (owner only), body: `{ "quizId": 1 }`
+- `GET /api/lobbies/{code}/game/state` -> current state (question/reveal/finished)
+- `POST /api/lobbies/{code}/game/answer` -> submit answer, body: `{ "questionId": 123, "optionId": 456 }`
+- `POST /api/lobbies/{code}/game/next` -> advance to next question (owner only; only after all players answered)
+- `POST /api/lobbies/{code}/game/end` -> end game (owner only)
+
+Notes:
+- Both players get the same question; answer options are shuffled per player.
+- The response includes per-player correctness only in `REVEAL` stage (after everyone answers).
+- Lobby status becomes `IN_GAME` while a game is active, then returns to `OPEN` after the game ends.
+
 ## Tests
 
 ```powershell
