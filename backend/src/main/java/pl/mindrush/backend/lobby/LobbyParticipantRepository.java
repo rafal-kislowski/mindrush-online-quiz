@@ -8,5 +8,5 @@ public interface LobbyParticipantRepository extends JpaRepository<LobbyParticipa
     long countByLobbyId(String lobbyId);
     boolean existsByLobbyIdAndGuestSessionId(String lobbyId, String guestSessionId);
     List<LobbyParticipant> findAllByLobbyIdOrderByJoinedAtAsc(String lobbyId);
+    long deleteByLobbyIdAndGuestSessionId(String lobbyId, String guestSessionId);
 }
-

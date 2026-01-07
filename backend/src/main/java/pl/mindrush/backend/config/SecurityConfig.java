@@ -22,6 +22,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/lobbies/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/lobbies").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/lobbies/*/join").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/lobbies/*/leave").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/lobbies/*/close").permitAll()
                         .anyRequest().authenticated()
                 )
 

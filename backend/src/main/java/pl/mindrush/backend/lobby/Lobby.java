@@ -21,7 +21,7 @@ public class Lobby {
     @Column(name = "code", length = 6, nullable = false, unique = true, updatable = false)
     private String code;
 
-    @Column(name = "owner_guest_session_id", length = 36, nullable = false, updatable = false)
+    @Column(name = "owner_guest_session_id", length = 36, nullable = false)
     private String ownerGuestSessionId;
 
     @Column(name = "password_hash")
@@ -61,6 +61,10 @@ public class Lobby {
         return ownerGuestSessionId;
     }
 
+    public void setOwnerGuestSessionId(String ownerGuestSessionId) {
+        this.ownerGuestSessionId = ownerGuestSessionId;
+    }
+
     public String getPasswordHash() {
         return passwordHash;
     }
@@ -85,4 +89,3 @@ public class Lobby {
         return passwordHash != null && !passwordHash.isBlank();
     }
 }
-

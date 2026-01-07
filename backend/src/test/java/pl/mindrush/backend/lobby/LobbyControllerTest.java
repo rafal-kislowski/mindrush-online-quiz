@@ -144,6 +144,138 @@ class LobbyControllerTest {
                 .andExpect(jsonPath("$.players.length()").value(1));
     }
 
+    @Test
+    void leave_freesSlotForAnotherGuest() throws Exception {
+        String ownerSessionId = createGuestSession();
+
+        MvcResult created = mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String code = jsonValue(created.getResponse().getContentAsString(), "\"code\":\"", "\"").orElseThrow();
+
+        String secondSessionId = createGuestSession();
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", secondSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.length()").value(2));
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/leave")
+                        .cookie(new Cookie("guestSessionId", secondSessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.length()").value(1));
+
+        String thirdSessionId = createGuestSession();
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", thirdSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.length()").value(2));
+    }
+
+    @Test
+    void close_requiresOwner_andPreventsJoin() throws Exception {
+        String ownerSessionId = createGuestSession();
+
+        MvcResult created = mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String code = jsonValue(created.getResponse().getContentAsString(), "\"code\":\"", "\"").orElseThrow();
+
+        String otherSessionId = createGuestSession();
+        mockMvc.perform(post("/api/lobbies/" + code + "/close")
+                        .cookie(new Cookie("guestSessionId", otherSessionId)))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/close")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CLOSED"));
+
+        String thirdSessionId = createGuestSession();
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", thirdSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void leave_ownerAsLastPlayer_deletesLobby() throws Exception {
+        String ownerSessionId = createGuestSession();
+
+        MvcResult created = mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String code = jsonValue(created.getResponse().getContentAsString(), "\"code\":\"", "\"").orElseThrow();
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/leave")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/lobbies/" + code))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void leave_ownerTransfersOwnership_andLobbyStaysOpen() throws Exception {
+        String ownerSessionId = createGuestSession();
+
+        MvcResult created = mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String code = jsonValue(created.getResponse().getContentAsString(), "\"code\":\"", "\"").orElseThrow();
+
+        String secondSessionId = createGuestSession();
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", secondSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.length()").value(2));
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/leave")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("OPEN"))
+                .andExpect(jsonPath("$.players.length()").value(1));
+
+        String thirdSessionId = createGuestSession();
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", thirdSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.length()").value(2));
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/close")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/close")
+                        .cookie(new Cookie("guestSessionId", secondSessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CLOSED"));
+    }
+
     private String createGuestSession() throws Exception {
         MvcResult res = mockMvc.perform(post("/api/guest/session"))
                 .andExpect(status().isCreated())

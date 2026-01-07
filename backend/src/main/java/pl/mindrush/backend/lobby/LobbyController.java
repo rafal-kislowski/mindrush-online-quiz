@@ -38,6 +38,21 @@ public class LobbyController {
         return ResponseEntity.ok(lobbyService.joinLobby(request, code, password));
     }
 
+    @PostMapping("/{code}/leave")
+    public ResponseEntity<?> leave(HttpServletRequest request, @PathVariable String code) {
+        LobbyService.LeaveResult result = lobbyService.leaveLobby(request, code);
+        if (result instanceof LobbyService.LeaveResult.Deleted) {
+            return ResponseEntity.noContent().build();
+        }
+        LobbyService.LeaveResult.Updated updated = (LobbyService.LeaveResult.Updated) result;
+        return ResponseEntity.ok(updated.lobby());
+    }
+
+    @PostMapping("/{code}/close")
+    public ResponseEntity<Map<String, Object>> close(HttpServletRequest request, @PathVariable String code) {
+        return ResponseEntity.ok(lobbyService.closeLobby(request, code));
+    }
+
     private static String asNullableString(Object value) {
         if (value == null) return null;
         String s = value.toString().trim();
