@@ -91,6 +91,15 @@ Notes:
 - If the owner leaves and another player remains, ownership is transferred to the remaining player.
 - If the last player leaves, the lobby is deleted.
 
+## Quizzes (read-only)
+Public, read-only quiz endpoints (no auth required):
+- `GET /api/quizzes` -> list quizzes
+- `GET /api/quizzes/{id}` -> quiz details
+- `GET /api/quizzes/{id}/questions` -> quiz questions + answer options (does not expose correct answers)
+
+Optional dev seed data:
+- set `app.seed.enabled=true` (e.g. in `application-local.properties`)
+
 ## Tests
 
 ```powershell
