@@ -1,0 +1,63 @@
+.card {
+  border: 1px solid #e7e7e7;
+  border-radius: 12px;
+  padding: 16px;
+  background: #fff;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.muted {
+  color: #666;
+}
+
+.block {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+input,
+select {
+  padding: 10px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 10px;
+  min-width: 260px;
+}
+
+.btn {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d9d9d9;
+  background: #f7f7f7;
+  cursor: pointer;
+}
+
+.btn.primary {
+  border-color: #1f6feb;
+  background: #1f6feb;
+  color: white;
+}
+
+.btn.danger {
+  border-color: #b00020;
+  background: #b00020;
+  color: white;
+}
+
+.error {
+  margin-top: 12px;
+  color: #b00020;
+}
+

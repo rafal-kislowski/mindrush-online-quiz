@@ -1,0 +1,74 @@
+<section class="card">
+  <div class="header">
+    <h2>Game • Lobby {{ code }}</h2>
+    <div class="actions">
+      <button class="btn" (click)="refresh()">Refresh</button>
+      <button class="btn" (click)="backToLobby()">Back to lobby</button>
+    </div>
+  </div>
+
+  <p class="muted" *ngIf="state as s">
+    Lobby: <b>{{ s.lobbyStatus }}</b> • Game: <b>{{ s.gameStatus }}</b> • Stage: <b>{{ s.stage }}</b>
+    <span *ngIf="remainingSeconds !== null"> • Ends in: <b>{{ remainingSeconds }}s</b></span>
+  </p>
+
+  <p class="error" *ngIf="error">{{ error }}</p>
+
+  <ng-container *ngIf="state as s; else loading">
+    <div *ngIf="s.stage === 'NO_GAME'">
+      <p>No active game. Start it from the lobby view.</p>
+    </div>
+
+    <div *ngIf="s.stage === 'FINISHED'">
+      <p>Game finished. Final results:</p>
+    </div>
+
+    <div *ngIf="s.question as q">
+      <div class="question">
+        <div class="meta">Question {{ s.questionIndex }}/{{ s.totalQuestions }}</div>
+        <div class="prompt">{{ q.prompt }}</div>
+      </div>
+
+      <div class="options" *ngIf="s.stage === 'QUESTION'">
+        <button class="opt" *ngFor="let o of q.options" (click)="answer(o.id)">{{ o.text }}</button>
+      </div>
+
+      <div class="reveal" *ngIf="s.stage === 'REVEAL'">
+        <p>Reveal stage (waiting for next question)...</p>
+      </div>
+    </div>
+
+    <div class="block">
+      <h3>{{ s.stage === 'FINISHED' ? 'Results' : 'Players' }}</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th *ngIf="s.stage !== 'FINISHED'">Answered</th>
+            <th *ngIf="s.stage === 'REVEAL'">Correct</th>
+            <th>Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let p of s.players">
+            <td>{{ p.displayName }}</td>
+            <td *ngIf="s.stage !== 'FINISHED'">{{ p.answered ? 'Yes' : 'No' }}</td>
+            <td *ngIf="s.stage === 'REVEAL'">{{ p.correct === true ? 'Yes' : 'No' }}</td>
+            <td>{{ p.score }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="block" *ngIf="isOwner">
+      <h3>Owner actions</h3>
+      <div class="actions">
+        <button class="btn danger" (click)="end()">End game</button>
+      </div>
+    </div>
+  </ng-container>
+
+  <ng-template #loading>
+    <p>Loading...</p>
+  </ng-template>
+</section>

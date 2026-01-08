@@ -1,0 +1,52 @@
+<section class="card" *ngIf="lobby as l; else loading">
+  <div class="header">
+    <h2>Lobby {{ l.code }}</h2>
+    <button class="btn" (click)="refresh()">Refresh</button>
+  </div>
+
+  <p class="muted" *ngIf="joinState === 'joined' && l.status && l.players && l.maxPlayers">
+    Status: <b>{{ l.status }}</b> • Players: {{ l.players.length }}/{{ l.maxPlayers }}
+  </p>
+
+  <div class="block" *ngIf="joinState === 'joined' && l.players">
+    <h3>Players</h3>
+    <ul>
+      <li *ngFor="let p of l.players">{{ p.displayName }}</li>
+    </ul>
+  </div>
+
+  <div class="block" *ngIf="joinState !== 'joined'">
+    <h3>Join</h3>
+    <div class="row">
+      <input *ngIf="l.hasPassword" [(ngModel)]="password" placeholder="Password" />
+      <button class="btn primary" (click)="join()" [disabled]="joinState === 'viewOnly' || (l.hasPassword && !password.trim())">Join lobby</button>
+    </div>
+    <p class="muted" *ngIf="l.hasPassword">This lobby requires a password.</p>
+    <p class="muted" *ngIf="!l.hasPassword">No password: opening this view auto-joins your guest.</p>
+    <p class="muted" *ngIf="joinState === 'viewOnly'">Lobby is full or not joinable.</p>
+  </div>
+
+  <div class="block" *ngIf="joinState === 'joined' && l.isOwner && l.players && l.maxPlayers">
+    <h3>Start game (owner only)</h3>
+    <div class="row">
+      <select [(ngModel)]="selectedQuizId">
+        <option *ngFor="let q of quizzes" [ngValue]="q.id">{{ q.title }}</option>
+      </select>
+      <button class="btn primary" (click)="startGame()" [disabled]="l.players.length !== l.maxPlayers">Start</button>
+    </div>
+    <p class="muted">Game requires exactly {{ l.maxPlayers }} players.</p>
+  </div>
+
+  <div class="block" *ngIf="joinState === 'joined'">
+    <button class="btn danger" (click)="leave()">Leave lobby</button>
+  </div>
+
+  <p class="error" *ngIf="error">{{ error }}</p>
+</section>
+
+<ng-template #loading>
+  <section class="card">
+    <p>Loading...</p>
+    <p class="error" *ngIf="error">{{ error }}</p>
+  </section>
+</ng-template>

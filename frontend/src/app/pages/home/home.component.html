@@ -1,0 +1,17 @@
+<section class="card">
+  <h1>MindRush</h1>
+  <p class="muted">Create or join a 2-player guest lobby.</p>
+
+  <div class="actions">
+    <div class="create">
+      <input [(ngModel)]="createPassword" placeholder="Create password (optional)" />
+      <button class="btn primary" (click)="createLobby()" [disabled]="creating">Create lobby</button>
+    </div>
+    <div class="join">
+      <input [(ngModel)]="joinCode" placeholder="Lobby code (e.g. ABC123)" maxlength="6" />
+      <button class="btn" (click)="joinLobby()">Join</button>
+    </div>
+  </div>
+
+  <p class="error" *ngIf="error">{{ error }}</p>
+</section>

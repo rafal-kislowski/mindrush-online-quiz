@@ -1,0 +1,52 @@
+.card {
+  border: 1px solid #e7e7e7;
+  border-radius: 12px;
+  padding: 16px;
+  background: #fff;
+}
+
+.muted {
+  color: #666;
+}
+
+.actions {
+  margin-top: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.create {
+  display: flex;
+  gap: 8px;
+}
+
+.join {
+  display: flex;
+  gap: 8px;
+}
+
+input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 10px;
+}
+
+.btn {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d9d9d9;
+  background: #f7f7f7;
+  cursor: pointer;
+}
+
+.btn.primary {
+  border-color: #1f6feb;
+  background: #1f6feb;
+  color: white;
+}
+
+.error {
+  margin-top: 12px;
+  color: #b00020;
+}

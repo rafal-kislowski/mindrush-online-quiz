@@ -1,0 +1,11 @@
+<header class="topbar">
+  <div class="brand">MindRush</div>
+  <div class="session" *ngIf="session$ | async as session">
+    <span class="label">Guest</span>
+    <span class="value">{{ session.displayName }}</span>
+  </div>
+</header>
+
+<main class="container">
+  <router-outlet />
+</main>
