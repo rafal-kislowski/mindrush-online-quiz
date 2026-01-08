@@ -156,7 +156,12 @@ public class GameService {
 
         Optional<GameSession> sessionOpt = gameSessionRepository.findFirstByLobbyIdAndStatusOrderByStartedAtDesc(lobby.getId(), GameStatus.IN_PROGRESS);
         if (sessionOpt.isEmpty()) {
-            return new GameStateDto(lobby.getCode(), lobby.getStatus().name(), "NONE", 0, 0, "NO_GAME", null, null, List.of());
+            Optional<GameSession> last = gameSessionRepository.findFirstByLobbyIdOrderByStartedAtDesc(lobby.getId());
+            if (last.isEmpty() || last.get().getStatus() != GameStatus.FINISHED) {
+                return new GameStateDto(lobby.getCode(), lobby.getStatus().name(), "NONE", 0, 0, "NO_GAME", null, null, List.of());
+            }
+            requireGamePlayer(last.get().getId(), guestSession.getId());
+            return buildState(lobby, last.get(), guestSession.getId());
         }
 
         requireGamePlayer(sessionOpt.get().getId(), guestSession.getId());
@@ -204,48 +209,6 @@ public class GameService {
 
         advanceIfNeeded(lobby, session);
         gameEventPublisher.gameUpdated(lobby.getCode());
-        return buildState(lobby, session, guestSession.getId());
-    }
-
-    public GameStateDto nextQuestion(HttpServletRequest request, String lobbyCode) {
-        GuestSession guestSession = guestSessionService.requireValidSession(request);
-        Lobby lobby = requireLobbyByCode(lobbyCode);
-
-        if (!Objects.equals(lobby.getOwnerGuestSessionId(), guestSession.getId())) {
-            throw new ResponseStatusException(FORBIDDEN, "Only the lobby owner can advance the game");
-        }
-
-        GameSession session = gameSessionRepository.findFirstByLobbyIdAndStatusOrderByStartedAtDesc(lobby.getId(), GameStatus.IN_PROGRESS).orElseThrow(() -> new ResponseStatusException(CONFLICT, "No active game"));
-        advanceIfNeeded(lobby, session);
-
-        if (session.getStatus() != GameStatus.IN_PROGRESS) {
-            return buildState(lobby, session, guestSession.getId());
-        }
-
-        if (session.getStage() == GameStage.QUESTION) {
-            CurrentQuestion current = currentQuestion(session);
-            long answered = gameAnswerRepository.countByGameSessionIdAndQuestionId(session.getId(), current.question().getId());
-            long playerCount = gamePlayerRepository.countByGameSessionId(session.getId());
-            if (answered < playerCount) {
-                throw new ResponseStatusException(CONFLICT, "Not all players have answered");
-            }
-
-            Instant now = clock.instant();
-            session.setStage(GameStage.REVEAL);
-            session.setStageEndsAt(now.plus(revealDuration));
-            gameSessionRepository.save(session);
-            gameEventPublisher.gameUpdated(lobby.getCode());
-            return buildState(lobby, session, guestSession.getId());
-        }
-
-        if (session.getStage() == GameStage.REVEAL) {
-            session.setStageEndsAt(clock.instant());
-            gameSessionRepository.save(session);
-            advanceIfNeeded(lobby, session);
-            gameEventPublisher.gameUpdated(lobby.getCode());
-            return buildState(lobby, session, guestSession.getId());
-        }
-
         return buildState(lobby, session, guestSession.getId());
     }
 
@@ -354,13 +317,13 @@ public class GameService {
 
     private void requireParticipant(String lobbyId, String guestSessionId) {
         if (!participantRepository.existsByLobbyIdAndGuestSessionId(lobbyId, guestSessionId)) {
-            throw new ResponseStatusException(UNAUTHORIZED, "Not a lobby participant");
+            throw new ResponseStatusException(FORBIDDEN, "Not a lobby participant");
         }
     }
 
     private void requireGamePlayer(String gameSessionId, String guestSessionId) {
         if (!gamePlayerRepository.existsByGameSessionIdAndGuestSessionId(gameSessionId, guestSessionId)) {
-            throw new ResponseStatusException(UNAUTHORIZED, "Not a game participant");
+            throw new ResponseStatusException(FORBIDDEN, "Not a game participant");
         }
     }
 

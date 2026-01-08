@@ -165,7 +165,9 @@ class GameControllerTest {
                 .andExpect(jsonPath("$.players[0].correct").exists())
                 .andExpect(jsonPath("$.players[1].correct").exists());
 
-        mockMvc.perform(post("/api/lobbies/" + lobbyCode + "/game/next")
+        clock.advance(Duration.ofSeconds(4));
+
+        mockMvc.perform(get("/api/lobbies/" + lobbyCode + "/game/state")
                         .cookie(new Cookie("guestSessionId", ownerSessionId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.stage").value("QUESTION"))
@@ -176,6 +178,14 @@ class GameControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.stage").value("FINISHED"))
                 .andExpect(jsonPath("$.lobbyStatus").value("OPEN"));
+
+        mockMvc.perform(get("/api/lobbies/" + lobbyCode + "/game/state")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stage").value("FINISHED"))
+                .andExpect(jsonPath("$.players.length()").value(2))
+                .andExpect(jsonPath("$.players[0].score").isNumber())
+                .andExpect(jsonPath("$.players[1].score").isNumber());
     }
 
     @Test

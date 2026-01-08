@@ -39,14 +39,8 @@ public class GameController {
         return ResponseEntity.ok(gameService.submitAnswer(request, code, questionId, optionId));
     }
 
-    @PostMapping("/next")
-    public ResponseEntity<GameStateDto> next(HttpServletRequest request, @PathVariable("code") String code) {
-        return ResponseEntity.ok(gameService.nextQuestion(request, code));
-    }
-
     @PostMapping("/end")
     public ResponseEntity<GameStateDto> end(HttpServletRequest request, @PathVariable("code") String code) {
         return ResponseEntity.ok(gameService.endGame(request, code));
     }
 }
-
