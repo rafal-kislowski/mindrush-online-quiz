@@ -41,6 +41,9 @@ class LobbyControllerTest {
     @Autowired
     private LobbyParticipantRepository participantRepository;
 
+    @Autowired
+    private LobbyService lobbyService;
+
     @BeforeEach
     void setUp() {
         participantRepository.deleteAll();
@@ -275,6 +278,33 @@ class LobbyControllerTest {
                         .cookie(new Cookie("guestSessionId", secondSessionId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CLOSED"));
+    }
+
+    @Test
+    void handleGuestDisconnected_removesParticipantWhenLobbyOpen() throws Exception {
+        String ownerSessionId = createGuestSession();
+
+        MvcResult created = mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String code = jsonValue(created.getResponse().getContentAsString(), "\"code\":\"", "\"").orElseThrow();
+
+        String secondSessionId = createGuestSession();
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", secondSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
+
+        Lobby lobby = lobbyRepository.findByCode(code).orElseThrow();
+        assertThat(participantRepository.countByLobbyId(lobby.getId())).isEqualTo(2);
+
+        lobbyService.handleGuestDisconnected(secondSessionId, code);
+        assertThat(participantRepository.countByLobbyId(lobby.getId())).isEqualTo(1);
     }
 
     @Test
