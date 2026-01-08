@@ -3,6 +3,7 @@
 # =========================
 .idea/
 *.iml
+.vscode/
 
 # =========================
 # Build artifacts
@@ -32,3 +33,4 @@ application-local.yml
 # =========================
 frontend/node_modules/
 frontend/dist/
+frontend/.angular/
