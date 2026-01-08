@@ -10,6 +10,7 @@ import pl.mindrush.backend.game.dto.GameOptionDto;
 import pl.mindrush.backend.game.dto.GamePlayerDto;
 import pl.mindrush.backend.game.dto.GameQuestionDto;
 import pl.mindrush.backend.game.dto.GameStateDto;
+import pl.mindrush.backend.game.events.GameEventPublisher;
 import pl.mindrush.backend.guest.GuestSession;
 import pl.mindrush.backend.guest.GuestSessionService;
 import pl.mindrush.backend.lobby.*;
@@ -39,6 +40,7 @@ public class GameService {
     private final GameSessionRepository gameSessionRepository;
     private final GameAnswerRepository gameAnswerRepository;
     private final GamePlayerRepository gamePlayerRepository;
+    private final GameEventPublisher gameEventPublisher;
 
     public GameService(
             Clock clock,
@@ -52,7 +54,8 @@ public class GameService {
             QuizAnswerOptionRepository optionRepository,
             GameSessionRepository gameSessionRepository,
             GameAnswerRepository gameAnswerRepository,
-            GamePlayerRepository gamePlayerRepository
+            GamePlayerRepository gamePlayerRepository,
+            GameEventPublisher gameEventPublisher
     ) {
         this.clock = clock;
         this.guestQuestionDuration = guestQuestionDuration;
@@ -66,6 +69,7 @@ public class GameService {
         this.gameSessionRepository = gameSessionRepository;
         this.gameAnswerRepository = gameAnswerRepository;
         this.gamePlayerRepository = gamePlayerRepository;
+        this.gameEventPublisher = gameEventPublisher;
     }
 
     private static List<QuizAnswerOption> shuffledOptions(String gameSessionId, String guestSessionId, Long questionId, List<QuizAnswerOption> options) {
@@ -141,6 +145,7 @@ public class GameService {
         lobby.setStatus(LobbyStatus.IN_GAME);
         lobbyRepository.save(lobby);
 
+        gameEventPublisher.gameUpdated(lobby.getCode());
         return buildState(lobby, session, guestSession.getId());
     }
 
@@ -155,7 +160,10 @@ public class GameService {
         }
 
         requireGamePlayer(sessionOpt.get().getId(), guestSession.getId());
-        advanceIfNeeded(lobby, sessionOpt.get());
+        boolean advanced = advanceIfNeeded(lobby, sessionOpt.get());
+        if (advanced) {
+            gameEventPublisher.gameUpdated(lobby.getCode());
+        }
         return buildState(lobby, sessionOpt.get(), guestSession.getId());
     }
 
@@ -195,6 +203,7 @@ public class GameService {
         }
 
         advanceIfNeeded(lobby, session);
+        gameEventPublisher.gameUpdated(lobby.getCode());
         return buildState(lobby, session, guestSession.getId());
     }
 
@@ -225,6 +234,7 @@ public class GameService {
             session.setStage(GameStage.REVEAL);
             session.setStageEndsAt(now.plus(revealDuration));
             gameSessionRepository.save(session);
+            gameEventPublisher.gameUpdated(lobby.getCode());
             return buildState(lobby, session, guestSession.getId());
         }
 
@@ -232,6 +242,7 @@ public class GameService {
             session.setStageEndsAt(clock.instant());
             gameSessionRepository.save(session);
             advanceIfNeeded(lobby, session);
+            gameEventPublisher.gameUpdated(lobby.getCode());
             return buildState(lobby, session, guestSession.getId());
         }
 
@@ -251,6 +262,7 @@ public class GameService {
         requireGamePlayer(session.getId(), guestSession.getId());
 
         finishGame(lobby, session);
+        gameEventPublisher.gameUpdated(lobby.getCode());
         return buildState(lobby, session, guestSession.getId());
     }
 
@@ -262,6 +274,19 @@ public class GameService {
 
         lobby.setStatus(LobbyStatus.OPEN);
         lobbyRepository.save(lobby);
+    }
+
+    public void tickDueSessions() {
+        Instant now = clock.instant();
+        List<GameSession> due = gameSessionRepository.findAllByStatusAndStageEndsAtBefore(GameStatus.IN_PROGRESS, now);
+        for (GameSession session : due) {
+            Lobby lobby = lobbyRepository.findById(session.getLobbyId()).orElse(null);
+            if (lobby == null) continue;
+            boolean changed = advanceIfNeeded(lobby, session);
+            if (changed) {
+                gameEventPublisher.gameUpdated(lobby.getCode());
+            }
+        }
     }
 
     private GameStateDto buildState(Lobby lobby, GameSession session, String viewerGuestSessionId) {
@@ -339,8 +364,8 @@ public class GameService {
         }
     }
 
-    private void advanceIfNeeded(Lobby lobby, GameSession session) {
-        if (session.getStatus() != GameStatus.IN_PROGRESS) return;
+    private boolean advanceIfNeeded(Lobby lobby, GameSession session) {
+        if (session.getStatus() != GameStatus.IN_PROGRESS) return false;
 
         Instant now = clock.instant();
 
@@ -361,25 +386,29 @@ public class GameService {
                 session.setStage(GameStage.REVEAL);
                 session.setStageEndsAt(now.plus(revealDuration));
                 gameSessionRepository.save(session);
+                return true;
             }
-            return;
+            return false;
         }
 
         if (session.getStage() == GameStage.REVEAL) {
-            if (now.isBefore(session.getStageEndsAt())) return;
+            if (now.isBefore(session.getStageEndsAt())) return false;
 
             int nextIndex = session.getCurrentQuestionIndex() + 1;
             long totalQuestions = questionRepository.countByQuizId(session.getQuizId());
             if (nextIndex >= totalQuestions) {
                 finishGame(lobby, session);
-                return;
+                return true;
             }
 
             session.setCurrentQuestionIndex(nextIndex);
             session.setStage(GameStage.QUESTION);
             session.setStageEndsAt(now.plus(guestQuestionDuration));
             gameSessionRepository.save(session);
+            return true;
         }
+
+        return false;
     }
 
     private void ensureTimeoutAnswers(GameSession session, Long questionId, Instant now) {
