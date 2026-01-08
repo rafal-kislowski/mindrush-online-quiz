@@ -28,8 +28,8 @@ public class LobbyController {
     }
 
     @GetMapping("/{code}")
-    public ResponseEntity<Map<String, Object>> get(@PathVariable String code) {
-        return ResponseEntity.ok(lobbyService.getLobby(code));
+    public ResponseEntity<Map<String, Object>> get(HttpServletRequest request, @PathVariable String code) {
+        return ResponseEntity.ok(lobbyService.getLobby(request, code));
     }
 
     @PostMapping("/{code}/join")

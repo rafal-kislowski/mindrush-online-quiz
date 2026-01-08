@@ -8,7 +8,6 @@ import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 import pl.mindrush.backend.lobby.LobbyService;
 
 import java.security.Principal;
-import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -40,7 +39,9 @@ public class WebSocketLobbyPresenceListener {
         String lobbyCode = matcher.group(1).toUpperCase();
         presenceBySessionId.compute(sessionId, (key, existing) -> {
             if (existing == null) {
-                return new Presence(user.getName(), ConcurrentHashMap.newKeySet(Set.of(lobbyCode)));
+                Set<String> lobbyCodes = ConcurrentHashMap.newKeySet();
+                lobbyCodes.add(lobbyCode);
+                return new Presence(user.getName(), lobbyCodes);
             }
             existing.lobbyCodes.add(lobbyCode);
             return existing;
@@ -67,8 +68,7 @@ public class WebSocketLobbyPresenceListener {
 
         private Presence(String guestSessionId, Set<String> lobbyCodes) {
             this.guestSessionId = guestSessionId;
-            this.lobbyCodes = lobbyCodes == null ? Collections.emptySet() : lobbyCodes;
+            this.lobbyCodes = lobbyCodes == null ? ConcurrentHashMap.newKeySet() : lobbyCodes;
         }
     }
 }
-

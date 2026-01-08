@@ -3,6 +3,7 @@ package pl.mindrush.backend.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -29,12 +30,15 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/lobbies/*/game/start").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/lobbies/*/game/state").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/lobbies/*/game/answer").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/lobbies/*/game/next").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/lobbies/*/game/end").permitAll()
                         .anyRequest().authenticated()
                 )
 
-                .httpBasic(basic -> {})
+                .httpBasic(basic -> basic.authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(401);
+                    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                    response.getWriter().write("{\"message\":\"UNAUTHORIZED\"}");
+                }))
                 .build();
     }
 }
