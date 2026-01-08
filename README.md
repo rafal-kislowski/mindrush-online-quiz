@@ -60,6 +60,15 @@ The app starts on `http://localhost:8080`.
 ## Test endpoint
 - `GET /api/health` -> `{"status":"UP"}` (no auth required)
 
+## Frontend (Angular)
+The repository contains an Angular app in `frontend/` (dev proxy to backend for cookies + WebSocket).
+
+```powershell
+cd frontend
+npm install
+npm start
+```
+
 ## Guest session (anonymous)
 Creates/refreshes an anonymous guest session backed by DB + an HttpOnly cookie:
 - `POST /api/guest/session` -> sets `guestSessionId` cookie
@@ -108,7 +117,6 @@ Endpoints (requires a valid `guestSessionId` cookie and being in the lobby):
 - `POST /api/lobbies/{code}/game/start` -> starts a game (owner only), body: `{ "quizId": 1 }`
 - `GET /api/lobbies/{code}/game/state` -> current state (question/reveal/finished)
 - `POST /api/lobbies/{code}/game/answer` -> submit answer, body: `{ "questionId": 123, "optionId": 456 }`
-- `POST /api/lobbies/{code}/game/next` -> advance to next question (owner only; only after all players answered)
 - `POST /api/lobbies/{code}/game/end` -> end game (owner only)
 
 Notes:
