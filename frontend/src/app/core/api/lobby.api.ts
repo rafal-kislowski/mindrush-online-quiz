@@ -24,5 +24,9 @@ export class LobbyApi {
   leave(code: string): Observable<unknown> {
     return this.http.post(`/api/lobbies/${encodeURIComponent(code)}/leave`, {}, { withCredentials: true });
   }
-}
 
+  setPassword(code: string, password?: string): Observable<LobbyDto> {
+    const body = password ? { password } : {};
+    return this.http.post<LobbyDto>(`/api/lobbies/${encodeURIComponent(code)}/password`, body, { withCredentials: true });
+  }
+}
