@@ -89,6 +89,9 @@ Simple guest lobbies (no login required), identified by a 6-character code.
 - `GET /api/lobbies/{code}` -> fetches lobby state
 - `POST /api/lobbies/{code}/join` -> joins a lobby (requires a valid `guestSessionId` cookie)
   - optional JSON body (when password is set): `{ "password": "secret123" }`
+- `POST /api/lobbies/{code}/password` -> changes lobby privacy (owner only, lobby must be `OPEN`)
+  - `{ "password": "secret123" }` -> set/update password (private lobby)
+  - `{}` (or blank password) -> clear password (public lobby)
 - `POST /api/lobbies/{code}/leave` -> leaves a lobby (requires a valid `guestSessionId` cookie)
 - `POST /api/lobbies/{code}/close` -> closes a lobby for new joins (owner only)
 
@@ -96,6 +99,7 @@ Guest lobby limits:
 - Max players: `2`
 
 Notes:
+- In Postman, call `POST /api/guest/session` first (cookie jar must be enabled) and keep the returned `guestSessionId` cookie for lobby requests.
 - `close` prevents new players from joining (status becomes `CLOSED`).
 - If the owner leaves and another player remains, ownership is transferred to the remaining player.
 - If the last player leaves, the lobby is deleted.
