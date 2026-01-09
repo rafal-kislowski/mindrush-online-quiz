@@ -38,6 +38,12 @@ public class LobbyController {
         return ResponseEntity.ok(lobbyService.joinLobby(request, code, password));
     }
 
+    @PostMapping("/{code}/password")
+    public ResponseEntity<Map<String, Object>> setPassword(HttpServletRequest request, @PathVariable String code, @RequestBody(required = false) Map<String, Object> body) {
+        String password = body == null ? null : asNullableString(body.get("password"));
+        return ResponseEntity.ok(lobbyService.setLobbyPassword(request, code, password));
+    }
+
     @PostMapping("/{code}/leave")
     public ResponseEntity<?> leave(HttpServletRequest request, @PathVariable String code) {
         LobbyService.LeaveResult result = lobbyService.leaveLobby(request, code);

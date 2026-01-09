@@ -101,6 +101,25 @@ public class LobbyService {
         return lobbySummary(lobby, guestSession.getId());
     }
 
+    public Map<String, Object> setLobbyPassword(HttpServletRequest request, String code, String rawPassword) {
+        GuestSession guestSession = guestSessionService.requireValidSession(request);
+        Lobby lobby = lobbyRepository.findByCode(code).orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Lobby not found"));
+
+        if (!guestSession.getId().equals(lobby.getOwnerGuestSessionId())) {
+            throw new ResponseStatusException(FORBIDDEN, "Only the lobby owner can change privacy settings");
+        }
+        if (lobby.getStatus() != LobbyStatus.OPEN) {
+            throw new ResponseStatusException(CONFLICT, "Lobby is not open");
+        }
+
+        String passwordHash = (rawPassword == null || rawPassword.isBlank()) ? null : passwordEncoder.encode(rawPassword);
+        lobby.setPasswordHash(passwordHash);
+        lobbyRepository.save(lobby);
+
+        lobbyEventPublisher.lobbyUpdated(lobby.getCode());
+        return lobbySummary(lobby, guestSession.getId());
+    }
+
     public LeaveResult leaveLobby(HttpServletRequest request, String code) {
         GuestSession guestSession = guestSessionService.requireValidSession(request);
         Lobby lobby = lobbyRepository.findByCode(code).orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Lobby not found"));

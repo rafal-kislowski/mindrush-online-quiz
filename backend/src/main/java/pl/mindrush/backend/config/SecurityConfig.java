@@ -27,6 +27,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/lobbies/*/join").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/lobbies/*/leave").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/lobbies/*/close").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/lobbies/*/password").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/lobbies/*/game/start").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/lobbies/*/game/state").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/lobbies/*/game/answer").permitAll()
