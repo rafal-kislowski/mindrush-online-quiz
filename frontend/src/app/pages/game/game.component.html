@@ -8,8 +8,11 @@
   </div>
 
   <p class="muted" *ngIf="state as s">
-    Lobby: <b>{{ s.lobbyStatus }}</b> • Game: <b>{{ s.gameStatus }}</b> • Stage: <b>{{ s.stage }}</b>
-    <span *ngIf="remainingSeconds !== null"> • Ends in: <b>{{ remainingSeconds }}s</b></span>
+    Lobby: <b>{{ s.lobbyStatus }}</b> • Game: <b>{{ s.gameStatus }}</b> • Stage:
+    <b>{{ s.stage }}</b>
+    <span *ngIf="remainingSeconds !== null">
+      • Ends in: <b>{{ remainingSeconds }}s</b></span
+    >
   </p>
 
   <p class="error" *ngIf="error">{{ error }}</p>
@@ -25,12 +28,16 @@
 
     <div *ngIf="s.question as q">
       <div class="question">
-        <div class="meta">Question {{ s.questionIndex }}/{{ s.totalQuestions }}</div>
+        <div class="meta">
+          Question {{ s.questionIndex }}/{{ s.totalQuestions }}
+        </div>
         <div class="prompt">{{ q.prompt }}</div>
       </div>
 
       <div class="options" *ngIf="s.stage === 'QUESTION'">
-        <button class="opt" *ngFor="let o of q.options" (click)="answer(o.id)">{{ o.text }}</button>
+        <button class="opt" *ngFor="let o of q.options" (click)="answer(o.id)">
+          {{ o.text }}
+        </button>
       </div>
 
       <div class="reveal" *ngIf="s.stage === 'REVEAL'">
@@ -39,7 +46,7 @@
     </div>
 
     <div class="block">
-      <h3>{{ s.stage === 'FINISHED' ? 'Results' : 'Players' }}</h3>
+      <h3>{{ s.stage === "FINISHED" ? "Results" : "Players" }}</h3>
       <table>
         <thead>
           <tr>
@@ -52,8 +59,12 @@
         <tbody>
           <tr *ngFor="let p of s.players">
             <td>{{ p.displayName }}</td>
-            <td *ngIf="s.stage !== 'FINISHED'">{{ p.answered ? 'Yes' : 'No' }}</td>
-            <td *ngIf="s.stage === 'REVEAL'">{{ p.correct === true ? 'Yes' : 'No' }}</td>
+            <td *ngIf="s.stage !== 'FINISHED'">
+              {{ p.answered ? "Yes" : "No" }}
+            </td>
+            <td *ngIf="s.stage === 'REVEAL'">
+              {{ p.correct === true ? "Yes" : "No" }}
+            </td>
             <td>{{ p.score }}</td>
           </tr>
         </tbody>

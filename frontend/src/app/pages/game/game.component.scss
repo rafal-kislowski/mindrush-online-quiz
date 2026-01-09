@@ -1,10 +1,3 @@
-.card {
-  border: 1px solid #e7e7e7;
-  border-radius: 12px;
-  padding: 16px;
-  background: #fff;
-}
-
 .header {
   display: flex;
   align-items: center;
@@ -12,20 +5,12 @@
   gap: 12px;
 }
 
-.muted {
-  color: #666;
-}
-
-.error {
-  color: #b00020;
-}
-
 .question {
   margin-top: 12px;
 }
 
 .meta {
-  color: #666;
+  color: rgba(255, 255, 255, 0.62);
   font-size: 12px;
 }
 
@@ -44,16 +29,16 @@
 .opt {
   text-align: left;
   padding: 12px;
-  border-radius: 10px;
-  border: 1px solid #d9d9d9;
-  background: #f7f7f7;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
   cursor: pointer;
 }
 
 .block {
   margin-top: 16px;
   padding-top: 12px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 table {
@@ -65,7 +50,7 @@ th,
 td {
   text-align: left;
   padding: 8px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .actions {
@@ -73,24 +58,3 @@ td {
   gap: 8px;
   flex-wrap: wrap;
 }
-
-.btn {
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid #d9d9d9;
-  background: #f7f7f7;
-  cursor: pointer;
-}
-
-.btn.primary {
-  border-color: #1f6feb;
-  background: #1f6feb;
-  color: white;
-}
-
-.btn.danger {
-  border-color: #b00020;
-  background: #b00020;
-  color: white;
-}
-

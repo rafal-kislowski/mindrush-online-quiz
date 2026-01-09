@@ -1,11 +1,243 @@
-<header class="topbar">
-  <div class="brand">MindRush</div>
-  <div class="session" *ngIf="session$ | async as session">
-    <span class="label">Guest</span>
-    <span class="value">{{ session.displayName }}</span>
-  </div>
-</header>
+<div class="layout" [class.is-open]="sidebarOpen">
+  <div class="overlay" (click)="closeSidebar()"></div>
 
-<main class="container">
-  <router-outlet />
-</main>
+  <aside class="sidebar">
+    <div class="sidebar__top">
+      <!-- BRAND -->
+      <div class="brand" routerLink="/">
+        <div class="brand__name">MindRush</div>
+      </div>
+
+      <!-- USER -->
+      <div class="user" *ngIf="session$ | async as session">
+        <div class="user__avatar" style="--p: 0.72">
+          <div class="ring" aria-hidden="true"></div>
+          <div class="face" aria-hidden="true">
+            <svg class="avatar-svg" viewBox="0 0 100 100" role="img" aria-label="Default avatar">
+              <defs>
+                <linearGradient id="avatarGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="rgba(255,255,255,0.20)" />
+                  <stop offset="1" stop-color="rgba(255,255,255,0.02)" />
+                </linearGradient>
+              </defs>
+              <rect x="0" y="0" width="100" height="100" rx="50" fill="url(#avatarGrad)" />
+              <circle cx="50" cy="42" r="18" fill="rgba(255,255,255,0.26)" />
+              <path d="M18 92c4-20 20-30 32-30s28 10 32 30" fill="rgba(255,255,255,0.22)" />
+            </svg>
+          </div>
+          <div class="level">0</div>
+        </div>
+
+        <div class="user__name">{{ session.displayName }}</div>
+        <div class="user__score">
+          0 <span class="coin" aria-hidden="true"></span>
+        </div>
+      </div>
+
+      <!-- MAIN MENU -->
+    </div>
+
+    <div class="sidebar__scroll">
+      <div class="nav-divider"><span>Main</span></div>
+      <nav class="menu" aria-label="Main navigation">
+        <a
+          class="menu__item"
+          *ngFor="let item of menuItems"
+          [routerLink]="item.route"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: item.route === '/' }"
+        >
+          <span class="ico" aria-hidden="true">
+            <svg
+              *ngIf="item.icon === 'home'"
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-house-icon lucide-house"
+            >
+              <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
+              <path
+                d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+              />
+            </svg>
+
+            <svg
+              *ngIf="item.icon === 'shop'"
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-shopping-bag-icon lucide-shopping-bag"
+            >
+              <path d="M16 10a4 4 0 0 1-8 0" />
+              <path d="M3.103 6.034h17.794" />
+              <path
+                d="M3.4 5.467a2 2 0 0 0-.4 1.2V20a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.667a2 2 0 0 0-.4-1.2l-2-2.667A2 2 0 0 0 17 2H7a2 2 0 0 0-1.6.8z"
+              />
+            </svg>
+
+            <svg
+              *ngIf="item.icon === 'news'"
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-newspaper-icon lucide-newspaper"
+            >
+              <path d="M15 18h-5" />
+              <path d="M18 14h-8" />
+              <path
+                d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-4 0v-9a2 2 0 0 1 2-2h2"
+              />
+              <rect width="8" height="4" x="10" y="6" rx="1" />
+            </svg>
+
+            <svg
+              *ngIf="item.icon === 'settings'"
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-settings-icon lucide-settings"
+            >
+              <path
+                d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"
+              />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </span>
+
+          <span class="text">{{ item.label }}</span>
+        </a>
+      </nav>
+
+      <!-- SECOND SECTION (kolorowe kafelki jak na screenie) -->
+      <div class="nav-divider"><span>Quick Actions</span></div>
+
+      <div class="section" aria-label="Quick actions">
+        <a class="app-item" routerLink="/create-quiz" routerLinkActive="active">
+          <span class="app-ico app-ico--orange" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 5v14M5 12h14"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+              />
+            </svg>
+          </span>
+          <span>Utwórz Quiz</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="sidebar__bottomFixed">
+      <div class="social" aria-hidden="true">
+        <span class="social__dot"
+          ><svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="lucide lucide-facebook-icon lucide-facebook"
+          >
+            <path
+              d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"
+            /></svg
+        ></span>
+
+        <span class="social__dot"
+          ><svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="lucide lucide-youtube-icon lucide-youtube"
+          >
+            <path
+              d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17"
+            />
+            <path d="m10 15 5-3-5-3z" /></svg
+        ></span>
+        <span class="social__dot"
+          ><svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="lucide lucide-instagram-icon lucide-instagram"
+          >
+            <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+            <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" /></svg
+        ></span>
+      </div>
+
+      <!-- BOTTOM -->
+      <!-- <div class="sidebar__bottom">
+        <div class="bottom-row">
+          <a class="btn accent register" routerLink="/register">Register</a>
+      </div>
+      </div> -->
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button
+        class="burger"
+        type="button"
+        (click)="toggleSidebar()"
+        [attr.aria-expanded]="sidebarOpen"
+      >
+        <span></span><span></span><span></span>
+      </button>
+
+      <div></div>
+
+      <div class="topbar__right">
+        <a class="btn accent register" routerLink="/register">Register</a>
+      </div>
+    </header>
+
+    <main class="content">
+      <router-outlet />
+    </main>
+  </div>
+</div>

@@ -12,7 +12,7 @@ import { GameEventsService } from '../../core/ws/game-events.service';
   standalone: true,
   imports: [CommonModule],
   templateUrl: './game.component.html',
-  styleUrl: './game.component.scss'
+  styleUrl: './game.component.scss',
 })
 export class GameComponent implements OnInit, OnDestroy {
   code = '';
@@ -35,10 +35,10 @@ export class GameComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.code = (this.route.snapshot.paramMap.get('code') ?? '').toUpperCase();
     this.lobbyApi.get(this.code).subscribe({
-      next: lobby => (this.isOwner = lobby.isOwner === true),
+      next: (lobby) => (this.isOwner = lobby.isOwner === true),
       error: () => {
         // ignore
-      }
+      },
     });
     this.ensureLeaveOnUnload();
     this.refresh();
@@ -48,7 +48,7 @@ export class GameComponent implements OnInit, OnDestroy {
         next: () => this.refresh(),
         error: () => {
           // REST fallback still works if WS can't connect
-        }
+        },
       })
     );
 
@@ -60,15 +60,17 @@ export class GameComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.unloadHandler && window.removeEventListener('beforeunload', this.unloadHandler);
+    this.unloadHandler &&
+      window.removeEventListener('beforeunload', this.unloadHandler);
     this.subscriptions.unsubscribe();
   }
 
   refresh(): void {
     this.error = null;
     this.gameApi.state(this.code).subscribe({
-      next: state => (this.state = state),
-      error: err => (this.error = err?.error?.message ?? 'Failed to load game state')
+      next: (state) => (this.state = state),
+      error: (err) =>
+        (this.error = err?.error?.message ?? 'Failed to load game state'),
     });
   }
 
@@ -76,16 +78,18 @@ export class GameComponent implements OnInit, OnDestroy {
     if (!this.state?.question) return;
     this.error = null;
     this.gameApi.answer(this.code, this.state.question.id, optionId).subscribe({
-      next: state => (this.state = state),
-      error: err => (this.error = err?.error?.message ?? 'Failed to submit answer')
+      next: (state) => (this.state = state),
+      error: (err) =>
+        (this.error = err?.error?.message ?? 'Failed to submit answer'),
     });
   }
 
   end(): void {
     this.error = null;
     this.gameApi.end(this.code).subscribe({
-      next: state => (this.state = state),
-      error: err => (this.error = err?.error?.message ?? 'Failed to end game')
+      next: (state) => (this.state = state),
+      error: (err) =>
+        (this.error = err?.error?.message ?? 'Failed to end game'),
     });
   }
 
@@ -97,7 +101,10 @@ export class GameComponent implements OnInit, OnDestroy {
     if (this.unloadHandler) return;
     this.unloadHandler = () => {
       try {
-        navigator.sendBeacon(`/api/lobbies/${encodeURIComponent(this.code)}/leave`, '');
+        navigator.sendBeacon(
+          `/api/lobbies/${encodeURIComponent(this.code)}/leave`,
+          ''
+        );
       } catch {
         // ignore
       }

@@ -1,17 +1,196 @@
-<section class="card">
-  <h1>MindRush</h1>
-  <p class="muted">Create or join a 2-player guest lobby.</p>
+<section class="hero">
+  <h1>Play quizzes. Earn bragging rights.</h1>
+  <p class="sub">
+    Real-time guest lobbies for friends.
+    <span class="accent">No paywalls, no account required.</span>
+  </p>
 
-  <div class="actions">
-    <div class="create">
-      <input [(ngModel)]="createPassword" placeholder="Create password (optional)" />
-      <button class="btn primary" (click)="createLobby()" [disabled]="creating">Create lobby</button>
-    </div>
-    <div class="join">
-      <input [(ngModel)]="joinCode" placeholder="Lobby code (e.g. ABC123)" maxlength="6" />
-      <button class="btn" (click)="joinLobby()">Join</button>
+  <div class="steps">
+    <div class="step" *ngFor="let s of steps">
+      <span class="step__n">{{ s.n }}</span>
+      <span class="step__label">{{ s.label }}</span>
     </div>
   </div>
-
-  <p class="error" *ngIf="error">{{ error }}</p>
 </section>
+
+<section class="grid">
+  <!-- PLAY SOLO -->
+  <a
+    class="tile tile3d tile--solo"
+    routerLink="/play-solo"
+    aria-label="Play Solo"
+  >
+    <div class="tile__layout">
+      <div class="tile__copy">
+        <div class="tile__title">Play Solo</div>
+        <div class="tile__desc">Warm up with a quick solo quiz.</div>
+      </div>
+
+      <div class="tile__media" aria-hidden="true">
+        <img class="tile__img" src="/dashboard/play_solo.png" alt="" />
+      </div>
+    </div>
+  </a>
+
+  <!-- SHOP -->
+  <a class="tile tile3d tile--ppc" routerLink="/shop" aria-label="Shop">
+    <div class="tile__layout">
+      <div class="tile__copy">
+        <div class="tile__title">Shop</div>
+        <div class="tile__desc">Cosmetics and profile items.</div>
+      </div>
+
+      <div class="tile__media" aria-hidden="true">
+        <img class="tile__img" src="/dashboard/shop.png" alt="" />
+      </div>
+    </div>
+  </a>
+
+  <!-- NEWS -->
+  <a class="tile tile3d tile--oneclick" routerLink="/news" aria-label="News">
+    <div class="tile__layout">
+      <div class="tile__copy">
+        <div class="tile__title">News</div>
+        <div class="tile__desc">Latest updates and patch notes.</div>
+      </div>
+
+      <div class="tile__media" aria-hidden="true">
+        <img class="tile__img" src="/dashboard/news.png" alt="" />
+      </div>
+    </div>
+  </a>
+
+  <!-- CREATE LOBBY -->
+  <article
+    class="tile tile3d tile3d--static tile--install"
+    aria-label="Create Lobby"
+  >
+    <div class="tile__layout tile__layout--with-actions">
+      <div class="tile__left">
+        <div class="tile__copy">
+          <div class="tile__title">Create Lobby</div>
+          <div class="tile__desc">Create a guest room (max 2 players).</div>
+        </div>
+
+        <div class="tile__actions">
+          <input
+            class="tile__input"
+            [(ngModel)]="createPassword"
+            placeholder="Password (optional)"
+          />
+          <button
+            class="btn primary"
+            type="button"
+            (click)="createLobby()"
+            [disabled]="creating"
+          >
+            Create
+          </button>
+        </div>
+      </div>
+
+      <div class="tile__media" aria-hidden="true">
+        <img class="tile__img" src="/dashboard/create_lobby.png" alt="" />
+      </div>
+    </div>
+  </article>
+
+  <!-- LEADERBOARD -->
+  <article class="tile tile--leaderboard" aria-label="Leaderboards">
+    <div class="leader__header">
+      <div class="leader__title">Leaderboards</div>
+      <div class="leader__meta">
+        <div class="meta-box">
+          <div class="meta__big">1000</div>
+          <div class="meta__small">Players</div>
+        </div>
+        <div class="meta-box">
+          <div class="meta__big">10 000</div>
+          <div class="meta__small">Matches</div>
+        </div>
+        <div class="meta-box">
+          <div class="meta__big">30 000</div>
+          <div class="meta__small">Answers</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="leader__table">
+      <div class="row-head">
+        <span>User</span>
+        <span class="right">Points</span>
+      </div>
+
+      <div class="row-item" *ngFor="let p of leaderboard; let i = index">
+        <div class="left">
+          <span class="rank">{{ i + 1 }}</span>
+          <span
+            class="badge"
+            [attr.data-badge]="p.badge"
+            aria-hidden="true"
+          ></span>
+          <span class="name">{{ p.name }}</span>
+        </div>
+        <div class="right">
+          <span class="points">{{ p.points | number }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="leader__footer">
+      <a routerLink="/rewards">Show more</a>
+    </div>
+  </article>
+
+  <!-- JOIN -->
+  <article
+    class="tile tile3d tile3d--static tile--videos"
+    aria-label="Join your friends"
+  >
+    <div class="tile__layout tile__layout--with-actions">
+      <div class="tile__left">
+        <div class="tile__copy">
+          <div class="tile__title">Join your friends</div>
+          <div class="tile__desc">Enter the 6-character lobby code.</div>
+        </div>
+
+        <div class="tile__actions">
+          <label class="code-input" aria-label="Lobby code">
+            <input
+              class="tile__input code-input__native"
+              [ngModel]="joinCode"
+              (ngModelChange)="onJoinCodeChange($event)"
+              placeholder="AB1234"
+              maxlength="6"
+              inputmode="text"
+              autocapitalize="characters"
+              autocomplete="one-time-code"
+              aria-label="Lobby code"
+            />
+            <span class="code-input__slots" aria-hidden="true">
+              <span
+                class="code-input__slot"
+                *ngFor="let i of joinCodeIndices"
+                >{{ joinCodeChars[i] }}</span
+              >
+            </span>
+          </label>
+          <button
+            class="btn accent"
+            type="button"
+            (click)="joinLobby()"
+            [disabled]="!isJoinCodeComplete()"
+          >
+            Join
+          </button>
+        </div>
+      </div>
+
+      <div class="tile__media" aria-hidden="true">
+        <img class="tile__img" src="/dashboard/join_lobby.png" alt="" />
+      </div>
+    </div>
+  </article>
+</section>
+
+<p class="error" *ngIf="error">{{ error }}</p>
