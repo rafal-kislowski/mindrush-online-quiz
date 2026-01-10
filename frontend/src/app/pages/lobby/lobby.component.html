@@ -1,16 +1,25 @@
 <div class="lobby-page" *ngIf="lobby as l; else loading">
   <header class="lobby-header">
     <div class="lobby-title">
-      <h1>Lobby <span class="code">{{ l.code }}</span></h1>
+      <h1>
+        Lobby <span class="code">{{ l.code }}</span>
+      </h1>
       <div class="lobby-meta" *ngIf="l.status && l.players && l.maxPlayers">
         <span class="pill" [attr.data-status]="l.status">{{ l.status }}</span>
-        <span class="muted">Players: {{ l.players.length }}/{{ l.maxPlayers }}</span>
+        <span class="muted"
+          >Players: {{ l.players.length }}/{{ l.maxPlayers }}</span
+        >
       </div>
     </div>
 
     <div class="lobby-actions">
-      <button class="btn" type="button" (click)="refresh()">Refresh</button>
-      <button class="btn danger leave-btn" type="button" (click)="leave()" *ngIf="joinState === 'joined'" aria-label="Leave lobby">
+      <button
+        class="btn danger leave-btn"
+        type="button"
+        (click)="leave()"
+        *ngIf="joinState === 'joined'"
+        aria-label="Leave lobby"
+      >
         <span class="leave-btn__text">Leave lobby</span>
         <span class="leave-btn__icon" aria-hidden="true">×</span>
       </button>
@@ -18,7 +27,10 @@
   </header>
 
   <div class="lobby-grid">
-    <section class="card panel players-panel" *ngIf="joinState === 'joined' && l.players">
+    <section
+      class="card panel players-panel"
+      *ngIf="joinState === 'joined' && l.players"
+    >
       <h2 class="section-title">Players</h2>
       <ng-container *ngIf="session$ | async as session">
         <div class="roster">
@@ -32,13 +44,23 @@
               <span class="rank">{{ i + 1 }}</span>
               <span
                 class="badge"
-                [attr.data-badge]="i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : 'none'"
+                [attr.data-badge]="
+                  i === 0
+                    ? 'gold'
+                    : i === 1
+                    ? 'silver'
+                    : i === 2
+                    ? 'bronze'
+                    : 'none'
+                "
                 aria-hidden="true"
               ></span>
               <span class="name">{{ p.displayName }}</span>
             </div>
             <div class="right">
-              <span class="tag" *ngIf="p.displayName === session.displayName">You</span>
+              <span class="tag" *ngIf="p.displayName === session.displayName"
+                >You</span
+              >
             </div>
           </div>
         </div>
@@ -48,8 +70,12 @@
     <section class="card panel" *ngIf="joinState !== 'joined'">
       <h2 class="section-title">Join</h2>
       <p class="muted" *ngIf="l.hasPassword">This lobby requires a password.</p>
-      <p class="muted" *ngIf="!l.hasPassword">No password: opening this view auto-joins your guest.</p>
-      <p class="muted" *ngIf="joinState === 'viewOnly'">Lobby is full or not joinable.</p>
+      <p class="muted" *ngIf="!l.hasPassword">
+        No password: opening this view auto-joins your guest.
+      </p>
+      <p class="muted" *ngIf="joinState === 'viewOnly'">
+        Lobby is full or not joinable.
+      </p>
 
       <div class="form">
         <div class="row" *ngIf="l.hasPassword">
@@ -61,14 +87,19 @@
           class="btn primary"
           type="button"
           (click)="join()"
-          [disabled]="joinState === 'viewOnly' || (l.hasPassword && !password.trim())"
+          [disabled]="
+            joinState === 'viewOnly' || (l.hasPassword && !password.trim())
+          "
         >
           Join lobby
         </button>
       </div>
     </section>
 
-    <section class="card panel owner" *ngIf="joinState === 'joined' && l.isOwner && l.players && l.maxPlayers">
+    <section
+      class="card panel owner"
+      *ngIf="joinState === 'joined' && l.isOwner && l.players && l.maxPlayers"
+    >
       <h2 class="section-title">Owner controls</h2>
       <div class="form">
         <div class="row">
@@ -91,7 +122,9 @@
               Private
             </button>
           </div>
-          <p class="muted hint" *ngIf="privacyMode === 'public'">Anyone can join without a password.</p>
+          <p class="muted hint" *ngIf="privacyMode === 'public'">
+            Anyone can join without a password.
+          </p>
         </div>
 
         <div class="row" *ngIf="privacyMode === 'private'">
@@ -100,37 +133,50 @@
             <input
               [type]="privacyShowPassword ? 'text' : 'password'"
               [(ngModel)]="privacyPassword"
-              [placeholder]="l.hasPassword ? '•••••• (set) — enter new to change' : 'Set a password'"
+              [placeholder]="
+                l.hasPassword
+                  ? '•••••• (set) — enter new to change'
+                  : 'Set a password'
+              "
             />
             <button class="btn" type="button" (click)="togglePrivacyPassword()">
-              {{ privacyShowPassword ? 'Hide' : 'Show' }}
+              {{ privacyShowPassword ? "Hide" : "Show" }}
             </button>
           </div>
           <p class="muted hint">Changing password affects new joins only.</p>
         </div>
 
-        <button class="btn primary" type="button" (click)="savePrivacy()" [disabled]="privacySaving">
-          {{ privacySaving ? 'Saving…' : 'Save privacy' }}
+        <button
+          class="btn primary"
+          type="button"
+          (click)="savePrivacy()"
+          [disabled]="privacySaving"
+        >
+          {{ privacySaving ? "Saving…" : "Save privacy" }}
         </button>
 
         <div class="row">
           <label class="label">Quiz</label>
           <select [(ngModel)]="selectedQuizId">
-            <option *ngFor="let q of quizzes" [ngValue]="q.id">{{ q.title }}</option>
+            <option *ngFor="let q of quizzes" [ngValue]="q.id">
+              {{ q.title }}
+            </option>
           </select>
         </div>
 
-        <button class="btn primary" type="button" (click)="startGame()" [disabled]="l.players.length !== l.maxPlayers">
+        <button
+          class="btn primary"
+          type="button"
+          (click)="startGame()"
+          [disabled]="l.players.length !== l.maxPlayers"
+        >
           Start game
         </button>
-        <p class="muted hint">Game requires exactly {{ l.maxPlayers }} players.</p>
+        <p class="muted hint">
+          Game requires exactly {{ l.maxPlayers }} players.
+        </p>
       </div>
     </section>
-
-    <!-- <section class="card panel danger-zone" *ngIf="joinState === 'joined'">
-      <h2 class="section-title">Actions</h2>
-      <button class="btn danger" type="button" (click)="leave()">Leave lobby</button>
-    </section> -->
   </div>
 
   <p class="error" *ngIf="error">{{ error }}</p>

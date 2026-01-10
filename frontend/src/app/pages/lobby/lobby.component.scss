@@ -38,10 +38,11 @@
   padding: 4px 10px;
   margin-left: 6px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.06);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
   font-weight: 900;
 }
 
@@ -60,7 +61,7 @@
   height: 28px;
   padding: 0 10px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.05);
   font-weight: 900;
   font-size: 12px;
@@ -68,39 +69,51 @@
 }
 
 .pill::before {
-  content: '';
+  content: "";
   width: 8px;
   height: 8px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.35);
 }
 
-.pill[data-status='OPEN'] {
+.pill[data-status="OPEN"] {
   border-color: rgba(0, 222, 170, 0.35);
-  background: linear-gradient(180deg, rgba(0, 222, 170, 0.22), rgba(255, 255, 255, 0.04));
+  background: linear-gradient(
+    180deg,
+    rgba(0, 222, 170, 0.22),
+    rgba(255, 255, 255, 0.04)
+  );
 }
 
-.pill[data-status='OPEN']::before {
+.pill[data-status="OPEN"]::before {
   background: rgba(0, 222, 170, 0.85);
   box-shadow: 0 0 14px rgba(0, 222, 170, 0.35);
 }
 
-.pill[data-status='IN_GAME'] {
+.pill[data-status="IN_GAME"] {
   border-color: rgba(185, 107, 255, 0.35);
-  background: linear-gradient(180deg, rgba(185, 107, 255, 0.22), rgba(255, 255, 255, 0.04));
+  background: linear-gradient(
+    180deg,
+    rgba(185, 107, 255, 0.22),
+    rgba(255, 255, 255, 0.04)
+  );
 }
 
-.pill[data-status='IN_GAME']::before {
-  background: rgba(185, 107, 255, 0.90);
+.pill[data-status="IN_GAME"]::before {
+  background: rgba(185, 107, 255, 0.9);
   box-shadow: 0 0 14px rgba(185, 107, 255, 0.35);
 }
 
-.pill[data-status='CLOSED'] {
+.pill[data-status="CLOSED"] {
   border-color: rgba(255, 90, 122, 0.35);
-  background: linear-gradient(180deg, rgba(255, 90, 122, 0.18), rgba(255, 255, 255, 0.04));
+  background: linear-gradient(
+    180deg,
+    rgba(255, 90, 122, 0.18),
+    rgba(255, 255, 255, 0.04)
+  );
 }
 
-.pill[data-status='CLOSED']::before {
+.pill[data-status="CLOSED"]::before {
   background: rgba(255, 90, 122, 0.92);
   box-shadow: 0 0 14px rgba(255, 90, 122, 0.35);
 }
@@ -113,20 +126,38 @@
 }
 
 .panel {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
-  border-color: rgba(255, 255, 255, 0.10);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.07),
+    rgba(255, 255, 255, 0.03)
+  );
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .panel.owner {
-  background:
-    radial-gradient(700px 220px at 30% 0%, rgba(47, 134, 255, 0.18), transparent 55%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
+  background: radial-gradient(
+      700px 220px at 30% 0%,
+      rgba(47, 134, 255, 0.18),
+      transparent 55%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.07),
+      rgba(255, 255, 255, 0.03)
+    );
 }
 
 .panel.danger-zone {
-  background:
-    radial-gradient(700px 220px at 30% 0%, rgba(255, 90, 122, 0.16), transparent 55%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
+  background: radial-gradient(
+      700px 220px at 30% 0%,
+      rgba(255, 90, 122, 0.16),
+      transparent 55%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.07),
+      rgba(255, 255, 255, 0.03)
+    );
 }
 
 .section-title {
@@ -182,14 +213,23 @@
   width: 18px;
   height: 18px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.10);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   flex: 0 0 auto;
 }
 
-.roster .badge[data-badge='gold'] { background: rgba(255, 205, 77, 0.6); border-color: rgba(255, 205, 77, 0.9); }
-.roster .badge[data-badge='silver'] { background: rgba(200, 210, 220, 0.55); border-color: rgba(200, 210, 220, 0.9); }
-.roster .badge[data-badge='bronze'] { background: rgba(255, 155, 42, 0.45); border-color: rgba(255, 155, 42, 0.9); }
+.roster .badge[data-badge="gold"] {
+  background: rgba(255, 205, 77, 0.6);
+  border-color: rgba(255, 205, 77, 0.9);
+}
+.roster .badge[data-badge="silver"] {
+  background: rgba(200, 210, 220, 0.55);
+  border-color: rgba(200, 210, 220, 0.9);
+}
+.roster .badge[data-badge="bronze"] {
+  background: rgba(255, 155, 42, 0.45);
+  border-color: rgba(255, 155, 42, 0.9);
+}
 
 .roster .name {
   font-weight: 800;
@@ -211,7 +251,7 @@
   align-items: center;
   border-radius: 999px;
   border: 1px solid rgba(47, 208, 255, 0.25);
-  background: rgba(47, 208, 255, 0.10);
+  background: rgba(47, 208, 255, 0.1);
   color: rgba(47, 208, 255, 0.95);
   font-weight: 900;
   font-size: 12px;
@@ -226,14 +266,15 @@
 .segmented__btn {
   height: 42px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.05);
   color: rgba(255, 255, 255, 0.72);
   font-weight: 900;
   letter-spacing: 0.2px;
   cursor: pointer;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  transition: transform 140ms ease, filter 140ms ease, background 140ms ease, border-color 140ms ease;
+  transition: transform 140ms ease, filter 140ms ease, background 140ms ease,
+    border-color 140ms ease;
 }
 
 .segmented__btn:hover {
@@ -244,7 +285,11 @@
 .segmented__btn.active {
   color: rgba(8, 12, 28, 0.95);
   border-color: rgba(47, 208, 255, 0.45);
-  background: linear-gradient(180deg, rgba(47, 208, 255, 0.92), rgba(47, 208, 255, 0.62));
+  background: linear-gradient(
+    180deg,
+    rgba(47, 208, 255, 0.92),
+    rgba(47, 208, 255, 0.62)
+  );
 }
 
 .password-row {
@@ -283,7 +328,11 @@ select {
 
 .btn.danger {
   border-color: rgba(255, 90, 122, 0.45);
-  background: linear-gradient(180deg, rgba(255, 90, 122, 0.95), rgba(255, 90, 122, 0.72));
+  background: linear-gradient(
+    180deg,
+    rgba(255, 90, 122, 0.95),
+    rgba(255, 90, 122, 0.72)
+  );
   color: rgba(8, 12, 28, 0.95);
 }
 
@@ -360,4 +409,3 @@ select {
     grid-template-columns: 1fr;
   }
 }
-

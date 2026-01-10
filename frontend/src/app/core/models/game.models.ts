@@ -26,5 +26,6 @@ export interface GameStateDto {
   stageEndsAt: string | null;
   question: GameQuestionDto | null;
   players: GamePlayerDto[];
+  gameSessionId: string | null;
+  correctOptionId: number | null;
 }
-

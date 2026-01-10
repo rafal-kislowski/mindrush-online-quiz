@@ -1,85 +1,186 @@
-<section class="card">
-  <div class="header">
-    <h2>Game • Lobby {{ code }}</h2>
-    <div class="actions">
-      <button class="btn" (click)="refresh()">Refresh</button>
-      <button class="btn" (click)="backToLobby()">Back to lobby</button>
-    </div>
-  </div>
-
-  <p class="muted" *ngIf="state as s">
-    Lobby: <b>{{ s.lobbyStatus }}</b> • Game: <b>{{ s.gameStatus }}</b> • Stage:
-    <b>{{ s.stage }}</b>
-    <span *ngIf="remainingSeconds !== null">
-      • Ends in: <b>{{ remainingSeconds }}s</b></span
-    >
-  </p>
-
+<div class="quiz">
   <p class="error" *ngIf="error">{{ error }}</p>
 
   <ng-container *ngIf="state as s; else loading">
-    <div *ngIf="s.stage === 'NO_GAME'">
-      <p>No active game. Start it from the lobby view.</p>
+    <!-- Start countdown (backend-driven, full screen) -->
+    <div class="quiz-precountdown" *ngIf="s.stage === 'PRE_COUNTDOWN'">
+      <div
+        class="precount-number"
+        *ngIf="remainingSeconds !== null && remainingSeconds > 1"
+      >
+        {{ remainingSeconds - 1 }}
+      </div>
+      <div
+        class="precount-start"
+        *ngIf="remainingSeconds !== null && remainingSeconds <= 1"
+      >
+        START!
+      </div>
     </div>
 
-    <div *ngIf="s.stage === 'FINISHED'">
-      <p>Game finished. Final results:</p>
-    </div>
-
-    <div *ngIf="s.question as q">
-      <div class="question">
-        <div class="meta">
-          Question {{ s.questionIndex }}/{{ s.totalQuestions }}
+    <!-- Reveal (feedback first, then transition overlay) -->
+    <div class="quiz-outer" *ngIf="s.stage === 'REVEAL' && s.question as q">
+      <div class="quiz-container">
+        <div class="quiz-header quiz-header-full">
+          <div class="quiz-number">{{ s.questionIndex }}</div>
+          <div class="quiz-numberText">Pytanie {{ s.questionIndex }}</div>
+          <div class="quiz-title">{{ q.prompt }}</div>
         </div>
-        <div class="prompt">{{ q.prompt }}</div>
-      </div>
 
-      <div class="options" *ngIf="s.stage === 'QUESTION'">
-        <button class="opt" *ngFor="let o of q.options" (click)="answer(o.id)">
-          {{ o.text }}
-        </button>
-      </div>
+        <div
+          class="quiz-timer"
+          [class.quiz-timer--hidden]="lastQuestionRemainingSeconds === null"
+        >
+          <div
+            class="timer-bar timer-bar--noanim"
+            [style.width.%]="lastQuestionProgressPct"
+          ></div>
+          <span class="timer-text"
+            >{{ lastQuestionRemainingSeconds ?? "" }} s</span
+          >
+        </div>
 
-      <div class="reveal" *ngIf="s.stage === 'REVEAL'">
-        <p>Reveal stage (waiting for next question)...</p>
+        <div class="quiz-answers">
+          <button
+            *ngFor="let o of q.options; let i = index"
+            class="quiz-answer"
+            disabled
+            [class.selected]="optionState(o.id) === 'selected'"
+            [class.correct]="optionState(o.id) === 'correct'"
+            [class.wrong]="optionState(o.id) === 'wrong'"
+          >
+            <span class="answer-label">{{ optionLabel(i) }}</span>
+            <span class="answer-text">{{ o.text }}</span>
+          </button>
+        </div>
       </div>
     </div>
 
-    <div class="block">
-      <h3>{{ s.stage === "FINISHED" ? "Results" : "Players" }}</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th *ngIf="s.stage !== 'FINISHED'">Answered</th>
-            <th *ngIf="s.stage === 'REVEAL'">Correct</th>
-            <th>Score</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let p of s.players">
-            <td>{{ p.displayName }}</td>
-            <td *ngIf="s.stage !== 'FINISHED'">
-              {{ p.answered ? "Yes" : "No" }}
-            </td>
-            <td *ngIf="s.stage === 'REVEAL'">
-              {{ p.correct === true ? "Yes" : "No" }}
-            </td>
-            <td>{{ p.score }}</td>
-          </tr>
-        </tbody>
-      </table>
+    <!-- Between questions overlay (only after brief feedback) -->
+    <div class="quiz-question-transition" *ngIf="showRevealTransition">
+      <div class="transition-title">
+        Question {{ s.questionIndex }} / {{ s.totalQuestions }}
+      </div>
+
+      <div class="transition-progress" *ngIf="questionResults.length">
+        <span
+          *ngFor="let res of questionResults; let i = index"
+          class="progress-dot"
+          [class.correct]="res === 'correct'"
+          [class.wrong]="res === 'wrong'"
+          [class.active]="i === s.questionIndex - 1"
+        >
+          <span *ngIf="res === 'correct'">&#10003;</span>
+          <span *ngIf="res === 'wrong'">&#10007;</span>
+          <span *ngIf="res === 'pending'">&#9679;</span>
+        </span>
+      </div>
+
+      <div class="transition-sub" *ngIf="remainingSeconds !== null">
+        Next question in <b>{{ remainingSeconds }}s</b>
+      </div>
     </div>
 
-    <div class="block" *ngIf="isOwner">
-      <h3>Owner actions</h3>
-      <div class="actions">
-        <button class="btn danger" (click)="end()">End game</button>
+    <!-- Question -->
+    <div class="quiz-outer" *ngIf="s.stage === 'QUESTION' && s.question as q">
+      <div class="quiz-container">
+        <div class="quiz-header quiz-header-full">
+          <div class="quiz-number">{{ s.questionIndex }}</div>
+          <div class="quiz-numberText">Pytanie {{ s.questionIndex }}</div>
+          <div class="quiz-title">{{ q.prompt }}</div>
+
+        </div>
+
+        <div
+          class="quiz-timer"
+          [class.quiz-timer--hidden]="remainingSeconds === null"
+        >
+          <div
+            class="timer-bar"
+            [class.timer-bar--noanim]="timerNoAnim"
+            [style.width.%]="progressPct"
+          ></div>
+          <span class="timer-text">{{ remainingSeconds ?? "" }} s</span>
+        </div>
+
+        <div class="quiz-answers">
+          <button
+            *ngFor="let o of q.options; let i = index"
+            class="quiz-answer"
+            [disabled]="!canAnswer"
+            [class.selected]="optionState(o.id) === 'selected'"
+            [class.correct]="optionState(o.id) === 'correct'"
+            [class.wrong]="optionState(o.id) === 'wrong'"
+            (click)="answer(o.id)"
+          >
+            <span class="answer-label">{{ optionLabel(i) }}</span>
+            <span class="answer-text">{{ o.text }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Finished -->
+    <div class="quiz-outer" *ngIf="s.stage === 'FINISHED'">
+      <div class="results-panel">
+        <div class="results-top">
+          <div>
+            <div class="results-title">Game finished</div>
+            <div class="muted">Final scores</div>
+          </div>
+          <button class="btn primary" (click)="backToLobby()">
+            Back to lobby
+          </button>
+        </div>
+
+        <div class="board">
+          <div class="board-head muted">
+            <span>#</span>
+            <span>Player</span>
+            <span class="right">Points</span>
+          </div>
+
+          <div
+            class="board-row"
+            *ngFor="let p of sortedPlayers; let i = index"
+            [class.me]="p.displayName === meDisplayName"
+          >
+            <span class="rank">{{ i + 1 }}</span>
+            <span class="name">
+              <span
+                class="badge"
+                [class.g]="i === 0"
+                [class.s]="i === 1"
+                [class.b]="i === 2"
+              ></span>
+              {{ p.displayName }}
+              <span class="tag" *ngIf="p.displayName === meDisplayName"
+                >You</span
+              >
+            </span>
+            <span class="points right">{{ p.score }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- No game -->
+    <div class="quiz-outer" *ngIf="s.stage === 'NO_GAME'">
+      <div class="results-panel">
+        <div class="results-title">No active game</div>
+        <div class="muted">Start it from the lobby view.</div>
+        <div class="results-actions">
+          <button class="btn" (click)="backToLobby()">Go to lobby</button>
+        </div>
       </div>
     </div>
   </ng-container>
 
   <ng-template #loading>
-    <p>Loading...</p>
+    <div class="quiz-outer">
+      <div class="results-panel">
+        <div class="muted">Loading&hellip;</div>
+      </div>
+    </div>
   </ng-template>
-</section>
+</div>

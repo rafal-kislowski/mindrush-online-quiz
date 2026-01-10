@@ -17,7 +17,7 @@ import { LobbyEventsService } from '../../core/ws/lobby-events.service';
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './lobby.component.html',
-  styleUrl: './lobby.component.scss'
+  styleUrl: './lobby.component.scss',
 })
 export class LobbyComponent implements OnInit, OnDestroy {
   code = '';
@@ -61,22 +61,25 @@ export class LobbyComponent implements OnInit, OnDestroy {
     this.subscriptions.add(
       this.route.paramMap
         .pipe(
-          switchMap(params => {
+          switchMap((params) => {
             this.code = (params.get('code') ?? '').toUpperCase();
-            return this.sessionService.ensure().pipe(switchMap(() => this.lobbyApi.get(this.code)));
+            return this.sessionService
+              .ensure()
+              .pipe(switchMap(() => this.lobbyApi.get(this.code)));
           })
         )
         .subscribe({
-          next: lobby => this.initLobby(lobby),
-          error: err => {
+          next: (lobby) => this.initLobby(lobby),
+          error: (err) => {
             this.error = err?.error?.message ?? 'Lobby not found';
-          }
+          },
         })
     );
   }
 
   ngOnDestroy(): void {
-    this.unloadHandler && window.removeEventListener('beforeunload', this.unloadHandler);
+    this.unloadHandler &&
+      window.removeEventListener('beforeunload', this.unloadHandler);
     this.subscriptions.unsubscribe();
   }
 
@@ -105,7 +108,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
         switchMap(() => this.lobbyApi.get(this.code))
       )
       .subscribe({
-        next: lobby => {
+        next: (lobby) => {
           this.onLobbyUpdate(lobby);
           this.attemptAutoJoinIfPossible(lobby);
           if (this.joinState === 'joined' && lobby.status === 'IN_GAME') {
@@ -114,31 +117,36 @@ export class LobbyComponent implements OnInit, OnDestroy {
         },
         error: () => {
           // ignore transient errors while typing/refreshing
-        }
+        },
       });
     this.subscriptions.add(this.pollSubscription);
   }
 
   private ensureGameAutoSwitch(): void {
     if (this.gameEventsSubscription) return;
-    this.gameEventsSubscription = this.gameEvents.subscribeLobbyGame(this.code).subscribe({
-      next: () => {
-        if (this.joinState !== 'joined') return;
-        this.gameApi.state(this.code).subscribe({
-          next: state => {
-            if (state.lobbyStatus === 'IN_GAME' && state.stage !== 'NO_GAME') {
-              this.router.navigate(['/lobby', this.code, 'game']);
-            }
-          },
-          error: () => {
-            // ignore
-          }
-        });
-      },
-      error: () => {
-        // fallback is polling
-      }
-    });
+    this.gameEventsSubscription = this.gameEvents
+      .subscribeLobbyGame(this.code)
+      .subscribe({
+        next: () => {
+          if (this.joinState !== 'joined') return;
+          this.gameApi.state(this.code).subscribe({
+            next: (state) => {
+              if (
+                state.lobbyStatus === 'IN_GAME' &&
+                state.stage !== 'NO_GAME'
+              ) {
+                this.router.navigate(['/lobby', this.code, 'game']);
+              }
+            },
+            error: () => {
+              // ignore
+            },
+          });
+        },
+        error: () => {
+          // fallback is polling
+        },
+      });
     this.subscriptions.add(this.gameEventsSubscription);
   }
 
@@ -146,7 +154,10 @@ export class LobbyComponent implements OnInit, OnDestroy {
     if (this.unloadHandler) return;
     this.unloadHandler = () => {
       try {
-        navigator.sendBeacon(`/api/lobbies/${encodeURIComponent(this.code)}/leave`, '');
+        navigator.sendBeacon(
+          `/api/lobbies/${encodeURIComponent(this.code)}/leave`,
+          ''
+        );
       } catch {
         // ignore
       }
@@ -157,8 +168,9 @@ export class LobbyComponent implements OnInit, OnDestroy {
   refresh(): void {
     this.error = null;
     this.lobbyApi.get(this.code).subscribe({
-      next: lobby => (this.lobby = lobby),
-      error: err => (this.error = err?.error?.message ?? 'Failed to refresh lobby')
+      next: (lobby) => (this.lobby = lobby),
+      error: (err) =>
+        (this.error = err?.error?.message ?? 'Failed to refresh lobby'),
     });
   }
 
@@ -181,7 +193,13 @@ export class LobbyComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (this.joinState === 'viewOnly' && lobby.status === 'OPEN' && lobby.players && lobby.maxPlayers && lobby.players.length < lobby.maxPlayers) {
+    if (
+      this.joinState === 'viewOnly' &&
+      lobby.status === 'OPEN' &&
+      lobby.players &&
+      lobby.maxPlayers &&
+      lobby.players.length < lobby.maxPlayers
+    ) {
       this.joinState = 'unknown';
       this.error = null;
     }
@@ -192,7 +210,11 @@ export class LobbyComponent implements OnInit, OnDestroy {
     if (this.joinState === 'joined') return;
     if (lobby.hasPassword) return;
     if (lobby.status !== 'OPEN') return;
-    if (lobby.players && lobby.maxPlayers && lobby.players.length >= lobby.maxPlayers) {
+    if (
+      lobby.players &&
+      lobby.maxPlayers &&
+      lobby.players.length >= lobby.maxPlayers
+    ) {
       this.joinState = 'viewOnly';
       return;
     }
@@ -200,37 +222,39 @@ export class LobbyComponent implements OnInit, OnDestroy {
 
     this.autoJoinInFlight = true;
     this.lobbyApi.join(this.code).subscribe({
-      next: joined => {
+      next: (joined) => {
         this.autoJoinInFlight = false;
         this.onLobbyUpdate(joined);
       },
-      error: err => {
+      error: (err) => {
         this.autoJoinInFlight = false;
         if (err?.status === 409) {
           this.joinState = 'viewOnly';
         }
-      }
+      },
     });
   }
 
   private ensureLobbyUpdates(): void {
     if (this.lobbyEventsSubscription) return;
-    this.lobbyEventsSubscription = this.lobbyEvents.subscribeLobby(this.code).subscribe({
-      next: () => {
-        this.lobbyApi.get(this.code).subscribe({
-          next: lobby => {
-            this.onLobbyUpdate(lobby);
-            this.attemptAutoJoinIfPossible(lobby);
-          },
-          error: () => {
-            // ignore
-          }
-        });
-      },
-      error: () => {
-        // polling is fallback
-      }
-    });
+    this.lobbyEventsSubscription = this.lobbyEvents
+      .subscribeLobby(this.code)
+      .subscribe({
+        next: () => {
+          this.lobbyApi.get(this.code).subscribe({
+            next: (lobby) => {
+              this.onLobbyUpdate(lobby);
+              this.attemptAutoJoinIfPossible(lobby);
+            },
+            error: () => {
+              // ignore
+            },
+          });
+        },
+        error: () => {
+          // polling is fallback
+        },
+      });
     this.subscriptions.add(this.lobbyEventsSubscription);
   }
 
@@ -241,16 +265,16 @@ export class LobbyComponent implements OnInit, OnDestroy {
       return;
     }
     this.lobbyApi.join(this.code, this.password.trim() || undefined).subscribe({
-      next: lobby => {
+      next: (lobby) => {
         this.onLobbyUpdate(lobby);
         this.startPolling();
       },
-      error: err => {
+      error: (err) => {
         if (err?.status === 409) {
           this.joinState = 'viewOnly';
         }
         this.error = err?.error?.message ?? 'Failed to join lobby';
-      }
+      },
     });
   }
 
@@ -258,7 +282,8 @@ export class LobbyComponent implements OnInit, OnDestroy {
     this.error = null;
     this.lobbyApi.leave(this.code).subscribe({
       next: () => this.router.navigate(['/']),
-      error: err => (this.error = err?.error?.message ?? 'Failed to leave lobby')
+      error: (err) =>
+        (this.error = err?.error?.message ?? 'Failed to leave lobby'),
     });
   }
 
@@ -267,18 +292,19 @@ export class LobbyComponent implements OnInit, OnDestroy {
     this.error = null;
     this.gameApi.start(this.code, this.selectedQuizId).subscribe({
       next: () => this.router.navigate(['/lobby', this.code, 'game']),
-      error: err => (this.error = err?.error?.message ?? 'Failed to start game')
+      error: (err) =>
+        (this.error = err?.error?.message ?? 'Failed to start game'),
     });
   }
 
   private loadQuizzes(): void {
     this.quizApi.list().subscribe({
-      next: quizzes => {
+      next: (quizzes) => {
         this.quizzes = quizzes;
         if (this.selectedQuizId == null) {
           this.selectedQuizId = quizzes[0]?.id ?? null;
         }
-      }
+      },
     });
   }
 
@@ -300,25 +326,31 @@ export class LobbyComponent implements OnInit, OnDestroy {
     if (this.privacySaving) return;
     this.error = null;
 
-    const password = this.privacyMode === 'private' ? this.privacyPassword.trim() : '';
+    const password =
+      this.privacyMode === 'private' ? this.privacyPassword.trim() : '';
     if (this.privacyMode === 'private' && !password) {
       this.error = 'Password is required to make this lobby private';
       return;
     }
 
     this.privacySaving = true;
-    this.lobbyApi.setPassword(this.code, this.privacyMode === 'private' ? password : undefined).subscribe({
-      next: updated => {
-        this.privacySaving = false;
-        this.privacyDirty = false;
-        this.privacyPassword = '';
-        this.privacyShowPassword = false;
-        this.onLobbyUpdate(updated);
-      },
-      error: err => {
-        this.privacySaving = false;
-        this.error = err?.error?.message ?? 'Failed to update lobby privacy';
-      }
-    });
+    this.lobbyApi
+      .setPassword(
+        this.code,
+        this.privacyMode === 'private' ? password : undefined
+      )
+      .subscribe({
+        next: (updated) => {
+          this.privacySaving = false;
+          this.privacyDirty = false;
+          this.privacyPassword = '';
+          this.privacyShowPassword = false;
+          this.onLobbyUpdate(updated);
+        },
+        error: (err) => {
+          this.privacySaving = false;
+          this.error = err?.error?.message ?? 'Failed to update lobby privacy';
+        },
+      });
   }
 }
