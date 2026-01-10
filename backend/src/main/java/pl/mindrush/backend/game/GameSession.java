@@ -51,14 +51,14 @@ public class GameSession {
     protected GameSession() {
     }
 
-    public static GameSession startNew(String lobbyId, Long quizId, Instant now, Duration questionDuration) {
+    public static GameSession startNew(String lobbyId, Long quizId, Instant now, Duration preCountdownDuration) {
         GameSession session = new GameSession();
         session.id = UUID.randomUUID().toString();
         session.lobbyId = lobbyId;
         session.quizId = quizId;
         session.status = GameStatus.IN_PROGRESS;
-        session.stage = GameStage.QUESTION;
-        session.stageEndsAt = now.plus(questionDuration);
+        session.stage = GameStage.PRE_COUNTDOWN;
+        session.stageEndsAt = now.plus(preCountdownDuration);
         session.currentQuestionIndex = 0;
         session.createdAt = now;
         session.startedAt = now;

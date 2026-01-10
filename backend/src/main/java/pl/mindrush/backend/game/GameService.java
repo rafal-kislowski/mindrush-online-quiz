@@ -30,6 +30,8 @@ public class GameService {
     private final Clock clock;
     private final Duration guestQuestionDuration;
     private final Duration revealDuration;
+    private final Duration preCountdownDuration;
+    private final Duration finalRevealDuration;
 
     private final GuestSessionService guestSessionService;
     private final LobbyRepository lobbyRepository;
@@ -46,6 +48,8 @@ public class GameService {
             Clock clock,
             @Value("${game.guest.question-duration:PT10S}") Duration guestQuestionDuration,
             @Value("${game.guest.reveal-duration:PT3S}") Duration revealDuration,
+            @Value("${game.guest.pre-countdown-duration:PT4S}") Duration preCountdownDuration,
+            @Value("${game.guest.final-reveal-duration:PT2S}") Duration finalRevealDuration,
             GuestSessionService guestSessionService,
             LobbyRepository lobbyRepository,
             LobbyParticipantRepository participantRepository,
@@ -60,6 +64,8 @@ public class GameService {
         this.clock = clock;
         this.guestQuestionDuration = guestQuestionDuration;
         this.revealDuration = revealDuration;
+        this.preCountdownDuration = preCountdownDuration;
+        this.finalRevealDuration = finalRevealDuration;
         this.guestSessionService = guestSessionService;
         this.lobbyRepository = lobbyRepository;
         this.participantRepository = participantRepository;
@@ -133,7 +139,7 @@ public class GameService {
         }
 
         Instant now = clock.instant();
-        GameSession session = GameSession.startNew(lobby.getId(), quiz.getId(), now, guestQuestionDuration);
+        GameSession session = GameSession.startNew(lobby.getId(), quiz.getId(), now, preCountdownDuration);
         gameSessionRepository.save(session);
 
         List<LobbyParticipant> lobbyPlayers = participantRepository.findAllByLobbyIdOrderByJoinedAtAsc(lobby.getId());
@@ -158,7 +164,7 @@ public class GameService {
         if (sessionOpt.isEmpty()) {
             Optional<GameSession> last = gameSessionRepository.findFirstByLobbyIdOrderByStartedAtDesc(lobby.getId());
             if (last.isEmpty() || last.get().getStatus() != GameStatus.FINISHED) {
-                return new GameStateDto(lobby.getCode(), lobby.getStatus().name(), "NONE", 0, 0, "NO_GAME", null, null, List.of());
+                return new GameStateDto(lobby.getCode(), lobby.getStatus().name(), "NONE", 0, 0, "NO_GAME", null, null, List.of(), null, null);
             }
             requireGamePlayer(last.get().getId(), guestSession.getId());
             return buildState(lobby, last.get(), guestSession.getId());
@@ -183,6 +189,9 @@ public class GameService {
 
         if (lobby.getStatus() != LobbyStatus.IN_GAME) {
             throw new ResponseStatusException(CONFLICT, "Lobby is not in game");
+        }
+        if (session.getStage() != GameStage.QUESTION) {
+            throw new ResponseStatusException(CONFLICT, "Not accepting answers at this stage");
         }
 
         CurrentQuestion current = currentQuestion(session);
@@ -276,7 +285,34 @@ public class GameService {
                     "FINISHED",
                     null,
                     null,
-                    playersDto
+                    playersDto,
+                    session.getId(),
+                    null
+            );
+        }
+
+        if (session.getStage() == GameStage.PRE_COUNTDOWN) {
+            List<GamePlayerDto> playersDto = players.stream()
+                    .map(p -> new GamePlayerDto(
+                            p.getDisplayName(),
+                            false,
+                            null,
+                            gameAnswerRepository.countCorrectByGameSessionIdAndGuestSessionId(session.getId(), p.getGuestSessionId())
+                    ))
+                    .toList();
+
+            return new GameStateDto(
+                    lobby.getCode(),
+                    lobby.getStatus().name(),
+                    session.getStatus().name(),
+                    1,
+                    (int) totalQuestions,
+                    session.getStage().name(),
+                    session.getStageEndsAt().toString(),
+                    null,
+                    playersDto,
+                    session.getId(),
+                    null
             );
         }
 
@@ -298,6 +334,15 @@ public class GameService {
 
         GameQuestionDto questionDto = new GameQuestionDto(current.question().getId(), current.question().getPrompt(), orderedOptions);
 
+        Long correctOptionId = null;
+        if (reveal) {
+            correctOptionId = current.options().stream()
+                    .filter(QuizAnswerOption::isCorrect)
+                    .map(QuizAnswerOption::getId)
+                    .findFirst()
+                    .orElse(null);
+        }
+
         return new GameStateDto(
                 lobby.getCode(),
                 lobby.getStatus().name(),
@@ -307,7 +352,9 @@ public class GameService {
                 session.getStage().name(),
                 session.getStageEndsAt().toString(),
                 questionDto,
-                playersDto
+                playersDto,
+                session.getId(),
+                correctOptionId
         );
     }
 
@@ -332,6 +379,14 @@ public class GameService {
 
         Instant now = clock.instant();
 
+        if (session.getStage() == GameStage.PRE_COUNTDOWN) {
+            if (now.isBefore(session.getStageEndsAt())) return false;
+            session.setStage(GameStage.QUESTION);
+            session.setStageEndsAt(now.plus(guestQuestionDuration));
+            gameSessionRepository.save(session);
+            return true;
+        }
+
         if (session.getStage() == GameStage.QUESTION) {
             CurrentQuestion current = currentQuestion(session);
             long playerCount = gamePlayerRepository.countByGameSessionId(session.getId());
@@ -347,7 +402,8 @@ public class GameService {
 
             if (allAnswered) {
                 session.setStage(GameStage.REVEAL);
-                session.setStageEndsAt(now.plus(revealDuration));
+                boolean isLastQuestion = session.getCurrentQuestionIndex() + 1 >= current.totalQuestions();
+                session.setStageEndsAt(now.plus(isLastQuestion ? finalRevealDuration : revealDuration));
                 gameSessionRepository.save(session);
                 return true;
             }

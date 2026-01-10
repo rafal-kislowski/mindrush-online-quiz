@@ -115,13 +115,16 @@ class GameControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"quizId\":" + quizId + "}"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.stage").value("QUESTION"))
+                .andExpect(jsonPath("$.stage").value("PRE_COUNTDOWN"))
                 .andExpect(jsonPath("$.questionIndex").value(1))
                 .andExpect(jsonPath("$.totalQuestions").value(2));
+
+        clock.advance(Duration.ofSeconds(4));
 
         MvcResult stateOwner1 = mockMvc.perform(get("/api/lobbies/" + lobbyCode + "/game/state")
                         .cookie(new Cookie("guestSessionId", ownerSessionId)))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stage").value("QUESTION"))
                 .andExpect(jsonPath("$.question.id").isNumber())
                 .andReturn();
 
@@ -203,11 +206,14 @@ class GameControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"quizId\":" + quizId + "}"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.stage").value("QUESTION"));
+                .andExpect(jsonPath("$.stage").value("PRE_COUNTDOWN"));
+
+        clock.advance(Duration.ofSeconds(4));
 
         MvcResult state = mockMvc.perform(get("/api/lobbies/" + lobbyCode + "/game/state")
                         .cookie(new Cookie("guestSessionId", ownerSessionId)))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stage").value("QUESTION"))
                 .andReturn();
 
         Number qIdNum = JsonPath.read(state.getResponse().getContentAsString(), "$.question.id");

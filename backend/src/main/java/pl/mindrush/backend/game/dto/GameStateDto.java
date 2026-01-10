@@ -11,6 +11,8 @@ public record GameStateDto(
         String stage,
         String stageEndsAt,
         GameQuestionDto question,
-        List<GamePlayerDto> players
+        List<GamePlayerDto> players,
+        String gameSessionId,
+        Long correctOptionId
 ) {
 }
