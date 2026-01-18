@@ -14,5 +14,8 @@ export class GuestSessionApi {
   get(): Observable<GuestSessionInfoDto> {
     return this.http.get<GuestSessionInfoDto>('/api/guest/session', { withCredentials: true });
   }
-}
 
+  heartbeat(): Observable<void> {
+    return this.http.post<void>('/api/guest/session/heartbeat', {}, { withCredentials: true });
+  }
+}
