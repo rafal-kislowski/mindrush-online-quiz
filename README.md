@@ -4,7 +4,7 @@ Spring Boot backend for the MindRush quiz platform.
 
 ## Tech stack
 - Java 17, Spring Boot 3
-- Spring Web, Spring Security (HTTP Basic)
+- Spring Web, Spring Security (JWT in HttpOnly cookies)
 - Spring Data JPA + MySQL
 - Docker Compose (MySQL)
 
@@ -93,8 +93,28 @@ lobby.presence.timeout=PT25S
 lobby.presence.cleanup.fixedDelayMs=5000
 ```
 
-All other endpoints (as they are added) are protected by Spring Security (HTTP Basic).
-If no user is configured, Spring generates a password and prints it in the startup logs.
+## Auth (email/password)
+Authentication uses a short-lived access JWT + a long-lived refresh token, both stored in **HttpOnly cookies**:
+- `accessToken` (JWT)
+- `refreshToken` (random token, server-side persisted and rotatable)
+
+Endpoints:
+- `POST /api/auth/register` -> creates a user and logs in (sets cookies)
+- `POST /api/auth/login` -> logs in (sets cookies)
+- `POST /api/auth/refresh` -> rotates refresh token + issues a new access token (sets cookies)
+- `POST /api/auth/logout` -> revokes refresh token and clears cookies
+- `GET /api/auth/me` -> current authenticated user
+
+### Bootstrap admin (local only)
+To create an admin account automatically on startup, set:
+```properties
+app.bootstrap.admin.email=admin@example.com
+app.bootstrap.admin.password=Password123
+```
+Recommended for dev:
+```properties
+app.jwt.secret=change-me-long-random
+```
 
 ## Lobby (guest)
 Simple guest lobbies (no login required), identified by a 6-character code.
@@ -125,6 +145,11 @@ Public, read-only quiz endpoints (no auth required):
 - `GET /api/quizzes` -> list quizzes
 - `GET /api/quizzes/{id}` -> quiz details
 - `GET /api/quizzes/{id}/questions` -> quiz questions + answer options (does not expose correct answers)
+
+## Admin (quiz management)
+Admin-only quiz endpoints (requires `ADMIN` role):
+- `POST /api/admin/quizzes` -> create quiz
+- `POST /api/admin/quizzes/{id}/questions` -> add a question (4 options, exactly 1 correct)
 
 Optional dev seed data:
 - set `app.seed.enabled=true` (e.g. in `application-local.properties`)
