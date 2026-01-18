@@ -11,6 +11,7 @@ import { QuizListItemDto } from '../../core/models/quiz.models';
 import { SessionService } from '../../core/session/session.service';
 import { GameEventsService } from '../../core/ws/game-events.service';
 import { LobbyEventsService } from '../../core/ws/lobby-events.service';
+import { StompClientService } from '../../core/ws/stomp-client.service';
 
 @Component({
   selector: 'app-lobby',
@@ -20,6 +21,9 @@ import { LobbyEventsService } from '../../core/ws/lobby-events.service';
   styleUrl: './lobby.component.scss',
 })
 export class LobbyComponent implements OnInit, OnDestroy {
+  private static readonly POLL_FAST_MS = 1500;
+  private static readonly POLL_SLOW_MS = 10_000;
+
   code = '';
   lobby: LobbyDto | null = null;
   quizzes: QuizListItemDto[] = [];
@@ -45,6 +49,8 @@ export class LobbyComponent implements OnInit, OnDestroy {
   private quizzesLoaded = false;
   private unloadHandler: (() => void) | null = null;
   private autoJoinInFlight = false;
+  private pollMs = LobbyComponent.POLL_FAST_MS;
+  private wsConnected = false;
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -54,10 +60,18 @@ export class LobbyComponent implements OnInit, OnDestroy {
     private readonly gameApi: GameApi,
     private readonly sessionService: SessionService,
     private readonly gameEvents: GameEventsService,
-    private readonly lobbyEvents: LobbyEventsService
+    private readonly lobbyEvents: LobbyEventsService,
+    private readonly stompClient: StompClientService
   ) {}
 
   ngOnInit(): void {
+    this.subscriptions.add(
+      this.stompClient.state$.subscribe((state) => {
+        this.wsConnected = state === 'connected';
+        this.updatePollingMode();
+      })
+    );
+
     this.subscriptions.add(
       this.route.paramMap
         .pipe(
@@ -101,8 +115,9 @@ export class LobbyComponent implements OnInit, OnDestroy {
   }
 
   private startPolling(): void {
+    if (!this.code) return;
     this.pollSubscription?.unsubscribe();
-    this.pollSubscription = interval(1500)
+    this.pollSubscription = interval(this.pollMs)
       .pipe(
         startWith(0),
         switchMap(() => this.lobbyApi.get(this.code))
@@ -120,6 +135,18 @@ export class LobbyComponent implements OnInit, OnDestroy {
         },
       });
     this.subscriptions.add(this.pollSubscription);
+  }
+
+  private updatePollingMode(): void {
+    const desired =
+      this.wsConnected && this.joinState === 'joined'
+        ? LobbyComponent.POLL_SLOW_MS
+        : LobbyComponent.POLL_FAST_MS;
+
+    if (desired === this.pollMs) return;
+    this.pollMs = desired;
+
+    if (this.pollSubscription) this.startPolling();
   }
 
   private ensureGameAutoSwitch(): void {
@@ -144,7 +171,8 @@ export class LobbyComponent implements OnInit, OnDestroy {
           });
         },
         error: () => {
-          // fallback is polling
+          // polling is fallback
+          this.updatePollingMode();
         },
       });
     this.subscriptions.add(this.gameEventsSubscription);
@@ -190,6 +218,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
       this.joinState = 'joined';
       this.ensureGameAutoSwitch();
       this.ensureLeaveOnUnload();
+      this.updatePollingMode();
       return;
     }
 
@@ -203,6 +232,8 @@ export class LobbyComponent implements OnInit, OnDestroy {
       this.joinState = 'unknown';
       this.error = null;
     }
+
+    this.updatePollingMode();
   }
 
   private attemptAutoJoinIfPossible(lobby: LobbyDto | null): void {

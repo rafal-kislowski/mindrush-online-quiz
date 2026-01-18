@@ -1,12 +1,13 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { Subscription, interval, startWith } from 'rxjs';
 import { GameApi } from '../../core/api/game.api';
 import { LobbyApi } from '../../core/api/lobby.api';
 import { GameStateDto } from '../../core/models/game.models';
 import { SessionService } from '../../core/session/session.service';
 import { GameEventsService } from '../../core/ws/game-events.service';
+import { StompClientService } from '../../core/ws/stomp-client.service';
 
 @Component({
   selector: 'app-game',
@@ -16,6 +17,8 @@ import { GameEventsService } from '../../core/ws/game-events.service';
   styleUrl: './game.component.scss',
 })
 export class GameComponent implements OnInit, OnDestroy {
+  private static readonly POLL_FAST_MS = 1500;
+  private static readonly POLL_SLOW_MS = 10_000;
   private static readonly GUEST_QUESTION_MS = 10_000;
   private static readonly GUEST_REVEAL_MS = 3_000;
   private static readonly GUEST_PRE_COUNTDOWN_MS = 4_000;
@@ -48,6 +51,9 @@ export class GameComponent implements OnInit, OnDestroy {
   private revealPhase: 'feedback' | 'transition' = 'feedback';
   private revealPhaseTimer: number | null = null;
   private revealKey: string | null = null;
+  private pollSubscription: Subscription | null = null;
+  private pollMs = GameComponent.POLL_FAST_MS;
+  private wsConnected = false;
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -55,11 +61,19 @@ export class GameComponent implements OnInit, OnDestroy {
     private readonly gameApi: GameApi,
     private readonly lobbyApi: LobbyApi,
     private readonly gameEvents: GameEventsService,
-    private readonly sessionService: SessionService
+    private readonly sessionService: SessionService,
+    private readonly stompClient: StompClientService
   ) {}
 
   ngOnInit(): void {
     this.code = (this.route.snapshot.paramMap.get('code') ?? '').toUpperCase();
+
+    this.subscriptions.add(
+      this.stompClient.state$.subscribe((state) => {
+        this.wsConnected = state === 'connected';
+        this.updatePollingMode();
+      })
+    );
 
     this.subscriptions.add(
       this.sessionService.ensure().subscribe({
@@ -83,7 +97,8 @@ export class GameComponent implements OnInit, OnDestroy {
       this.gameEvents.subscribeLobbyGame(this.code).subscribe({
         next: () => this.refresh(),
         error: () => {
-          // REST fallback still works if WS can't connect
+          // polling is fallback
+          this.updatePollingMode();
         },
       })
     );
@@ -97,6 +112,7 @@ export class GameComponent implements OnInit, OnDestroy {
     if (this.timerNoAnimRaf !== null) cancelAnimationFrame(this.timerNoAnimRaf);
     this.stopCountdownLoop();
     this.stopRevealPhaseTimer();
+    this.pollSubscription?.unsubscribe();
     this.subscriptions.unsubscribe();
   }
 
@@ -110,6 +126,35 @@ export class GameComponent implements OnInit, OnDestroy {
       error: (err) =>
         (this.error = err?.error?.message ?? 'Failed to load game state'),
     });
+  }
+
+  private refreshSilent(): void {
+    this.gameApi.state(this.code).subscribe({
+      next: (state) => {
+        this.state = state;
+        this.onStateUpdated(state);
+      },
+      error: () => {
+        // ignore transient errors while reconnecting
+      },
+    });
+  }
+
+  private startPolling(): void {
+    this.pollSubscription?.unsubscribe();
+    this.pollSubscription = interval(this.pollMs)
+      .pipe(startWith(0))
+      .subscribe(() => this.refreshSilent());
+    this.subscriptions.add(this.pollSubscription);
+  }
+
+  private updatePollingMode(): void {
+    const desired = this.wsConnected
+      ? GameComponent.POLL_SLOW_MS
+      : GameComponent.POLL_FAST_MS;
+    if (desired === this.pollMs && this.pollSubscription) return;
+    this.pollMs = desired;
+    this.startPolling();
   }
 
   answer(optionId: number): void {
