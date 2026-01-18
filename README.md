@@ -74,9 +74,24 @@ Creates/refreshes an anonymous guest session backed by DB + an HttpOnly cookie:
 - `POST /api/guest/session` -> sets `guestSessionId` cookie
 - `DELETE /api/guest/session` -> clears cookie (and revokes the session server-side)
 - `GET /api/guest/session` -> returns current session info (including generated `displayName`)
+- `POST /api/guest/session/heartbeat` -> keeps the session “alive” (updates `lastSeenAt`, extends expiry), returns `204 No Content`
 
 Notes:
 - Guest `displayName` is generated server-side (safe characters, no user input).
+
+### Presence (disconnect handling)
+Browsers don’t always fire `beforeunload` / `sendBeacon` (crash, sleep, network loss), so the app also uses a heartbeat + server cleanup:
+- Frontend sends `POST /api/guest/session/heartbeat` periodically (every ~10s).
+- Backend removes stale guests from **OPEN** lobbies only (never during `IN_GAME`).
+
+Config (optional):
+```properties
+# How long a guest can be “silent” before being treated as disconnected
+lobby.presence.timeout=PT25S
+
+# Cleanup frequency
+lobby.presence.cleanup.fixedDelayMs=5000
+```
 
 All other endpoints (as they are added) are protected by Spring Security (HTTP Basic).
 If no user is configured, Spring generates a password and prints it in the startup logs.
