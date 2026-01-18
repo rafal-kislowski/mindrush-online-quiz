@@ -54,4 +54,10 @@ public class GuestSessionController {
                 .header("Set-Cookie", service.clearCookieHeader())
                 .build();
     }
+
+    @PostMapping("/heartbeat")
+    public ResponseEntity<Void> heartbeat(HttpServletRequest request) {
+        service.heartbeat(request);
+        return ResponseEntity.noContent().build();
+    }
 }

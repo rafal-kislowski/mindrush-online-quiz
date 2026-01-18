@@ -129,6 +129,14 @@ public class GuestSessionService {
         repository.save(session);
     }
 
+    public void heartbeat(HttpServletRequest request) {
+        Instant now = Instant.now();
+        GuestSession session = requireValidSession(request);
+        session.setLastSeenAt(now);
+        session.setExpiresAt(now.plus(ttl));
+        repository.save(session);
+    }
+
     private String generateGuestDisplayName() {
         String adjective = ADJECTIVES[random.nextInt(ADJECTIVES.length)];
         String noun = NOUNS[random.nextInt(NOUNS.length)];

@@ -18,6 +18,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/guest/session").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/guest/session/heartbeat").permitAll()
                         .requestMatchers(HttpMethod.DELETE, "/api/guest/session").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/guest/session").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/quizzes/**").permitAll()

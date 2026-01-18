@@ -12,6 +12,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import jakarta.servlet.http.Cookie;
 
+import java.time.Instant;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -91,6 +92,21 @@ class GuestSessionControllerTest {
 
         GuestSession session = repository.findById(sessionId).orElseThrow();
         assertThat(session.isRevoked()).isTrue();
+    }
+
+    @Test
+    void postHeartbeat_updatesLastSeenAt() throws Exception {
+        String sessionId = createGuestSessionId();
+
+        GuestSession session = repository.findById(sessionId).orElseThrow();
+        session.setLastSeenAt(Instant.EPOCH);
+        repository.save(session);
+
+        mockMvc.perform(post("/api/guest/session/heartbeat").cookie(new Cookie("guestSessionId", sessionId)))
+                .andExpect(status().isNoContent());
+
+        GuestSession updated = repository.findById(sessionId).orElseThrow();
+        assertThat(updated.getLastSeenAt()).isAfter(Instant.EPOCH);
     }
 
     private String createGuestSessionId() throws Exception {
