@@ -4,7 +4,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
@@ -44,6 +48,72 @@ public class QuizAdminService {
         return quizRepository.save(quiz);
     }
 
+    @Transactional(readOnly = true)
+    public List<AdminQuizListItem> listQuizzes() {
+        return quizRepository.findAllWithCategory().stream()
+                .map(q -> new AdminQuizListItem(
+                        q.getId(),
+                        q.getTitle(),
+                        q.getDescription(),
+                        q.getCategory() == null ? null : q.getCategory().getName(),
+                        questionRepository.countByQuizId(q.getId())
+                ))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public AdminQuizDetail getQuiz(Long quizId) {
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
+
+        List<QuizQuestion> questions = questionRepository.findAllByQuizIdOrderByOrderIndexAsc(quizId);
+        List<Long> questionIds = questions.stream().map(QuizQuestion::getId).toList();
+
+        Map<Long, List<AdminAnswerOption>> optionsByQuestionId = new HashMap<>();
+        if (!questionIds.isEmpty()) {
+            optionRepository.findAllByQuestionIdInOrderByQuestionIdAscOrderIndexAsc(questionIds).forEach(o -> {
+                optionsByQuestionId.computeIfAbsent(o.getQuestion().getId(), ignored -> new java.util.ArrayList<>())
+                        .add(new AdminAnswerOption(o.getId(), o.getOrderIndex(), o.getText(), o.isCorrect()));
+            });
+        }
+
+        List<AdminQuestion> qDtos = questions.stream()
+                .map(q -> new AdminQuestion(
+                        q.getId(),
+                        q.getOrderIndex(),
+                        q.getPrompt(),
+                        optionsByQuestionId.getOrDefault(q.getId(), List.of())
+                ))
+                .toList();
+
+        return new AdminQuizDetail(
+                quiz.getId(),
+                quiz.getTitle(),
+                quiz.getDescription(),
+                quiz.getCategory() == null ? null : quiz.getCategory().getName(),
+                qDtos
+        );
+    }
+
+    public Quiz updateQuiz(Long quizId, String title, String description, String categoryName) {
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
+
+        String t = title == null ? "" : title.trim();
+        if (t.isBlank()) throw new ResponseStatusException(BAD_REQUEST, "Title is required");
+
+        QuizCategory category = null;
+        if (categoryName != null && !categoryName.trim().isBlank()) {
+            String name = categoryName.trim();
+            category = categoryRepository.findByName(name).orElseGet(() -> categoryRepository.save(new QuizCategory(name)));
+        }
+
+        quiz.setTitle(t);
+        quiz.setDescription(description == null ? null : description.trim());
+        quiz.setCategory(category);
+        return quizRepository.save(quiz);
+    }
+
     public QuizQuestion addQuestion(Long quizId, String prompt, List<AnswerOptionInput> options) {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
@@ -75,6 +145,102 @@ public class QuizAdminService {
         return q;
     }
 
-    public record AnswerOptionInput(String text, boolean correct) {}
-}
+    public void updateQuestion(Long quizId, Long questionId, String prompt, List<AnswerOptionUpdateInput> options) {
+        QuizQuestion question = questionRepository.findByIdAndQuizId(questionId, quizId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Question not found"));
 
+        String p = prompt == null ? "" : prompt.trim();
+        if (p.isBlank()) throw new ResponseStatusException(BAD_REQUEST, "Prompt is required");
+
+        if (options == null || options.size() != 4) {
+            throw new ResponseStatusException(BAD_REQUEST, "Exactly 4 answer options are required");
+        }
+
+        long correctCount = options.stream().filter(o -> o != null && o.correct()).count();
+        if (correctCount != 1) {
+            throw new ResponseStatusException(BAD_REQUEST, "Exactly 1 answer option must be correct");
+        }
+        for (AnswerOptionUpdateInput o : options) {
+            String text = o == null ? "" : (o.text() == null ? "" : o.text().trim());
+            if (text.isBlank()) throw new ResponseStatusException(BAD_REQUEST, "Answer option text is required");
+            if (o.id() == null) throw new ResponseStatusException(BAD_REQUEST, "Answer option id is required");
+        }
+
+        question.setPrompt(p);
+
+        List<QuizAnswerOption> existing = optionRepository.findAllByQuestionIdOrderByOrderIndexAsc(questionId);
+        if (existing.size() != 4) {
+            throw new ResponseStatusException(BAD_REQUEST, "Existing question must have exactly 4 answer options");
+        }
+
+        Map<Long, QuizAnswerOption> existingById = existing.stream()
+                .collect(Collectors.toMap(QuizAnswerOption::getId, o -> o));
+
+        Set<Long> existingIds = existingById.keySet();
+        Set<Long> requestedIds = options.stream().map(AnswerOptionUpdateInput::id).collect(Collectors.toSet());
+        if (!existingIds.equals(requestedIds)) {
+            throw new ResponseStatusException(BAD_REQUEST, "Answer option ids do not match existing question options");
+        }
+
+        for (int i = 0; i < options.size(); i++) {
+            AnswerOptionUpdateInput in = options.get(i);
+            QuizAnswerOption opt = existingById.get(in.id());
+            opt.setText(in.text().trim());
+            opt.setCorrect(in.correct());
+            opt.setOrderIndex(i);
+            optionRepository.save(opt);
+        }
+        questionRepository.save(question);
+    }
+
+    public void deleteQuestion(Long quizId, Long questionId) {
+        QuizQuestion question = questionRepository.findByIdAndQuizId(questionId, quizId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Question not found"));
+        optionRepository.deleteAllByQuestionId(questionId);
+        questionRepository.delete(question);
+    }
+
+    public void deleteQuiz(Long quizId) {
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
+        List<QuizQuestion> questions = questionRepository.findAllByQuizIdOrderByOrderIndexAsc(quizId);
+        List<Long> qIds = questions.stream().map(QuizQuestion::getId).toList();
+        if (!qIds.isEmpty()) optionRepository.deleteAllByQuestionIdIn(qIds);
+        questionRepository.deleteAll(questions);
+        quizRepository.delete(quiz);
+    }
+
+    public record AnswerOptionInput(String text, boolean correct) {}
+
+    public record AnswerOptionUpdateInput(Long id, String text, boolean correct) {}
+
+    public record AdminQuizListItem(
+            Long id,
+            String title,
+            String description,
+            String categoryName,
+            long questionCount
+    ) {}
+
+    public record AdminQuizDetail(
+            Long id,
+            String title,
+            String description,
+            String categoryName,
+            List<AdminQuestion> questions
+    ) {}
+
+    public record AdminQuestion(
+            Long id,
+            int orderIndex,
+            String prompt,
+            List<AdminAnswerOption> options
+    ) {}
+
+    public record AdminAnswerOption(
+            Long id,
+            int orderIndex,
+            String text,
+            boolean correct
+    ) {}
+}

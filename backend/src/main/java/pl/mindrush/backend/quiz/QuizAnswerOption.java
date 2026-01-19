@@ -60,5 +60,16 @@ public class QuizAnswerOption {
     public int getOrderIndex() {
         return orderIndex;
     }
-}
 
+    public void setText(String text) {
+        this.text = text;
+    }
+
+    public void setCorrect(boolean correct) {
+        this.correct = correct;
+    }
+
+    public void setOrderIndex(int orderIndex) {
+        this.orderIndex = orderIndex;
+    }
+}

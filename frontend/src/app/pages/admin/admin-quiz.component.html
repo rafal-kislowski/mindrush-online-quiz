@@ -1,11 +1,141 @@
 <section class="admin">
   <div class="card admin__card">
-    <h1>Admin · Quiz Builder</h1>
-    <p class="muted">Create quizzes and add questions. (MVP version)</p>
+    <div class="admin__head">
+      <div>
+        <h1>Admin · Quizzes</h1>
+        <p class="muted">Create, browse and edit quizzes.</p>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="Admin tabs">
+        <button class="tab" type="button" [class.active]="tab === 'manage'" (click)="setTab('manage')">
+          Manage
+        </button>
+        <button class="tab" type="button" [class.active]="tab === 'create'" (click)="setTab('create')">
+          Create
+        </button>
+      </div>
+    </div>
 
     <div class="error" *ngIf="error">{{ error }}</div>
 
-    <div class="block">
+    <!-- MANAGE -->
+    <div class="panel" *ngIf="tab === 'manage'">
+      <div class="panel__left">
+        <div class="panel__title">
+          <h2>All quizzes</h2>
+          <button class="btn" type="button" (click)="loadList()" [disabled]="loadingList">Refresh</button>
+        </div>
+
+        <div class="list" *ngIf="quizzes.length; else emptyList">
+          <button
+            class="list__item"
+            type="button"
+            *ngFor="let q of quizzes"
+            [class.active]="selectedQuiz?.id === q.id"
+            (click)="selectQuiz(q.id)"
+          >
+            <div class="list__name">{{ q.title }}</div>
+            <div class="list__meta muted">
+              <span *ngIf="q.categoryName">{{ q.categoryName }}</span>
+              <span *ngIf="q.categoryName">·</span>
+              <span>{{ q.questionCount }} questions</span>
+            </div>
+          </button>
+        </div>
+        <ng-template #emptyList>
+          <div class="muted">No quizzes yet.</div>
+        </ng-template>
+      </div>
+
+      <div class="panel__right">
+        <div class="muted" *ngIf="!selectedQuiz">Select a quiz to edit.</div>
+
+        <ng-container *ngIf="selectedQuiz as quiz">
+          <div class="block">
+            <div class="panel__title">
+              <h2>Quiz details</h2>
+              <button class="btn" type="button" (click)="deleteSelectedQuiz()" [disabled]="deletingQuiz">
+                Delete quiz
+              </button>
+            </div>
+
+            <form class="form" [formGroup]="editQuizForm" (ngSubmit)="saveQuiz()">
+              <label class="field">
+                <span class="field__label">Title</span>
+                <input formControlName="title" />
+              </label>
+              <label class="field">
+                <span class="field__label">Description</span>
+                <input formControlName="description" />
+              </label>
+              <label class="field">
+                <span class="field__label">Category</span>
+                <input formControlName="categoryName" />
+              </label>
+              <button class="btn primary" type="submit" [disabled]="savingQuiz || editQuizForm.invalid">
+                Save quiz
+              </button>
+            </form>
+          </div>
+
+          <div class="block">
+            <div class="panel__title">
+              <h2>Questions</h2>
+              <div class="muted">{{ quiz.questions.length }} total</div>
+            </div>
+
+            <div class="question-list">
+              <button
+                class="qitem"
+                type="button"
+                *ngFor="let q of quiz.questions"
+                [class.active]="selectedQuestionId === q.id"
+                (click)="selectQuestion(q)"
+              >
+                <div class="qitem__n">#{{ q.orderIndex + 1 }}</div>
+                <div class="qitem__txt">{{ q.prompt }}</div>
+              </button>
+            </div>
+
+            <div class="editor" *ngIf="selectedQuestionId; else pickQuestion">
+              <div class="panel__title">
+                <h2>Edit question</h2>
+                <button class="btn" type="button" (click)="deleteSelectedQuestion()" [disabled]="deletingQuestion">
+                  Delete question
+                </button>
+              </div>
+
+              <form class="form" [formGroup]="editQuestionForm" (ngSubmit)="saveQuestion()">
+                <label class="field">
+                  <span class="field__label">Prompt</span>
+                  <input formControlName="prompt" />
+                </label>
+
+                <div class="options">
+                  <div class="opt" *ngFor="let key of ['o1','o2','o3','o4']; let i = index">
+                    <label class="opt__radio">
+                      <input type="radio" [value]="i" formControlName="correctIndex" />
+                      <span>Correct</span>
+                    </label>
+                    <input [formControlName]="key" [placeholder]="'Option ' + (i + 1)" />
+                  </div>
+                </div>
+
+                <button class="btn accent" type="submit" [disabled]="savingQuestion || editQuestionForm.invalid">
+                  Save question
+                </button>
+              </form>
+            </div>
+            <ng-template #pickQuestion>
+              <div class="muted">Pick a question to edit.</div>
+            </ng-template>
+          </div>
+        </ng-container>
+      </div>
+    </div>
+
+    <!-- CREATE -->
+    <div class="block" *ngIf="tab === 'create'">
       <h2>Create quiz</h2>
       <form class="form" [formGroup]="quizForm" (ngSubmit)="createQuiz()">
         <label class="field">
@@ -34,31 +164,30 @@
           <div class="pill" *ngIf="q.categoryName">Category: {{ q.categoryName }}</div>
         </div>
       </div>
-    </div>
 
-    <div class="block" *ngIf="createdQuiz">
-      <h2>Add question</h2>
-      <form class="form" [formGroup]="questionForm" (ngSubmit)="addQuestion()">
-        <label class="field">
-          <span class="field__label">Prompt</span>
-          <input formControlName="prompt" placeholder="Question text..." />
-        </label>
+      <div class="block" *ngIf="createdQuiz">
+        <h2>Add question</h2>
+        <form class="form" [formGroup]="questionForm" (ngSubmit)="addQuestion()">
+          <label class="field">
+            <span class="field__label">Prompt</span>
+            <input formControlName="prompt" placeholder="Question text..." />
+          </label>
 
-        <div class="options">
-          <div class="opt" *ngFor="let key of ['o1','o2','o3','o4']; let i = index">
-            <label class="opt__radio">
-              <input type="radio" [value]="i" formControlName="correctIndex" />
-              <span>Correct</span>
-            </label>
-            <input [formControlName]="key" [placeholder]="'Option ' + (i + 1)" />
+          <div class="options">
+            <div class="opt" *ngFor="let key of ['o1','o2','o3','o4']; let i = index">
+              <label class="opt__radio">
+                <input type="radio" [value]="i" formControlName="correctIndex" />
+                <span>Correct</span>
+              </label>
+              <input [formControlName]="key" [placeholder]="'Option ' + (i + 1)" />
+            </div>
           </div>
-        </div>
 
-        <button class="btn accent" type="submit" [disabled]="addingQuestion || questionForm.invalid">
-          Add question
-        </button>
-      </form>
+          <button class="btn accent" type="submit" [disabled]="addingQuestion || questionForm.invalid">
+            Add question
+          </button>
+        </form>
+      </div>
     </div>
   </div>
 </section>
-

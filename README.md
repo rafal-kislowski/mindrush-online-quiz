@@ -148,8 +148,14 @@ Public, read-only quiz endpoints (no auth required):
 
 ## Admin (quiz management)
 Admin-only quiz endpoints (requires `ADMIN` role):
+- `GET /api/admin/quizzes` -> list quizzes
+- `GET /api/admin/quizzes/{id}` -> quiz detail including questions and correct answers
 - `POST /api/admin/quizzes` -> create quiz
+- `PUT /api/admin/quizzes/{id}` -> update quiz (title/description/category)
+- `DELETE /api/admin/quizzes/{id}` -> delete quiz (and all its questions)
 - `POST /api/admin/quizzes/{id}/questions` -> add a question (4 options, exactly 1 correct)
+- `PUT /api/admin/quizzes/{id}/questions/{questionId}` -> update question + options (requires option ids, exactly 1 correct)
+- `DELETE /api/admin/quizzes/{id}/questions/{questionId}` -> delete question
 
 Optional dev seed data:
 - set `app.seed.enabled=true` (e.g. in `application-local.properties`)

@@ -19,6 +19,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -106,6 +107,87 @@ class AuthControllerTest {
                         .cookie(new jakarta.servlet.http.Cookie("accessToken", access)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.title").value("Test quiz"));
+    }
+
+    @Test
+    void admin_canEditQuestionAndOptions() throws Exception {
+        AppUser admin = new AppUser(
+                "admin@example.com",
+                passwordEncoder.encode("Password123"),
+                Set.of(AppRole.ADMIN),
+                clock.instant()
+        );
+        userRepository.save(admin);
+
+        MvcResult loginRes = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new Login("admin@example.com", "Password123"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String setCookie = String.join("\n", loginRes.getResponse().getHeaders(HttpHeaders.SET_COOKIE));
+        String access = cookieValueFromSetCookie(setCookie, "accessToken").orElseThrow();
+        jakarta.servlet.http.Cookie accessCookie = new jakarta.servlet.http.Cookie("accessToken", access);
+
+        MvcResult createQuizRes = mockMvc.perform(post("/api/admin/quizzes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Edit quiz\"}")
+                        .cookie(accessCookie))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        long quizId = objectMapper.readTree(createQuizRes.getResponse().getContentAsString()).get("id").asLong();
+
+        mockMvc.perform(post("/api/admin/quizzes/" + quizId + "/questions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "prompt": "Q1",
+                                  "options": [
+                                    { "text": "A", "correct": true },
+                                    { "text": "B", "correct": false },
+                                    { "text": "C", "correct": false },
+                                    { "text": "D", "correct": false }
+                                  ]
+                                }
+                                """)
+                        .cookie(accessCookie))
+                .andExpect(status().isCreated());
+
+        MvcResult detailRes = mockMvc.perform(get("/api/admin/quizzes/" + quizId).cookie(accessCookie))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        var detailJson = objectMapper.readTree(detailRes.getResponse().getContentAsString());
+        var question = detailJson.get("questions").get(0);
+        long questionId = question.get("id").asLong();
+        var options = question.get("options");
+
+        long o1 = options.get(0).get("id").asLong();
+        long o2 = options.get(1).get("id").asLong();
+        long o3 = options.get(2).get("id").asLong();
+        long o4 = options.get(3).get("id").asLong();
+
+        mockMvc.perform(put("/api/admin/quizzes/" + quizId + "/questions/" + questionId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "prompt": "Q1 updated",
+                                  "options": [
+                                    { "id": %d, "text": "A1", "correct": false },
+                                    { "id": %d, "text": "B1", "correct": false },
+                                    { "id": %d, "text": "C1", "correct": true },
+                                    { "id": %d, "text": "D1", "correct": false }
+                                  ]
+                                }
+                                """.formatted(o1, o2, o3, o4))
+                        .cookie(accessCookie))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/admin/quizzes/" + quizId).cookie(accessCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.questions[0].prompt").value("Q1 updated"))
+                .andExpect(jsonPath("$.questions[0].options[2].correct").value(true));
     }
 
     private record Login(String email, String password) {}

@@ -52,5 +52,16 @@ public class Quiz {
     public QuizCategory getCategory() {
         return category;
     }
-}
 
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public void setCategory(QuizCategory category) {
+        this.category = category;
+    }
+}

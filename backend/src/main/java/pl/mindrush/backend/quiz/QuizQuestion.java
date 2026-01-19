@@ -52,5 +52,8 @@ public class QuizQuestion {
     public int getOrderIndex() {
         return orderIndex;
     }
-}
 
+    public void setPrompt(String prompt) {
+        this.prompt = prompt;
+    }
+}
