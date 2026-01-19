@@ -403,6 +403,18 @@
   backdrop-filter: blur(12px);
 }
 
+.topbar__right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar .btn {
+  height: 36px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
 .burger {
   width: 42px;
   height: 42px;
@@ -429,6 +441,17 @@
   font-weight: 900;
   letter-spacing: 0.2px;
   color: rgba(255, 255, 255, 0.92);
+}
+
+.topbar__user {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.78);
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.2px;
 }
 
 .register {

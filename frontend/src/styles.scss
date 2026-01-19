@@ -86,6 +86,9 @@ input::placeholder {
 }
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   height: 42px;
   padding: 0 14px;
   border-radius: 12px;
@@ -121,4 +124,18 @@ input::placeholder {
   border-color: rgba(255, 138, 43, 0.60);
   background: linear-gradient(180deg, rgba(255, 138, 43, 0.96), rgba(255, 138, 43, 0.72));
   color: rgba(8, 12, 28, 0.95);
+}
+
+.btn.secondary {
+  border-color: rgba(47, 134, 255, 0.55);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.07),
+    rgba(255, 255, 255, 0.03)
+  );
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.btn.secondary:hover {
+  filter: brightness(1.08);
 }

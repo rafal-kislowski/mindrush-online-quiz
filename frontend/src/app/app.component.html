@@ -9,6 +9,40 @@
       </div>
 
       <!-- USER -->
+      <div class="user" *ngIf="authUser$ | async as user; else guestUser">
+        <div class="user__avatar" style="--p: 0.72">
+          <div class="ring" aria-hidden="true"></div>
+          <div class="face" aria-hidden="true">
+            <svg
+              class="avatar-svg"
+              viewBox="0 0 100 100"
+              role="img"
+              aria-label="Default avatar"
+            >
+              <defs>
+                <linearGradient id="avatarGradAuth" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="rgba(255,255,255,0.20)" />
+                  <stop offset="1" stop-color="rgba(255,255,255,0.02)" />
+                </linearGradient>
+              </defs>
+              <rect x="0" y="0" width="100" height="100" rx="50" fill="url(#avatarGradAuth)" />
+              <circle cx="50" cy="42" r="18" fill="rgba(255,255,255,0.26)" />
+              <path
+                d="M18 92c4-20 20-30 32-30s28 10 32 30"
+                fill="rgba(255,255,255,0.22)"
+              />
+            </svg>
+          </div>
+          <div class="level">A</div>
+        </div>
+
+        <div class="user__name">{{ user.email }}</div>
+        <div class="user__score">
+          {{ (user.roles || []).includes('ADMIN') ? 'ADMIN' : 'USER' }}
+        </div>
+      </div>
+
+      <ng-template #guestUser>
       <div class="user" *ngIf="session$ | async as session">
         <div class="user__avatar" style="--p: 0.72">
           <div class="ring" aria-hidden="true"></div>
@@ -48,6 +82,7 @@
           0 <span class="coin" aria-hidden="true"></span>
         </div>
       </div>
+      </ng-template>
 
       <!-- MAIN MENU -->
     </div>
@@ -151,7 +186,7 @@
       <div class="nav-divider"><span>Quick Actions</span></div>
 
       <div class="section" aria-label="Quick actions">
-        <a class="app-item" routerLink="/create-quiz" routerLinkActive="active">
+        <a class="app-item" *ngIf="isAdmin$ | async" routerLink="/create-quiz" routerLinkActive="active">
           <span class="app-ico app-ico--orange" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none">
               <path
@@ -241,7 +276,14 @@
       <div></div>
 
       <div class="topbar__right">
-        <a class="btn accent register" routerLink="/register">Register</a>
+        <ng-container *ngIf="authUser$ | async as user; else guestActions">
+          <span class="topbar__user">{{ user.email }}</span>
+          <button class="btn" type="button" (click)="logout()">Logout</button>
+        </ng-container>
+        <ng-template #guestActions>
+          <a class="btn secondary" routerLink="/login">Login</a>
+          <a class="btn accent register" routerLink="/register">Register</a>
+        </ng-template>
       </div>
     </header>
 

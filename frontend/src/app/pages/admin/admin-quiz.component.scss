@@ -1,0 +1,90 @@
+.admin {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.admin__card h1 {
+  margin: 0 0 6px;
+  font-weight: 900;
+}
+
+.admin__card > p {
+  margin: 0 0 14px;
+}
+
+.block {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.form {
+  display: grid;
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.field__label {
+  font-size: 12px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.72);
+  text-transform: uppercase;
+  letter-spacing: 0.35px;
+}
+
+.options {
+  display: grid;
+  gap: 10px;
+}
+
+.opt {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.opt__radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.created__meta {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pill {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  font-weight: 800;
+  font-size: 12px;
+}
+
+@media (max-width: 520px) {
+  .opt {
+    grid-template-columns: 1fr;
+  }
+}
+

@@ -1,0 +1,64 @@
+<section class="admin">
+  <div class="card admin__card">
+    <h1>Admin · Quiz Builder</h1>
+    <p class="muted">Create quizzes and add questions. (MVP version)</p>
+
+    <div class="error" *ngIf="error">{{ error }}</div>
+
+    <div class="block">
+      <h2>Create quiz</h2>
+      <form class="form" [formGroup]="quizForm" (ngSubmit)="createQuiz()">
+        <label class="field">
+          <span class="field__label">Title</span>
+          <input formControlName="title" placeholder="e.g. Java Basics" />
+        </label>
+
+        <label class="field">
+          <span class="field__label">Description</span>
+          <input formControlName="description" placeholder="Optional" />
+        </label>
+
+        <label class="field">
+          <span class="field__label">Category</span>
+          <input formControlName="categoryName" placeholder="Optional (e.g. Programming)" />
+        </label>
+
+        <button class="btn primary" type="submit" [disabled]="creating || quizForm.invalid">
+          Create
+        </button>
+      </form>
+
+      <div class="created" *ngIf="createdQuiz as q">
+        <div class="created__meta">
+          <div class="pill">Quiz ID: {{ q.id }}</div>
+          <div class="pill" *ngIf="q.categoryName">Category: {{ q.categoryName }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="block" *ngIf="createdQuiz">
+      <h2>Add question</h2>
+      <form class="form" [formGroup]="questionForm" (ngSubmit)="addQuestion()">
+        <label class="field">
+          <span class="field__label">Prompt</span>
+          <input formControlName="prompt" placeholder="Question text..." />
+        </label>
+
+        <div class="options">
+          <div class="opt" *ngFor="let key of ['o1','o2','o3','o4']; let i = index">
+            <label class="opt__radio">
+              <input type="radio" [value]="i" formControlName="correctIndex" />
+              <span>Correct</span>
+            </label>
+            <input [formControlName]="key" [placeholder]="'Option ' + (i + 1)" />
+          </div>
+        </div>
+
+        <button class="btn accent" type="submit" [disabled]="addingQuestion || questionForm.invalid">
+          Add question
+        </button>
+      </form>
+    </div>
+  </div>
+</section>
+

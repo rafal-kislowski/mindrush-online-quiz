@@ -1,0 +1,49 @@
+.auth {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.auth__card {
+  padding: 18px;
+}
+
+.auth__top h1 {
+  margin: 0 0 6px;
+  font-weight: 900;
+  letter-spacing: 0.2px;
+}
+
+.auth__top p {
+  margin: 0 0 16px;
+}
+
+.auth__form {
+  display: grid;
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.field__label {
+  font-size: 12px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.72);
+  text-transform: uppercase;
+  letter-spacing: 0.35px;
+}
+
+.auth__submit {
+  width: 100%;
+  justify-content: center;
+}
+
+.auth__links {
+  display: flex;
+  justify-content: center;
+  margin-top: 6px;
+}
+

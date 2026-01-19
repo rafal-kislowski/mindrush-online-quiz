@@ -1,0 +1,41 @@
+<section class="auth">
+  <div class="card auth__card">
+    <div class="auth__top">
+      <h1>{{ mode === 'login' ? 'Login' : 'Register' }}</h1>
+      <p class="muted">
+        {{ mode === 'login'
+          ? 'Sign in to access admin features.'
+          : 'Create an account to unlock more features.' }}
+      </p>
+    </div>
+
+    <form class="auth__form" (ngSubmit)="submit()" [formGroup]="form">
+      <label class="field">
+        <span class="field__label">Email</span>
+        <input type="email" formControlName="email" placeholder="you@example.com" autocomplete="email" />
+      </label>
+
+      <label class="field">
+        <span class="field__label">Password</span>
+        <input type="password" formControlName="password" placeholder="Min 8 characters" autocomplete="current-password" />
+      </label>
+
+      <label class="field" *ngIf="mode === 'register'">
+        <span class="field__label">Confirm password</span>
+        <input type="password" formControlName="confirmPassword" placeholder="Repeat password" autocomplete="new-password" />
+      </label>
+
+      <div class="error" *ngIf="error">{{ error }}</div>
+
+      <button class="btn primary auth__submit" type="submit" [disabled]="loading || form.invalid">
+        {{ mode === 'login' ? 'Login' : 'Create account' }}
+      </button>
+
+      <div class="auth__links">
+        <a class="muted" *ngIf="mode === 'login'" routerLink="/register">Need an account? Register</a>
+        <a class="muted" *ngIf="mode === 'register'" routerLink="/login">Already have an account? Login</a>
+      </div>
+    </form>
+  </div>
+</section>
+

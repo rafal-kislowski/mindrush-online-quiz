@@ -8,6 +8,8 @@ import {
   RouterOutlet,
 } from '@angular/router';
 import { filter } from 'rxjs';
+import { map } from 'rxjs';
+import { AuthService } from './core/auth/auth.service';
 import { SessionService } from './core/session/session.service';
 
 @Component({
@@ -19,8 +21,11 @@ import { SessionService } from './core/session/session.service';
 })
 export class AppComponent implements OnInit {
   private readonly sessionService = inject(SessionService);
+  private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   readonly session$ = this.sessionService.session$;
+  readonly authUser$ = this.authService.user$;
+  readonly isAdmin$ = this.authService.user$.pipe(map(u => !!u?.roles?.includes('ADMIN')));
 
   sidebarOpen = false;
 
@@ -37,6 +42,7 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     this.sessionService.ensure().subscribe();
+    this.authService.ensureLoaded().subscribe();
 
     this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
@@ -51,5 +57,11 @@ export class AppComponent implements OnInit {
 
   closeSidebar(): void {
     this.sidebarOpen = false;
+  }
+
+  logout(): void {
+    this.authService.logout().subscribe(() => {
+      this.router.navigate(['/']);
+    });
   }
 }
