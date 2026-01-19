@@ -33,6 +33,7 @@ export class AdminQuizComponent implements OnInit {
   deletingQuiz = false;
   creating = false;
   addingQuestion = false;
+  addingExistingQuestion = false;
 
   readonly quizForm = new FormGroup({
     title: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(120)] }),
@@ -41,6 +42,15 @@ export class AdminQuizComponent implements OnInit {
   });
 
   readonly questionForm = new FormGroup({
+    prompt: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(500)] }),
+    correctIndex: new FormControl(0, { nonNullable: true }),
+    o1: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
+    o2: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
+    o3: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
+    o4: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
+  });
+
+  readonly addExistingQuestionForm = new FormGroup({
     prompt: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(500)] }),
     correctIndex: new FormControl(0, { nonNullable: true }),
     o1: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
@@ -103,6 +113,14 @@ export class AdminQuizComponent implements OnInit {
           title: quiz.title ?? '',
           description: quiz.description ?? '',
           categoryName: quiz.categoryName ?? '',
+        });
+        this.addExistingQuestionForm.reset({
+          prompt: '',
+          correctIndex: 0,
+          o1: '',
+          o2: '',
+          o3: '',
+          o4: '',
         });
       },
       error: (err) => {
@@ -256,6 +274,49 @@ export class AdminQuizComponent implements OnInit {
         this.error = err?.error?.message ?? 'Failed to delete quiz';
       },
     });
+  }
+
+  addQuestionToSelectedQuiz(): void {
+    this.error = null;
+    if (!this.selectedQuiz) return;
+    if (this.addingExistingQuestion) return;
+    if (this.addExistingQuestionForm.invalid) return;
+
+    const prompt = this.addExistingQuestionForm.controls.prompt.value.trim();
+    const correctIndex = this.addExistingQuestionForm.controls.correctIndex.value;
+    const texts = [
+      this.addExistingQuestionForm.controls.o1.value.trim(),
+      this.addExistingQuestionForm.controls.o2.value.trim(),
+      this.addExistingQuestionForm.controls.o3.value.trim(),
+      this.addExistingQuestionForm.controls.o4.value.trim(),
+    ];
+
+    this.addingExistingQuestion = true;
+    this.api
+      .addQuestion(this.selectedQuiz.id, {
+        prompt,
+        options: texts.map((text, idx) => ({ text, correct: idx === correctIndex })),
+      })
+      .subscribe({
+        next: () => {
+          this.addingExistingQuestion = false;
+          const quizId = this.selectedQuiz!.id;
+          this.addExistingQuestionForm.reset({
+            prompt: '',
+            correctIndex: 0,
+            o1: '',
+            o2: '',
+            o3: '',
+            o4: '',
+          });
+          this.selectQuiz(quizId);
+          this.loadList();
+        },
+        error: (err) => {
+          this.addingExistingQuestion = false;
+          this.error = err?.error?.message ?? 'Failed to add question';
+        },
+      });
   }
 
   createQuiz(): void {

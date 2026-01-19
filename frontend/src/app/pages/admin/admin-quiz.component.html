@@ -129,6 +129,30 @@
             <ng-template #pickQuestion>
               <div class="muted">Pick a question to edit.</div>
             </ng-template>
+
+            <div class="block block--sub">
+              <h2>Add new question</h2>
+              <form class="form" [formGroup]="addExistingQuestionForm" (ngSubmit)="addQuestionToSelectedQuiz()">
+                <label class="field">
+                  <span class="field__label">Prompt</span>
+                  <input formControlName="prompt" placeholder="Question text..." />
+                </label>
+
+                <div class="options">
+                  <div class="opt" *ngFor="let key of ['o1','o2','o3','o4']; let i = index">
+                    <label class="opt__radio">
+                      <input type="radio" [value]="i" formControlName="correctIndex" />
+                      <span>Correct</span>
+                    </label>
+                    <input [formControlName]="key" [placeholder]="'Option ' + (i + 1)" />
+                  </div>
+                </div>
+
+                <button class="btn accent" type="submit" [disabled]="addingExistingQuestion || addExistingQuestionForm.invalid">
+                  Add question
+                </button>
+              </form>
+            </div>
           </div>
         </ng-container>
       </div>
