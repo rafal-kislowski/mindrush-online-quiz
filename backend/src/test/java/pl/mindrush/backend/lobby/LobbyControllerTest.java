@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import pl.mindrush.backend.guest.GuestSessionRepository;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.not;
@@ -94,6 +95,123 @@ class LobbyControllerTest {
         mockMvc.perform(get("/api/lobbies/" + code))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.players.length()").value(2));
+    }
+
+    @Test
+    void createLobby_guestCannotRequestMoreThan2Players() throws Exception {
+        String ownerSessionId = createGuestSession();
+
+        mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"maxPlayers\":3}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void createLobby_authenticatedUser_canRequestUpTo5Players() throws Exception {
+        String ownerSessionId = createGuestSession();
+        Cookie access = registerAndGetAccessCookie();
+
+        MvcResult created = mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .cookie(access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"maxPlayers\":5}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.maxPlayers").value(5))
+                .andExpect(jsonPath("$.players.length()").value(1))
+                .andReturn();
+
+        String code = jsonValue(created.getResponse().getContentAsString(), "\"code\":\"", "\"").orElseThrow();
+
+        String s2 = createGuestSession();
+        String s3 = createGuestSession();
+        String s4 = createGuestSession();
+        String s5 = createGuestSession();
+        String s6 = createGuestSession();
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", s2))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", s3))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", s4))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", s5))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.length()").value(5));
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", s6))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void setMaxPlayers_ownerCanChangeButNotBelowCurrentPlayers() throws Exception {
+        Cookie access = registerAndGetAccessCookie();
+
+        String ownerSessionId = createGuestSession();
+        MvcResult created = mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .cookie(access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"maxPlayers\":2}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String code = jsonValue(created.getResponse().getContentAsString(), "\"code\":\"", "\"").orElseThrow();
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/max-players")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .cookie(access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"maxPlayers\":4}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.maxPlayers").value(4));
+
+        String s2 = createGuestSession();
+        String s3 = createGuestSession();
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", s2))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", s3))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.length()").value(3));
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/max-players")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .cookie(access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"maxPlayers\":2}"))
+                .andExpect(status().isConflict());
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/max-players")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .cookie(access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"maxPlayers\":3}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.maxPlayers").value(3));
     }
 
     @Test
@@ -352,7 +470,7 @@ class LobbyControllerTest {
     }
 
     @Test
-    void leave_ownerAsLastPlayer_deletesLobby() throws Exception {
+    void leave_ownerAsLastPlayer_keepsLobbyForGracePeriod() throws Exception {
         String ownerSessionId = createGuestSession();
 
         MvcResult created = mockMvc.perform(post("/api/lobbies")
@@ -369,7 +487,9 @@ class LobbyControllerTest {
                 .andExpect(status().isNoContent());
 
         mockMvc.perform(get("/api/lobbies/" + code))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.length()").value(0))
+                .andExpect(jsonPath("$.status").value("OPEN"));
     }
 
     @Test
@@ -483,6 +603,27 @@ class LobbyControllerTest {
                 .andReturn();
         String setCookie = res.getResponse().getHeader(HttpHeaders.SET_COOKIE);
         return cookieValueFromSetCookie(setCookie, "guestSessionId").orElseThrow();
+    }
+
+    private Cookie registerAndGetAccessCookie() throws Exception {
+        String email = "user-" + UUID.randomUUID() + "@example.com";
+        String body = """
+                {
+                  "email": "%s",
+                  "displayName": "User",
+                  "password": "Password123"
+                }
+                """.formatted(email);
+
+        MvcResult res = mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String setCookie = String.join("\n", res.getResponse().getHeaders(HttpHeaders.SET_COOKIE));
+        String access = cookieValueFromSetCookie(setCookie, "accessToken").orElseThrow();
+        return new Cookie("accessToken", access);
     }
 
     private Long firstQuizId() throws Exception {

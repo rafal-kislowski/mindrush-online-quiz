@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
@@ -23,6 +24,8 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 public class LobbyService {
 
     public static final int GUEST_LOBBY_MAX_PLAYERS = 2;
+    public static final int AUTH_LOBBY_MIN_PLAYERS = 2;
+    public static final int AUTH_LOBBY_MAX_PLAYERS = 5;
 
     private static final char[] CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".toCharArray();
     private static final int CODE_LENGTH = 6;
@@ -47,20 +50,63 @@ public class LobbyService {
         this.lobbyEventPublisher = lobbyEventPublisher;
     }
 
-    public Map<String, Object> createLobby(HttpServletRequest request, String rawPassword) {
+    public Map<String, Object> createLobby(
+            HttpServletRequest request,
+            String rawPassword,
+            Integer requestedMaxPlayers,
+            boolean authenticatedUser
+    ) {
         GuestSession guestSession = guestSessionService.requireValidSession(request);
         Instant now = Instant.now();
 
         String code = generateUniqueCode();
         String passwordHash = (rawPassword == null || rawPassword.isBlank()) ? null : passwordEncoder.encode(rawPassword);
 
-        Lobby lobby = Lobby.createNew(code, guestSession.getId(), GUEST_LOBBY_MAX_PLAYERS, passwordHash, now);
+        int maxPlayers = resolveMaxPlayers(requestedMaxPlayers, authenticatedUser);
+        Lobby lobby = Lobby.createNew(code, guestSession.getId(), maxPlayers, passwordHash, now);
         lobbyRepository.save(lobby);
 
         String displayName = uniqueDisplayNameForLobby(lobby.getId(), guestSession.getDisplayName());
         participantRepository.save(LobbyParticipant.createGuest(lobby, guestSession.getId(), displayName, now));
 
         lobbyEventPublisher.lobbyUpdated(lobby.getCode());
+        return lobbySummary(lobby, guestSession.getId());
+    }
+
+    public Map<String, Object> setLobbyMaxPlayers(
+            HttpServletRequest request,
+            String code,
+            int maxPlayers,
+            boolean authenticatedUser
+    ) {
+        GuestSession guestSession = guestSessionService.requireValidSession(request);
+        Lobby lobby = lobbyRepository.findByCode(code).orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Lobby not found"));
+
+        if (!guestSession.getId().equals(lobby.getOwnerGuestSessionId())) {
+            throw new ResponseStatusException(FORBIDDEN, "Only the lobby owner can change lobby settings");
+        }
+        if (lobby.getStatus() != LobbyStatus.OPEN) {
+            throw new ResponseStatusException(CONFLICT, "Lobby is not open");
+        }
+
+        if (!authenticatedUser && maxPlayers > GUEST_LOBBY_MAX_PLAYERS) {
+            throw new ResponseStatusException(FORBIDDEN, "Login required for lobbies larger than 2 players");
+        }
+        if (maxPlayers < AUTH_LOBBY_MIN_PLAYERS || maxPlayers > AUTH_LOBBY_MAX_PLAYERS) {
+            throw new ResponseStatusException(BAD_REQUEST, "maxPlayers must be between 2 and 5");
+        }
+
+        long current = participantRepository.countByLobbyId(lobby.getId());
+        if (maxPlayers < current) {
+            throw new ResponseStatusException(CONFLICT, "maxPlayers cannot be lower than current player count");
+        }
+
+        if (lobby.getMaxPlayers() != maxPlayers) {
+            lobby.setMaxPlayers(maxPlayers);
+            lobbyRepository.save(lobby);
+            lobbyEventPublisher.lobbyUpdated(lobby.getCode());
+        }
+
         return lobbySummary(lobby, guestSession.getId());
     }
 
@@ -94,6 +140,13 @@ public class LobbyService {
         }
 
         Instant now = Instant.now();
+        if (count == 0 && lobby.getEmptySince() != null) {
+            lobby.setEmptySince(null);
+            if (!guestSession.getId().equals(lobby.getOwnerGuestSessionId())) {
+                lobby.setOwnerGuestSessionId(guestSession.getId());
+            }
+            lobbyRepository.save(lobby);
+        }
         String displayName = uniqueDisplayNameForLobby(lobby.getId(), guestSession.getDisplayName());
         participantRepository.save(LobbyParticipant.createGuest(lobby, guestSession.getId(), displayName, now));
 
@@ -132,7 +185,9 @@ public class LobbyService {
 
         long remaining = participantRepository.countByLobbyId(lobby.getId());
         if (remaining == 0) {
-            lobbyRepository.delete(lobby);
+            lobby.setEmptySince(Instant.now());
+            lobbyRepository.save(lobby);
+            lobbyEventPublisher.lobbyUpdated(lobby.getCode());
             return LeaveResult.deleted();
         }
 
@@ -182,7 +237,9 @@ public class LobbyService {
 
         long remaining = participantRepository.countByLobbyId(lobby.getId());
         if (remaining == 0) {
-            lobbyRepository.delete(lobby);
+            lobby.setEmptySince(Instant.now());
+            lobbyRepository.save(lobby);
+            lobbyEventPublisher.lobbyUpdated(lobby.getCode());
             return;
         }
 
@@ -236,6 +293,23 @@ public class LobbyService {
             }
         }
         throw new ResponseStatusException(CONFLICT, "Failed to generate unique lobby code");
+    }
+
+    private static int resolveMaxPlayers(Integer requestedMaxPlayers, boolean authenticatedUser) {
+        if (requestedMaxPlayers == null) return GUEST_LOBBY_MAX_PLAYERS;
+
+        if (!authenticatedUser) {
+            if (requestedMaxPlayers == GUEST_LOBBY_MAX_PLAYERS) return GUEST_LOBBY_MAX_PLAYERS;
+            if (requestedMaxPlayers > GUEST_LOBBY_MAX_PLAYERS) {
+                throw new ResponseStatusException(FORBIDDEN, "Login required for lobbies larger than 2 players");
+            }
+            throw new ResponseStatusException(BAD_REQUEST, "maxPlayers must be at least 2");
+        }
+
+        if (requestedMaxPlayers < AUTH_LOBBY_MIN_PLAYERS || requestedMaxPlayers > AUTH_LOBBY_MAX_PLAYERS) {
+            throw new ResponseStatusException(BAD_REQUEST, "maxPlayers must be between 2 and 5");
+        }
+        return requestedMaxPlayers;
     }
 
     private String randomCode() {

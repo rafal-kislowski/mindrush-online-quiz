@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, ElementRef, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription, interval, startWith, switchMap } from 'rxjs';
@@ -8,6 +8,7 @@ import { LobbyApi } from '../../core/api/lobby.api';
 import { QuizApi } from '../../core/api/quiz.api';
 import { LobbyDto } from '../../core/models/lobby.models';
 import { QuizListItemDto } from '../../core/models/quiz.models';
+import { AuthService } from '../../core/auth/auth.service';
 import { SessionService } from '../../core/session/session.service';
 import { GameEventsService } from '../../core/ws/game-events.service';
 import { LobbyEventsService } from '../../core/ws/lobby-events.service';
@@ -23,6 +24,11 @@ import { StompClientService } from '../../core/ws/stomp-client.service';
 export class LobbyComponent implements OnInit, OnDestroy {
   private static readonly POLL_FAST_MS = 1500;
   private static readonly POLL_SLOW_MS = 10_000;
+
+  get authUser$() {
+    return this.auth.user$;
+  }
+  readonly maxPlayersOptions = [2, 3, 4, 5] as const;
 
   code = '';
   lobby: LobbyDto | null = null;
@@ -42,6 +48,11 @@ export class LobbyComponent implements OnInit, OnDestroy {
   privacySaving = false;
   private privacyDirty = false;
 
+  maxPlayersDraft: 2 | 3 | 4 | 5 = 2;
+  maxPlayersSaving = false;
+  private maxPlayersDirty = false;
+  maxPlayersMenuOpen = false;
+
   private readonly subscriptions = new Subscription();
   private pollSubscription: Subscription | null = null;
   private gameEventsSubscription: Subscription | null = null;
@@ -58,13 +69,17 @@ export class LobbyComponent implements OnInit, OnDestroy {
     private readonly lobbyApi: LobbyApi,
     private readonly quizApi: QuizApi,
     private readonly gameApi: GameApi,
+    private readonly auth: AuthService,
     private readonly sessionService: SessionService,
     private readonly gameEvents: GameEventsService,
     private readonly lobbyEvents: LobbyEventsService,
-    private readonly stompClient: StompClientService
+    private readonly stompClient: StompClientService,
+    private readonly el: ElementRef<HTMLElement>
   ) {}
 
   ngOnInit(): void {
+    this.auth.ensureLoaded().subscribe({ error: () => {} });
+
     this.subscriptions.add(
       this.stompClient.state$.subscribe((state) => {
         this.wsConnected = state === 'connected';
@@ -207,6 +222,13 @@ export class LobbyComponent implements OnInit, OnDestroy {
 
     if (!this.privacyDirty) {
       this.privacyMode = lobby.hasPassword ? 'private' : 'public';
+    }
+
+    if (!this.maxPlayersDirty && lobby.maxPlayers != null) {
+      const mp = lobby.maxPlayers;
+      if (mp === 2 || mp === 3 || mp === 4 || mp === 5) {
+        this.maxPlayersDraft = mp;
+      }
     }
 
     if (lobby.isOwner && !this.quizzesLoaded) {
@@ -383,5 +405,72 @@ export class LobbyComponent implements OnInit, OnDestroy {
           this.error = err?.error?.message ?? 'Failed to update lobby privacy';
         },
       });
+  }
+
+  onMaxPlayersChange(value: number): void {
+    this.maxPlayersDirty = true;
+    this.maxPlayersDraft = value as 2 | 3 | 4 | 5;
+  }
+
+  toggleMaxPlayersMenu(): void {
+    this.maxPlayersMenuOpen = !this.maxPlayersMenuOpen;
+  }
+
+  setMaxPlayersFromMenu(value: 2 | 3 | 4 | 5): void {
+    if (this.lobby?.players && value < this.lobby.players.length) return;
+    this.onMaxPlayersChange(value);
+    this.maxPlayersMenuOpen = false;
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(ev: MouseEvent): void {
+    if (!this.maxPlayersMenuOpen) return;
+    const target = ev.target as Node | null;
+    if (!target) return;
+    if (!this.el.nativeElement.contains(target)) {
+      this.maxPlayersMenuOpen = false;
+    }
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  onDocumentKeydown(ev: KeyboardEvent): void {
+    if (!this.maxPlayersMenuOpen) return;
+    if (ev.key === 'Escape') {
+      this.maxPlayersMenuOpen = false;
+    }
+  }
+
+  saveMaxPlayers(): void {
+    if (!this.lobby?.isOwner) return;
+    if (!this.lobby.players) return;
+    if (this.maxPlayersSaving) return;
+
+    this.error = null;
+    const currentPlayers = this.lobby.players.length;
+    const desired = this.maxPlayersDraft;
+
+    if (desired < currentPlayers) {
+      this.error = `Cannot set max players below current players (${currentPlayers})`;
+      return;
+    }
+
+    const isLoggedIn = !!this.auth.snapshot;
+    if (!isLoggedIn && desired > 2) {
+      this.error = 'Login required for lobbies larger than 2 players';
+      return;
+    }
+
+    this.maxPlayersSaving = true;
+    this.lobbyApi.setMaxPlayers(this.code, desired).subscribe({
+      next: (updated) => {
+        this.maxPlayersSaving = false;
+        this.maxPlayersDirty = false;
+        this.onLobbyUpdate(updated);
+      },
+      error: (err) => {
+        this.maxPlayersSaving = false;
+        this.error = err?.error?.message ?? 'Failed to update max players';
+      },
+    });
   }
 }

@@ -27,8 +27,11 @@ public class Lobby {
     @Column(name = "password_hash")
     private String passwordHash;
 
-    @Column(name = "max_players", nullable = false, updatable = false)
+    @Column(name = "max_players", nullable = false)
     private int maxPlayers;
+
+    @Column(name = "empty_since")
+    private Instant emptySince;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 16, nullable = false)
@@ -44,6 +47,7 @@ public class Lobby {
         lobby.ownerGuestSessionId = ownerGuestSessionId;
         lobby.maxPlayers = maxPlayers;
         lobby.passwordHash = passwordHash;
+        lobby.emptySince = null;
         lobby.status = LobbyStatus.OPEN;
         lobby.createdAt = now;
         return lobby;
@@ -75,6 +79,18 @@ public class Lobby {
 
     public int getMaxPlayers() {
         return maxPlayers;
+    }
+
+    public void setMaxPlayers(int maxPlayers) {
+        this.maxPlayers = maxPlayers;
+    }
+
+    public Instant getEmptySince() {
+        return emptySince;
+    }
+
+    public void setEmptySince(Instant emptySince) {
+        this.emptySince = emptySince;
     }
 
     public LobbyStatus getStatus() {

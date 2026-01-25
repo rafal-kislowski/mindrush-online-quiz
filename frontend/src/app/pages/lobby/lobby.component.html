@@ -155,6 +155,54 @@
           {{ privacySaving ? "Saving…" : "Save privacy" }}
         </button>
 
+        <ng-container *ngIf="(authUser$ | async) as user">
+          <div class="row">
+            <label class="label">Max players</label>
+            <div class="mr-select-wrap" [class.menu-open]="maxPlayersMenuOpen">
+              <button
+                class="mr-select"
+                type="button"
+                (click)="toggleMaxPlayersMenu()"
+                [attr.aria-expanded]="maxPlayersMenuOpen"
+                aria-label="Max players"
+              >
+                <span class="mr-select__label">{{ maxPlayersDraft }} players</span>
+                <span class="mr-select__caret" aria-hidden="true"></span>
+              </button>
+
+              <div
+                class="mr-select__menu"
+                *ngIf="maxPlayersMenuOpen"
+                role="listbox"
+                aria-label="Select max players"
+              >
+                <button
+                  type="button"
+                  class="mr-select__item"
+                  *ngFor="let n of maxPlayersOptions"
+                  [class.active]="maxPlayersDraft === n"
+                  [class.disabled]="n < l.players.length"
+                  [disabled]="n < l.players.length"
+                  (click)="setMaxPlayersFromMenu(n)"
+                  role="option"
+                  [attr.aria-selected]="maxPlayersDraft === n"
+                >
+                  {{ n }} players
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <button
+            class="btn primary"
+            type="button"
+            (click)="saveMaxPlayers()"
+            [disabled]="maxPlayersSaving"
+          >
+            {{ maxPlayersSaving ? "Saving…" : "Save max players" }}
+          </button>
+        </ng-container>
+
         <div class="row">
           <label class="label">Quiz</label>
           <select [(ngModel)]="selectedQuizId">

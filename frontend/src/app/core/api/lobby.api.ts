@@ -7,8 +7,10 @@ import { LobbyDto } from '../models/lobby.models';
 export class LobbyApi {
   constructor(private readonly http: HttpClient) {}
 
-  create(password?: string): Observable<{ code: string }> {
-    const body = password ? { password } : {};
+  create(params: { password?: string; maxPlayers?: number } = {}): Observable<{ code: string }> {
+    const body: Record<string, unknown> = {};
+    if (params.password) body['password'] = params.password;
+    if (params.maxPlayers != null) body['maxPlayers'] = params.maxPlayers;
     return this.http.post<{ code: string }>('/api/lobbies', body, { withCredentials: true });
   }
 
@@ -28,5 +30,13 @@ export class LobbyApi {
   setPassword(code: string, password?: string): Observable<LobbyDto> {
     const body = password ? { password } : {};
     return this.http.post<LobbyDto>(`/api/lobbies/${encodeURIComponent(code)}/password`, body, { withCredentials: true });
+  }
+
+  setMaxPlayers(code: string, maxPlayers: number): Observable<LobbyDto> {
+    return this.http.post<LobbyDto>(
+      `/api/lobbies/${encodeURIComponent(code)}/max-players`,
+      { maxPlayers },
+      { withCredentials: true }
+    );
   }
 }

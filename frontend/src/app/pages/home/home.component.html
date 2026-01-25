@@ -63,16 +63,83 @@
   <!-- CREATE LOBBY -->
   <article
     class="tile tile3d tile3d--static tile--install"
+    [class.tile--menu-open]="maxPlayersMenuOpen"
     aria-label="Create Lobby"
   >
-    <div class="tile__layout tile__layout--with-actions">
-      <div class="tile__left">
-        <div class="tile__copy">
-          <div class="tile__title">Create Lobby</div>
-          <div class="tile__desc">Create a guest room (max 2 players).</div>
-        </div>
+      <div class="tile__layout tile__layout--with-actions">
+        <div class="tile__left">
+          <div class="tile__copy">
+            <div class="tile__title">Create Lobby</div>
+            <div class="tile__desc" *ngIf="(authUser$ | async) as user; else guestCreateDesc">
+              Create a room (2–5 players).
+            </div>
+            <ng-template #guestCreateDesc>
+              <div class="tile__desc">Create a guest room (max 2 players).</div>
+            </ng-template>
+          </div>
 
         <div class="tile__actions">
+          <div class="tile__select-wrap" *ngIf="(authUser$ | async) as user">
+            <button
+              class="tile__select"
+              type="button"
+              (click)="toggleMaxPlayersMenu($event)"
+              [attr.aria-expanded]="maxPlayersMenuOpen"
+              aria-label="Max players"
+            >
+              <span class="tile__select-label">{{ createMaxPlayers }} players</span>
+              <span class="tile__select-caret" aria-hidden="true"></span>
+            </button>
+
+            <div
+              class="tile__select-menu"
+              [class.is-up]="maxPlayersMenuDirection === 'up'"
+              *ngIf="maxPlayersMenuOpen"
+              role="listbox"
+              aria-label="Select max players"
+            >
+              <button
+                type="button"
+                class="tile__select-item"
+                [class.active]="createMaxPlayers === 2"
+                (click)="setCreateMaxPlayers(2)"
+                role="option"
+                [attr.aria-selected]="createMaxPlayers === 2"
+              >
+                2 players
+              </button>
+              <button
+                type="button"
+                class="tile__select-item"
+                [class.active]="createMaxPlayers === 3"
+                (click)="setCreateMaxPlayers(3)"
+                role="option"
+                [attr.aria-selected]="createMaxPlayers === 3"
+              >
+                3 players
+              </button>
+              <button
+                type="button"
+                class="tile__select-item"
+                [class.active]="createMaxPlayers === 4"
+                (click)="setCreateMaxPlayers(4)"
+                role="option"
+                [attr.aria-selected]="createMaxPlayers === 4"
+              >
+                4 players
+              </button>
+              <button
+                type="button"
+                class="tile__select-item"
+                [class.active]="createMaxPlayers === 5"
+                (click)="setCreateMaxPlayers(5)"
+                role="option"
+                [attr.aria-selected]="createMaxPlayers === 5"
+              >
+                5 players
+              </button>
+            </div>
+          </div>
           <input
             class="tile__input"
             [(ngModel)]="createPassword"
@@ -82,7 +149,7 @@
             class="btn primary"
             type="button"
             (click)="createLobby()"
-            [disabled]="creating"
+              [disabled]="creating"
           >
             Create
           </button>
