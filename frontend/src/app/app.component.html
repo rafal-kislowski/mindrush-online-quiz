@@ -183,23 +183,25 @@
       </nav>
 
       <!-- SECOND SECTION -->
-      <div class="nav-divider"><span>Quick Actions</span></div>
+      <ng-container *ngIf="isAdmin$ | async">
+        <div class="nav-divider"><span>Quick Actions</span></div>
 
-      <div class="section" aria-label="Quick actions">
-        <a class="app-item" *ngIf="isAdmin$ | async" routerLink="/create-quiz" routerLinkActive="active">
-          <span class="app-ico app-ico--orange" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none">
-              <path
-                d="M12 5v14M5 12h14"
-                stroke="currentColor"
-                stroke-width="2.2"
-                stroke-linecap="round"
-              />
-            </svg>
-          </span>
-          <span>Create Quiz</span>
-        </a>
-      </div>
+        <div class="section" aria-label="Quick actions">
+          <a class="app-item" routerLink="/create-quiz" routerLinkActive="active">
+            <span class="app-ico app-ico--orange" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M12 5v14M5 12h14"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </span>
+            <span>Create Quiz</span>
+          </a>
+        </div>
+      </ng-container>
     </div>
 
     <div class="sidebar__bottomFixed">
