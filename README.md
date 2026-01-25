@@ -99,11 +99,14 @@ Authentication uses a short-lived access JWT + a long-lived refresh token, both 
 - `refreshToken` (random token, server-side persisted and rotatable)
 
 Endpoints:
-- `POST /api/auth/register` -> creates a user and logs in (sets cookies)
+- `POST /api/auth/register` -> creates a user (email + nickname) and logs in (sets cookies)
 - `POST /api/auth/login` -> logs in (sets cookies)
 - `POST /api/auth/refresh` -> rotates refresh token + issues a new access token (sets cookies)
 - `POST /api/auth/logout` -> revokes refresh token and clears cookies
 - `GET /api/auth/me` -> current authenticated user
+
+Notes:
+- The UI shows `displayName` (nickname) in game/lobby instead of email.
 
 ### Bootstrap admin (local only)
 To create an admin account automatically on startup, set:
