@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, catchError, finalize, of, shareReplay, tap } from 'rxjs';
 import { AuthApi } from '../api/auth.api';
 import { AuthUserDto } from '../models/auth.models';
+import { SessionService } from '../session/session.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -12,7 +13,10 @@ export class AuthService {
   private loading: Observable<AuthUserDto | null> | null = null;
   private refreshInFlight: Observable<AuthUserDto> | null = null;
 
-  constructor(private readonly api: AuthApi) {}
+  constructor(
+    private readonly api: AuthApi,
+    private readonly sessionService: SessionService
+  ) {}
 
   get snapshot(): AuthUserDto | null {
     return this.userSubject.value;
@@ -43,15 +47,17 @@ export class AuthService {
       tap((u) => {
         this.loaded = true;
         this.userSubject.next(u);
+        this.sessionService.refresh().subscribe({ error: () => {} });
       })
     );
   }
 
-  register(email: string, password: string): Observable<AuthUserDto> {
-    return this.api.register(email, password).pipe(
+  register(email: string, displayName: string, password: string): Observable<AuthUserDto> {
+    return this.api.register(email, displayName, password).pipe(
       tap((u) => {
         this.loaded = true;
         this.userSubject.next(u);
+        this.sessionService.refresh().subscribe({ error: () => {} });
       })
     );
   }
@@ -62,6 +68,7 @@ export class AuthService {
       tap((u) => {
         this.loaded = true;
         this.userSubject.next(u);
+        this.sessionService.refresh().subscribe({ error: () => {} });
       }),
       finalize(() => (this.refreshInFlight = null)),
       shareReplay({ bufferSize: 1, refCount: false })
@@ -74,10 +81,12 @@ export class AuthService {
       tap(() => {
         this.loaded = true;
         this.userSubject.next(null);
+        this.sessionService.clearAndRefresh().subscribe({ error: () => {} });
       }),
       catchError(() => {
         this.loaded = true;
         this.userSubject.next(null);
+        this.sessionService.clearAndRefresh().subscribe({ error: () => {} });
         return of(void 0);
       })
     );
@@ -87,4 +96,3 @@ export class AuthService {
     return !!u?.roles?.includes('ADMIN');
   }
 }
-

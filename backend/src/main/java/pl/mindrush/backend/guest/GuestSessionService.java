@@ -52,6 +52,10 @@ public class GuestSessionService {
     }
 
     public Result ensureSession(HttpServletRequest request) {
+        return ensureSession(request, null);
+    }
+
+    public Result ensureSession(HttpServletRequest request, String preferredDisplayName) {
         Instant now = Instant.now();
         String sessionId = readCookie(request, cookieName).orElse(null);
         GuestSession session = null;
@@ -70,7 +74,9 @@ public class GuestSessionService {
             session.setExpiresAt(now.plus(ttl));
         }
 
-        if (session.getDisplayName() == null || session.getDisplayName().isBlank()) {
+        if (preferredDisplayName != null && !preferredDisplayName.isBlank()) {
+            session.setDisplayName(preferredDisplayName.trim());
+        } else if (session.getDisplayName() == null || session.getDisplayName().isBlank()) {
             session.setDisplayName(generateGuestDisplayName());
         }
 
@@ -134,6 +140,17 @@ public class GuestSessionService {
         GuestSession session = requireValidSession(request);
         session.setLastSeenAt(now);
         session.setExpiresAt(now.plus(ttl));
+        repository.save(session);
+    }
+
+    public void heartbeat(HttpServletRequest request, String preferredDisplayName) {
+        Instant now = Instant.now();
+        GuestSession session = requireValidSession(request);
+        session.setLastSeenAt(now);
+        session.setExpiresAt(now.plus(ttl));
+        if (preferredDisplayName != null && !preferredDisplayName.isBlank()) {
+            session.setDisplayName(preferredDisplayName.trim());
+        }
         repository.save(session);
     }
 

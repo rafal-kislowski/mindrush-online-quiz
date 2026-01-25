@@ -36,6 +36,9 @@ public class AppUser {
     @Column(name = "password_hash", length = 100, nullable = false)
     private String passwordHash;
 
+    @Column(name = "display_name", length = 32)
+    private String displayName;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "app_user_roles", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "role", length = 32, nullable = false)
@@ -48,9 +51,10 @@ public class AppUser {
     protected AppUser() {
     }
 
-    public AppUser(String email, String passwordHash, Set<AppRole> roles, Instant createdAt) {
+    public AppUser(String email, String passwordHash, String displayName, Set<AppRole> roles, Instant createdAt) {
         this.email = email;
         this.passwordHash = passwordHash;
+        this.displayName = displayName;
         this.roles = roles == null ? new HashSet<>() : new HashSet<>(roles);
         this.createdAt = createdAt;
     }
@@ -67,6 +71,10 @@ public class AppUser {
         return passwordHash;
     }
 
+    public String getDisplayName() {
+        return displayName;
+    }
+
     public Set<AppRole> getRoles() {
         return Collections.unmodifiableSet(roles);
     }
@@ -79,8 +87,11 @@ public class AppUser {
         this.passwordHash = passwordHash;
     }
 
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
+    }
+
     public void setRoles(Set<AppRole> roles) {
         this.roles = roles == null ? new HashSet<>() : new HashSet<>(roles);
     }
 }
-

@@ -28,7 +28,7 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<AuthService.AuthUserDto> register(@Valid @RequestBody RegisterRequest req) {
-        AuthService.AuthResult res = authService.register(req.email(), req.password());
+        AuthService.AuthResult res = authService.register(req.email(), req.password(), req.displayName());
         return withCookies(ResponseEntity.status(CREATED).body(res.user()), res.cookies());
     }
 
@@ -62,7 +62,7 @@ public class AuthController {
         }
         Object p = authentication.getPrincipal();
         if (p instanceof JwtCookieAuthenticationFilter.AuthenticatedUser au) {
-            return ResponseEntity.ok(new AuthService.AuthUserDto(au.id(), au.email(), au.roles()));
+            return ResponseEntity.ok(new AuthService.AuthUserDto(au.id(), au.email(), au.displayName(), au.roles()));
         }
         return ResponseEntity.status(401).build();
     }
@@ -81,6 +81,7 @@ public class AuthController {
 
     public record RegisterRequest(
             @Email @NotBlank String email,
+            @NotBlank @Size(min = 3, max = 32) String displayName,
             @NotBlank @Size(min = 8, max = 72) String password
     ) {}
 
@@ -89,4 +90,3 @@ public class AuthController {
             @NotBlank @Size(min = 8, max = 72) String password
     ) {}
 }
-

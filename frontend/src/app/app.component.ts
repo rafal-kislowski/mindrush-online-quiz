@@ -42,7 +42,11 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     this.sessionService.ensure().subscribe();
-    this.authService.ensureLoaded().subscribe();
+    this.authService.ensureLoaded().subscribe((u) => {
+      if (u) {
+        this.sessionService.refresh().subscribe({ error: () => {} });
+      }
+    });
 
     this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))

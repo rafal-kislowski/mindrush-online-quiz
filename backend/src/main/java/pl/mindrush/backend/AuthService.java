@@ -51,7 +51,7 @@ public class AuthService {
         this.refreshTtl = refreshTtl;
     }
 
-    public AuthResult register(String email, String password) {
+    public AuthResult register(String email, String password, String displayName) {
         String normalized = normalizeEmail(email);
         if (userRepository.existsByEmailIgnoreCase(normalized)) {
             throw new ResponseStatusException(BAD_REQUEST, "Email already registered");
@@ -61,6 +61,7 @@ public class AuthService {
         AppUser user = new AppUser(
                 normalized,
                 passwordEncoder.encode(password),
+                normalizeDisplayName(displayName),
                 Set.of(AppRole.USER),
                 now
         );
@@ -129,9 +130,15 @@ public class AuthService {
         ResponseCookie accessCookie = cookies.accessCookie(access.value(), Duration.between(now, access.expiresAt()));
         ResponseCookie refreshCookie = cookies.refreshCookie(refreshValue, refreshTtl);
 
+        String displayName = user.getDisplayName();
+        if (displayName == null || displayName.isBlank()) {
+            displayName = user.getEmail() == null ? "Player" : user.getEmail().split("@", 2)[0];
+        }
+
         AuthUserDto dto = new AuthUserDto(
                 user.getId(),
                 user.getEmail(),
+                displayName,
                 user.getRoles().stream().map(Enum::name).sorted().toList()
         );
         return new AuthResult(dto, new ResponseCookies(accessCookie, refreshCookie));
@@ -140,6 +147,23 @@ public class AuthService {
     private static String normalizeEmail(String email) {
         String e = email == null ? "" : email.trim();
         return e.toLowerCase();
+    }
+
+    private static String normalizeDisplayName(String displayName) {
+        String d = displayName == null ? "" : displayName.trim();
+        if (d.isBlank()) throw new ResponseStatusException(BAD_REQUEST, "Nickname is required");
+        if (d.length() < 3 || d.length() > 32) throw new ResponseStatusException(BAD_REQUEST, "Nickname must be 3-32 characters");
+        // Allowed: letters, digits, space, dash, underscore
+        for (int i = 0; i < d.length(); i++) {
+            char c = d.charAt(i);
+            boolean ok =
+                    (c >= 'a' && c <= 'z') ||
+                    (c >= 'A' && c <= 'Z') ||
+                    (c >= '0' && c <= '9') ||
+                    c == ' ' || c == '-' || c == '_';
+            if (!ok) throw new ResponseStatusException(BAD_REQUEST, "Nickname contains invalid characters");
+        }
+        return d;
     }
 
     private static String randomToken() {
@@ -158,10 +182,9 @@ public class AuthService {
         }
     }
 
-    public record AuthUserDto(Long id, String email, java.util.List<String> roles) {}
+    public record AuthUserDto(Long id, String email, String displayName, java.util.List<String> roles) {}
 
     public record AuthResult(AuthUserDto user, ResponseCookies cookies) {}
 
     public record ResponseCookies(ResponseCookie access, ResponseCookie refresh) {}
 }
-

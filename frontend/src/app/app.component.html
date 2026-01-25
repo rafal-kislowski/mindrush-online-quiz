@@ -36,7 +36,7 @@
           <div class="level">A</div>
         </div>
 
-        <div class="user__name">{{ user.email }}</div>
+        <div class="user__name">{{ user.displayName }}</div>
         <div class="user__score">
           {{ (user.roles || []).includes('ADMIN') ? 'ADMIN' : 'USER' }}
         </div>
@@ -277,7 +277,7 @@
 
       <div class="topbar__right">
         <ng-container *ngIf="authUser$ | async as user; else guestActions">
-          <span class="topbar__user">{{ user.email }}</span>
+          <span class="topbar__user">{{ user.displayName }}</span>
           <button class="btn" type="button" (click)="logout()">Logout</button>
         </ng-container>
         <ng-template #guestActions>

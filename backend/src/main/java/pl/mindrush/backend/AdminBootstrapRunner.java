@@ -46,6 +46,7 @@ public class AdminBootstrapRunner implements ApplicationRunner {
             user = new AppUser(
                     email.toLowerCase(),
                     passwordEncoder.encode(password),
+                    "Admin",
                     Set.of(AppRole.ADMIN),
                     clock.instant()
             );
@@ -59,6 +60,10 @@ public class AdminBootstrapRunner implements ApplicationRunner {
             user.setRoles(roles);
             userRepository.save(user);
         }
+
+        if (user.getDisplayName() == null || user.getDisplayName().isBlank()) {
+            user.setDisplayName("Admin");
+            userRepository.save(user);
+        }
     }
 }
-

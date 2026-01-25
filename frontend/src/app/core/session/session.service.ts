@@ -39,9 +39,28 @@ export class SessionService {
     return this.ensureOnce$;
   }
 
+  refresh(): Observable<GuestSessionInfoDto | null> {
+    this.resetCache();
+    return this.ensure();
+  }
+
+  clearAndRefresh(): Observable<GuestSessionInfoDto | null> {
+    this.resetCache();
+    return this.guestSessionApi.clear().pipe(
+      catchError(() => of(void 0)),
+      concatMap(() => this.ensure())
+    );
+  }
+
   private ensureOnce$?: Observable<GuestSessionInfoDto | null>;
 
   private heartbeatSubscription: Subscription | null = null;
+
+  private resetCache(): void {
+    this.ensureOnce$ = undefined;
+    this.heartbeatSubscription?.unsubscribe();
+    this.heartbeatSubscription = null;
+  }
 
   private startHeartbeat(): void {
     if (this.heartbeatSubscription) return;

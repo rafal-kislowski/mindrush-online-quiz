@@ -41,6 +41,7 @@ public class JwtCookieAuthenticationFilter extends OncePerRequestFilter {
                         AuthenticatedUser principal = new AuthenticatedUser(
                                 user.getId(),
                                 user.getEmail(),
+                                user.getDisplayName(),
                                 user.getRoles().stream().map(Enum::name).toList()
                         );
                         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
@@ -79,6 +80,5 @@ public class JwtCookieAuthenticationFilter extends OncePerRequestFilter {
         return Optional.empty();
     }
 
-    public record AuthenticatedUser(Long id, String email, List<String> roles) {}
+    public record AuthenticatedUser(Long id, String email, String displayName, List<String> roles) {}
 }
-

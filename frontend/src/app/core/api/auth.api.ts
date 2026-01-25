@@ -7,10 +7,10 @@ import { AuthUserDto } from '../models/auth.models';
 export class AuthApi {
   constructor(private readonly http: HttpClient) {}
 
-  register(email: string, password: string): Observable<AuthUserDto> {
+  register(email: string, displayName: string, password: string): Observable<AuthUserDto> {
     return this.http.post<AuthUserDto>(
       '/api/auth/register',
-      { email, password },
+      { email, displayName, password },
       { withCredentials: true }
     );
   }
@@ -39,4 +39,3 @@ export class AuthApi {
     return this.http.get<AuthUserDto>('/api/auth/me', { withCredentials: true });
   }
 }
-

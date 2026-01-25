@@ -59,6 +59,7 @@ class AuthControllerTest {
         AppUser admin = new AppUser(
                 "admin@example.com",
                 passwordEncoder.encode("Password123"),
+                "Admin",
                 Set.of(AppRole.ADMIN),
                 clock.instant()
         );
@@ -69,6 +70,7 @@ class AuthControllerTest {
                         .content(objectMapper.writeValueAsString(new Login("admin@example.com", "Password123"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("admin@example.com"))
+                .andExpect(jsonPath("$.displayName").value("Admin"))
                 .andReturn();
 
         String setCookie = String.join("\n", loginRes.getResponse().getHeaders(HttpHeaders.SET_COOKIE));
@@ -87,6 +89,7 @@ class AuthControllerTest {
         AppUser user = new AppUser(
                 "admin@example.com",
                 passwordEncoder.encode("Password123"),
+                "Admin",
                 Set.of(AppRole.ADMIN),
                 clock.instant()
         );
@@ -114,6 +117,7 @@ class AuthControllerTest {
         AppUser admin = new AppUser(
                 "admin@example.com",
                 passwordEncoder.encode("Password123"),
+                "Admin",
                 Set.of(AppRole.ADMIN),
                 clock.instant()
         );

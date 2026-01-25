@@ -10,6 +10,11 @@
     </div>
 
     <form class="auth__form" (ngSubmit)="submit()" [formGroup]="form">
+      <label class="field" *ngIf="mode === 'register'">
+        <span class="field__label">Nickname</span>
+        <input type="text" formControlName="displayName" placeholder="Visible in game" autocomplete="nickname" />
+      </label>
+
       <label class="field">
         <span class="field__label">Email</span>
         <input type="email" formControlName="email" placeholder="you@example.com" autocomplete="email" />
@@ -38,4 +43,3 @@
     </form>
   </div>
 </section>
-

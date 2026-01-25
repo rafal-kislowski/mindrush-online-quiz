@@ -2,11 +2,13 @@ package pl.mindrush.backend.guest;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import pl.mindrush.backend.JwtCookieAuthenticationFilter;
 
 import java.time.Instant;
 import java.util.Map;
@@ -22,8 +24,11 @@ public class GuestSessionController {
     }
 
     @PostMapping
-    public ResponseEntity<Map<String, Object>> ensureSession(HttpServletRequest request) {
-        GuestSessionService.Result result = service.ensureSession(request);
+    public ResponseEntity<Map<String, Object>> ensureSession(HttpServletRequest request, Authentication authentication) {
+        String preferred = displayNameFrom(authentication);
+        GuestSessionService.Result result = preferred == null
+                ? service.ensureSession(request)
+                : service.ensureSession(request, preferred);
         GuestSession session = result.session();
 
         return ResponseEntity
@@ -56,8 +61,23 @@ public class GuestSessionController {
     }
 
     @PostMapping("/heartbeat")
-    public ResponseEntity<Void> heartbeat(HttpServletRequest request) {
-        service.heartbeat(request);
+    public ResponseEntity<Void> heartbeat(HttpServletRequest request, Authentication authentication) {
+        String preferred = displayNameFrom(authentication);
+        if (preferred != null) {
+            service.heartbeat(request, preferred);
+        } else {
+            service.heartbeat(request);
+        }
         return ResponseEntity.noContent().build();
+    }
+
+    private static String displayNameFrom(Authentication authentication) {
+        if (authentication == null) return null;
+        Object p = authentication.getPrincipal();
+        if (p instanceof JwtCookieAuthenticationFilter.AuthenticatedUser au) {
+            String d = au.displayName();
+            return d == null || d.isBlank() ? null : d.trim();
+        }
+        return null;
     }
 }
