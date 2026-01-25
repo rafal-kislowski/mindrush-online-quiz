@@ -27,11 +27,10 @@ export const authRefreshInterceptor: HttpInterceptorFn = (req, next) => {
       return auth.refreshOnce().pipe(
         switchMap(() => next(req)),
         catchError(() => {
-          void auth.logout().subscribe();
+          auth.dropLocalAuth();
           return throwError(() => err);
         })
       );
     })
   );
 };
-

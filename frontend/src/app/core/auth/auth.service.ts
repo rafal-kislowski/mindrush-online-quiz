@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { BehaviorSubject, Observable, catchError, finalize, of, shareReplay, tap } from 'rxjs';
 import { AuthApi } from '../api/auth.api';
 import { AuthUserDto } from '../models/auth.models';
@@ -27,19 +28,26 @@ export class AuthService {
     if (this.loading) return this.loading;
 
     this.loading = this.api.me().pipe(
+      catchError((err: unknown) => {
+        if (err instanceof HttpErrorResponse && err.status === 401) {
+          return this.refreshOnce().pipe(catchError(() => of(null)));
+        }
+        return of(null);
+      }),
       tap((u) => {
         this.loaded = true;
         this.userSubject.next(u);
-      }),
-      catchError(() => {
-        this.loaded = true;
-        this.userSubject.next(null);
-        return of(null);
+        if (u) this.sessionService.refresh().subscribe({ error: () => {} });
       }),
       finalize(() => (this.loading = null)),
       shareReplay({ bufferSize: 1, refCount: false })
     );
     return this.loading;
+  }
+
+  dropLocalAuth(): void {
+    this.loaded = true;
+    this.userSubject.next(null);
   }
 
   login(email: string, password: string): Observable<AuthUserDto> {

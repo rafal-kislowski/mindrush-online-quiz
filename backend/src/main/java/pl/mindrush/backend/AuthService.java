@@ -98,11 +98,29 @@ public class AuthService {
         }
 
         AppUser user = token.getUser();
+        JwtService.Token access = jwtService.createAccessToken(user);
 
-        token.setRevoked(true);
-        refreshTokenRepository.save(token);
+        Duration refreshRemaining = Duration.between(now, token.getExpiresAt());
+        if (refreshRemaining.isNegative()) {
+            token.setRevoked(true);
+            refreshTokenRepository.save(token);
+            throw new ResponseStatusException(UNAUTHORIZED, "Refresh token expired");
+        }
 
-        return issueTokens(user);
+        ResponseCookie accessCookie = cookies.accessCookie(access.value(), Duration.between(now, access.expiresAt()));
+        ResponseCookie refreshCookie = cookies.refreshCookie(refreshTokenValue, refreshRemaining);
+
+        String displayName = user.getDisplayName();
+        if (displayName == null || displayName.isBlank()) {
+            displayName = user.getEmail() == null ? "Player" : user.getEmail().split("@", 2)[0];
+        }
+        AuthUserDto dto = new AuthUserDto(
+                user.getId(),
+                user.getEmail(),
+                displayName,
+                user.getRoles().stream().map(Enum::name).sorted().toList()
+        );
+        return new AuthResult(dto, new ResponseCookies(accessCookie, refreshCookie));
     }
 
     public void logout(String refreshTokenValue) {
