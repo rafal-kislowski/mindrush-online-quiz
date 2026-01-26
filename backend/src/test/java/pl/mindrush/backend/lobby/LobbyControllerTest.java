@@ -245,6 +245,33 @@ class LobbyControllerTest {
     }
 
     @Test
+    void ownerCanRejoinPasswordProtectedLobby_withoutPassword_afterRefreshGrace() throws Exception {
+        String ownerSessionId = createGuestSession();
+
+        MvcResult created = mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"secret123\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String code = jsonValue(created.getResponse().getContentAsString(), "\"code\":\"", "\"").orElseThrow();
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/leave")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.length()").value(1))
+                .andExpect(jsonPath("$.isOwner").value(true))
+                .andExpect(jsonPath("$.isParticipant").value(true));
+    }
+
+    @Test
     void setLobbyPassword_ownerCanSetAndClear_andNonParticipantSeesLimitedView() throws Exception {
         String ownerSessionId = createGuestSession();
 

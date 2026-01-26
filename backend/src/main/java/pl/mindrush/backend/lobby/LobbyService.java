@@ -119,6 +119,7 @@ public class LobbyService {
     public Map<String, Object> joinLobby(HttpServletRequest request, String code, String rawPassword) {
         GuestSession guestSession = guestSessionService.requireValidSession(request);
         Lobby lobby = lobbyRepository.findByCode(code).orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Lobby not found"));
+        boolean isOwner = guestSession.getId().equals(lobby.getOwnerGuestSessionId());
 
         if (lobby.getStatus() != LobbyStatus.OPEN) {
             throw new ResponseStatusException(CONFLICT, "Lobby is closed");
@@ -129,7 +130,7 @@ public class LobbyService {
         }
 
         if (lobby.hasPassword()) {
-            if (rawPassword == null || rawPassword.isBlank() || !passwordEncoder.matches(rawPassword, lobby.getPasswordHash())) {
+            if (!isOwner && (rawPassword == null || rawPassword.isBlank() || !passwordEncoder.matches(rawPassword, lobby.getPasswordHash()))) {
                 throw new ResponseStatusException(FORBIDDEN, "Invalid lobby password");
             }
         }
@@ -142,7 +143,7 @@ public class LobbyService {
         Instant now = Instant.now();
         if (count == 0 && lobby.getEmptySince() != null) {
             lobby.setEmptySince(null);
-            if (!guestSession.getId().equals(lobby.getOwnerGuestSessionId())) {
+            if (!isOwner) {
                 lobby.setOwnerGuestSessionId(guestSession.getId());
             }
             lobbyRepository.save(lobby);

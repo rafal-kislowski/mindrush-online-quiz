@@ -121,11 +121,6 @@ public class GameService {
             throw new ResponseStatusException(CONFLICT, "Lobby is not open");
         }
 
-        long playerCount = participantRepository.countByLobbyId(lobby.getId());
-        if (playerCount != lobby.getMaxPlayers()) {
-            throw new ResponseStatusException(CONFLICT, "Game requires exactly " + lobby.getMaxPlayers() + " players");
-        }
-
         Quiz quiz = quizRepository.findById(quizId).orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
 
         long questionCount = questionRepository.countByQuizId(quizId);
