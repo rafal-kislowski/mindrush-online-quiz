@@ -28,6 +28,7 @@ export class AppComponent implements OnInit {
   readonly isAdmin$ = this.authService.user$.pipe(map(u => !!u?.roles?.includes('ADMIN')));
 
   sidebarOpen = false;
+  contentWide = false;
 
   readonly menuItems: Array<{
     label: string;
@@ -52,7 +53,10 @@ export class AppComponent implements OnInit {
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
       .subscribe(() => {
         this.sidebarOpen = false;
+        this.contentWide = this.router.url.startsWith('/create-quiz');
       });
+
+    this.contentWide = this.router.url.startsWith('/create-quiz');
   }
 
   toggleSidebar(): void {

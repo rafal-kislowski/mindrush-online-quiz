@@ -81,6 +81,17 @@ select {
   outline: none;
 }
 
+select {
+  /* Prevent bright/white native dropdown menus on Windows (Chrome/Edge). */
+  color-scheme: dark;
+}
+
+select option,
+select optgroup {
+  background: rgba(11, 16, 38, 0.98);
+  color: rgba(255, 255, 255, 0.92);
+}
+
 input::placeholder {
   color: rgba(255, 255, 255, 0.42);
 }

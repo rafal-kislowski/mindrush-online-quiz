@@ -69,7 +69,7 @@
 
     <section class="card panel" *ngIf="joinState !== 'joined'">
       <h2 class="section-title">Join</h2>
-      <p class="muted" *ngIf="l.hasPassword">This lobby requires a password.</p>
+      <p class="muted" *ngIf="l.hasPassword && !l.isOwner">This lobby requires a password.</p>
       <p class="muted" *ngIf="!l.hasPassword">
         No password: opening this view auto-joins your guest.
       </p>
@@ -78,7 +78,7 @@
       </p>
 
       <div class="form">
-        <div class="row" *ngIf="l.hasPassword">
+        <div class="row" *ngIf="l.hasPassword && !l.isOwner">
           <label class="label">Password</label>
           <input [(ngModel)]="password" placeholder="Enter lobby password" />
         </div>
@@ -88,7 +88,7 @@
           type="button"
           (click)="join()"
           [disabled]="
-            joinState === 'viewOnly' || (l.hasPassword && !password.trim())
+            joinState === 'viewOnly' || (l.hasPassword && !l.isOwner && !password.trim())
           "
         >
           Join lobby
@@ -110,6 +110,7 @@
               type="button"
               [class.active]="privacyMode === 'public'"
               (click)="setPrivacyMode('public')"
+              [disabled]="privacySaving"
             >
               Public
             </button>
@@ -118,38 +119,58 @@
               type="button"
               [class.active]="privacyMode === 'private'"
               (click)="setPrivacyMode('private')"
+              [disabled]="privacySaving"
             >
               Private
             </button>
           </div>
-          <p class="muted hint" *ngIf="privacyMode === 'public'">
-            Anyone can join without a password.
-          </p>
+      
         </div>
 
         <div class="row" *ngIf="privacyMode === 'private'">
           <label class="label">Password</label>
           <div class="password-row">
-            <input
-              [type]="privacyShowPassword ? 'text' : 'password'"
-              [(ngModel)]="privacyPassword"
-              [placeholder]="
-                l.hasPassword
-                  ? '•••••• (set) — enter new to change'
-                  : 'Set a password'
-              "
-            />
-            <button class="btn" type="button" (click)="togglePrivacyPassword()">
-              {{ privacyShowPassword ? "Hide" : "Show" }}
+            <div class="password-input">
+              <input
+                class="password-input__field"
+                [type]="privacyShowPassword ? 'text' : 'password'"
+                [(ngModel)]="privacyPassword"
+                (keydown.enter)="setPrivatePassword()"
+                [placeholder]="l.hasPassword ? 'enter new to change' : 'Set a password'"
+              />
+              <button
+                class="password-input__toggle"
+                type="button"
+                (click)="togglePrivacyPassword()"
+                [disabled]="privacySaving"
+                [attr.aria-label]="privacyShowPassword ? 'Hide password' : 'Show password'"
+                [attr.aria-pressed]="privacyShowPassword"
+                title="{{ privacyShowPassword ? 'Hide password' : 'Show password' }}"
+              >
+                <i
+                  class="fa-solid"
+                  [class.fa-eye]="!privacyShowPassword"
+                  [class.fa-eye-slash]="privacyShowPassword"
+                  aria-hidden="true"
+                ></i>
+              </button>
+            </div>
+            <button
+              class="btn primary"
+              type="button"
+              (click)="setPrivatePassword()"
+              [disabled]="privacySaving || !privacyPassword.trim()"
+            >
+              {{ privacySaving ? "Saving..." : "Set password" }}
             </button>
           </div>
-          <p class="muted hint">Changing password affects new joins only.</p>
         </div>
 
         <button
           class="btn primary"
           type="button"
-          (click)="savePrivacy()"
+          *ngIf="false"
+          (click)="setPrivatePassword()"
           [disabled]="privacySaving"
         >
           {{ privacySaving ? "Saving…" : "Save privacy" }}
@@ -164,6 +185,7 @@
                 type="button"
                 (click)="toggleMaxPlayersMenu()"
                 [attr.aria-expanded]="maxPlayersMenuOpen"
+                [disabled]="maxPlayersSaving"
                 aria-label="Max players"
               >
                 <span class="mr-select__label">{{ maxPlayersDraft }} players</span>
@@ -191,11 +213,13 @@
                 </button>
               </div>
             </div>
+            <p class="muted hint" *ngIf="maxPlayersSaving">Saving...</p>
           </div>
 
           <button
             class="btn primary"
             type="button"
+            *ngIf="false"
             (click)="saveMaxPlayers()"
             [disabled]="maxPlayersSaving"
           >
@@ -205,11 +229,38 @@
 
         <div class="row">
           <label class="label">Quiz</label>
-          <select [(ngModel)]="selectedQuizId">
-            <option *ngFor="let q of quizzes" [ngValue]="q.id">
-              {{ q.title }}
-            </option>
-          </select>
+          <div class="mr-select-wrap" [class.menu-open]="quizMenuOpen">
+            <button
+              class="mr-select"
+              type="button"
+              (click)="toggleQuizMenu()"
+              [attr.aria-expanded]="quizMenuOpen"
+              [disabled]="!quizzes.length"
+              aria-label="Quiz"
+            >
+              <span class="mr-select__label">{{ selectedQuizLabel }}</span>
+              <span class="mr-select__caret" aria-hidden="true"></span>
+            </button>
+
+            <div
+              class="mr-select__menu"
+              *ngIf="quizMenuOpen"
+              role="listbox"
+              aria-label="Select quiz"
+            >
+              <button
+                type="button"
+                class="mr-select__item"
+                *ngFor="let q of quizzes"
+                [class.active]="selectedQuizId === q.id"
+                (click)="selectQuizFromMenu(q.id)"
+                role="option"
+                [attr.aria-selected]="selectedQuizId === q.id"
+              >
+                {{ q.title }}
+              </button>
+            </div>
+          </div>
         </div>
 
         <button
@@ -220,9 +271,7 @@
         >
           Start game
         </button>
-        <p class="muted hint">
-          Game requires exactly {{ l.maxPlayers }} players.
-        </p>
+  
       </div>
     </section>
   </div>

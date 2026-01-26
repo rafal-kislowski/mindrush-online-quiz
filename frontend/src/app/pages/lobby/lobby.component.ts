@@ -52,6 +52,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
   maxPlayersSaving = false;
   private maxPlayersDirty = false;
   maxPlayersMenuOpen = false;
+  quizMenuOpen = false;
 
   private readonly subscriptions = new Subscription();
   private pollSubscription: Subscription | null = null;
@@ -261,7 +262,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
   private attemptAutoJoinIfPossible(lobby: LobbyDto | null): void {
     if (!lobby) return;
     if (this.joinState === 'joined') return;
-    if (lobby.hasPassword) return;
+    if (lobby.hasPassword && !lobby.isOwner) return;
     if (lobby.status !== 'OPEN') return;
     if (
       lobby.players &&
@@ -313,7 +314,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
 
   join(): void {
     this.error = null;
-    if (this.lobby?.hasPassword && !this.password.trim()) {
+    if (this.lobby?.hasPassword && !this.lobby.isOwner && !this.password.trim()) {
       this.error = 'Password is required';
       return;
     }
@@ -362,11 +363,33 @@ export class LobbyComponent implements OnInit, OnDestroy {
   }
 
   setPrivacyMode(mode: 'public' | 'private'): void {
+    if (this.privacySaving) return;
     this.privacyDirty = true;
     this.privacyMode = mode;
+
     if (mode === 'public') {
       this.privacyPassword = '';
       this.privacyShowPassword = false;
+      if (!this.lobby?.hasPassword) {
+        this.privacyDirty = false;
+        return;
+      }
+
+      this.privacySaving = true;
+      this.lobbyApi.setPassword(this.code, undefined).subscribe({
+        next: (updated) => {
+          this.privacySaving = false;
+          this.privacyDirty = false;
+          this.onLobbyUpdate(updated);
+        },
+        error: (err) => {
+          this.privacySaving = false;
+          this.privacyDirty = false;
+          this.error = err?.error?.message ?? 'Failed to update lobby privacy';
+          this.privacyMode = this.lobby?.hasPassword ? 'private' : 'public';
+        },
+      });
+      return;
     }
   }
 
@@ -374,24 +397,20 @@ export class LobbyComponent implements OnInit, OnDestroy {
     this.privacyShowPassword = !this.privacyShowPassword;
   }
 
-  savePrivacy(): void {
+  setPrivatePassword(): void {
     if (!this.lobby?.isOwner) return;
     if (this.privacySaving) return;
     this.error = null;
 
-    const password =
-      this.privacyMode === 'private' ? this.privacyPassword.trim() : '';
-    if (this.privacyMode === 'private' && !password) {
+    const password = this.privacyPassword.trim();
+    if (!password) {
       this.error = 'Password is required to make this lobby private';
       return;
     }
 
     this.privacySaving = true;
     this.lobbyApi
-      .setPassword(
-        this.code,
-        this.privacyMode === 'private' ? password : undefined
-      )
+      .setPassword(this.code, password)
       .subscribe({
         next: (updated) => {
           this.privacySaving = false;
@@ -413,30 +432,49 @@ export class LobbyComponent implements OnInit, OnDestroy {
   }
 
   toggleMaxPlayersMenu(): void {
+    if (this.maxPlayersSaving) return;
     this.maxPlayersMenuOpen = !this.maxPlayersMenuOpen;
+    if (this.maxPlayersMenuOpen) this.quizMenuOpen = false;
   }
 
   setMaxPlayersFromMenu(value: 2 | 3 | 4 | 5): void {
     if (this.lobby?.players && value < this.lobby.players.length) return;
     this.onMaxPlayersChange(value);
     this.maxPlayersMenuOpen = false;
+    this.saveMaxPlayers();
+  }
+
+  toggleQuizMenu(): void {
+    this.quizMenuOpen = !this.quizMenuOpen;
+    if (this.quizMenuOpen) this.maxPlayersMenuOpen = false;
+  }
+
+  selectQuizFromMenu(id: number): void {
+    this.selectedQuizId = id;
+    this.quizMenuOpen = false;
+  }
+
+  get selectedQuizLabel(): string {
+    const selectedId = this.selectedQuizId;
+    const found = selectedId == null ? null : this.quizzes.find((q) => q.id === selectedId);
+    return found?.title ?? (this.quizzes[0]?.title ?? 'Select quiz');
   }
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(ev: MouseEvent): void {
-    if (!this.maxPlayersMenuOpen) return;
-    const target = ev.target as Node | null;
+    if (!this.maxPlayersMenuOpen && !this.quizMenuOpen) return;
+    const target = ev.target as HTMLElement | null;
     if (!target) return;
-    if (!this.el.nativeElement.contains(target)) {
-      this.maxPlayersMenuOpen = false;
-    }
+    if (target.closest('.mr-select-wrap')) return;
+    this.maxPlayersMenuOpen = false;
+    this.quizMenuOpen = false;
   }
 
   @HostListener('document:keydown', ['$event'])
   onDocumentKeydown(ev: KeyboardEvent): void {
-    if (!this.maxPlayersMenuOpen) return;
     if (ev.key === 'Escape') {
       this.maxPlayersMenuOpen = false;
+      this.quizMenuOpen = false;
     }
   }
 
@@ -446,6 +484,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
     if (this.maxPlayersSaving) return;
 
     this.error = null;
+    const previous = this.lobby.maxPlayers;
     const currentPlayers = this.lobby.players.length;
     const desired = this.maxPlayersDraft;
 
@@ -469,6 +508,10 @@ export class LobbyComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.maxPlayersSaving = false;
+        this.maxPlayersDirty = false;
+        if (previous === 2 || previous === 3 || previous === 4 || previous === 5) {
+          this.maxPlayersDraft = previous;
+        }
         this.error = err?.error?.message ?? 'Failed to update max players';
       },
     });

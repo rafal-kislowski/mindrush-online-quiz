@@ -1,11 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, HostListener, OnInit } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
   AdminQuestionDto,
   AdminQuizApi,
   AdminQuizDetailDto,
-  AdminQuizDto,
   AdminQuizListItemDto,
 } from '../../core/api/admin-quiz.api';
 
@@ -18,12 +17,15 @@ import {
 })
 export class AdminQuizComponent implements OnInit {
   tab: 'manage' | 'create' = 'manage';
+  editorTab: 'details' | 'questions' = 'questions';
+  openMenu: 'category' | 'sort' | 'pageSize' | null = null;
   error: string | null = null;
-  createdQuiz: AdminQuizDto | null = null;
 
   quizzes: AdminQuizListItemDto[] = [];
   selectedQuiz: AdminQuizDetailDto | null = null;
   selectedQuestionId: number | null = null;
+  questionPanelMode: 'edit' | 'create' = 'create';
+  lastEditingQuestionId: number | null = null;
 
   loadingList = false;
   loadingQuiz = false;
@@ -32,22 +34,34 @@ export class AdminQuizComponent implements OnInit {
   deletingQuestion = false;
   deletingQuiz = false;
   creating = false;
-  addingQuestion = false;
   addingExistingQuestion = false;
+
+  readonly quizSearch = new FormControl('', { nonNullable: true });
+  readonly quizCategory = new FormControl<string>('all', { nonNullable: true });
+  readonly questionSearch = new FormControl('', { nonNullable: true });
+  readonly pageSize = new FormControl<number>(8, { nonNullable: true });
+  readonly quizSort = new FormControl<'titleAsc' | 'titleDesc' | 'questionsDesc' | 'questionsAsc' | 'categoryAsc' | 'categoryDesc'>(
+    'titleAsc',
+    { nonNullable: true }
+  );
+  quizPageIndex = 0;
+
+  readonly quizSortOptions: ReadonlyArray<{
+    value: 'titleAsc' | 'titleDesc' | 'questionsDesc' | 'questionsAsc' | 'categoryAsc' | 'categoryDesc';
+    label: string;
+  }> = [
+    { value: 'titleAsc', label: 'Title (A-Z)' },
+    { value: 'titleDesc', label: 'Title (Z-A)' },
+    { value: 'questionsDesc', label: 'Questions (high-low)' },
+    { value: 'questionsAsc', label: 'Questions (low-high)' },
+    { value: 'categoryAsc', label: 'Category (A-Z)' },
+    { value: 'categoryDesc', label: 'Category (Z-A)' },
+  ];
 
   readonly quizForm = new FormGroup({
     title: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(120)] }),
     description: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(500)] }),
     categoryName: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(64)] }),
-  });
-
-  readonly questionForm = new FormGroup({
-    prompt: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(500)] }),
-    correctIndex: new FormControl(0, { nonNullable: true }),
-    o1: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
-    o2: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
-    o3: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
-    o4: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
   });
 
   readonly addExistingQuestionForm = new FormGroup({
@@ -80,6 +94,177 @@ export class AdminQuizComponent implements OnInit {
     this.loadList();
   }
 
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    this.openMenu = null;
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    this.openMenu = null;
+  }
+
+  toggleMenu(menu: 'category' | 'sort' | 'pageSize', ev?: Event): void {
+    ev?.stopPropagation();
+    this.openMenu = this.openMenu === menu ? null : menu;
+  }
+
+  setQuizCategory(value: string, ev?: Event): void {
+    ev?.stopPropagation();
+    this.quizCategory.setValue(value);
+    this.resetQuizPage();
+    this.openMenu = null;
+  }
+
+  setQuizSort(
+    value: 'titleAsc' | 'titleDesc' | 'questionsDesc' | 'questionsAsc' | 'categoryAsc' | 'categoryDesc',
+    ev?: Event
+  ): void {
+    ev?.stopPropagation();
+    this.quizSort.setValue(value);
+    this.resetQuizPage();
+    this.openMenu = null;
+  }
+
+  setPageSize(size: number, ev?: Event): void {
+    ev?.stopPropagation();
+    this.pageSize.setValue(size);
+    this.resetQuizPage();
+    this.openMenu = null;
+  }
+
+  get quizCategoryLabel(): string {
+    const v = this.quizCategory.value;
+    if (!v || v === 'all') return 'All categories';
+    return v;
+  }
+
+  get quizSortLabel(): string {
+    const v = this.quizSort.value;
+    const found = this.quizSortOptions.find((x) => x.value === v);
+    return found?.label ?? 'Sort';
+  }
+
+  get pageSizeLabel(): string {
+    return `Show ${this.pageSize.value ?? 8}`;
+  }
+
+  setEditorTab(tab: 'details' | 'questions'): void {
+    this.editorTab = tab;
+  }
+
+  resetQuizPage(): void {
+    this.quizPageIndex = 0;
+  }
+
+  prevQuizPage(): void {
+    this.quizPageIndex = Math.max(0, this.quizPageIndex - 1);
+  }
+
+  nextQuizPage(): void {
+    this.quizPageIndex = Math.min(this.quizTotalPages - 1, this.quizPageIndex + 1);
+  }
+
+  setQuizPage(index: number): void {
+    this.quizPageIndex = Math.min(Math.max(0, index), this.quizTotalPages - 1);
+  }
+
+  get quizTotalPages(): number {
+    const size = Math.max(1, this.pageSize.value ?? 8);
+    const total = this.filteredQuizzes.length;
+    return Math.max(1, Math.ceil(total / size));
+  }
+
+  get pagedQuizzes(): AdminQuizListItemDto[] {
+    const size = Math.max(1, this.pageSize.value ?? 8);
+    const start = this.quizPageIndex * size;
+    return this.filteredQuizzes.slice(start, start + size);
+  }
+
+  get quizPageFrom(): number {
+    const total = this.filteredQuizzes.length;
+    if (!total) return 0;
+    return this.quizPageIndex * (this.pageSize.value ?? 8) + 1;
+  }
+
+  get quizPageTo(): number {
+    const total = this.filteredQuizzes.length;
+    if (!total) return 0;
+    return Math.min(total, (this.quizPageIndex + 1) * (this.pageSize.value ?? 8));
+  }
+
+  titleInitial(title: string | null | undefined): string {
+    const t = (title ?? '').trim();
+    if (!t) return '?';
+    return t[0].toUpperCase();
+  }
+
+  get categories(): string[] {
+    const set = new Set<string>();
+    for (const q of this.quizzes) {
+      const c = (q.categoryName ?? '').trim();
+      if (c) set.add(c);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }
+
+  get filteredQuizzes(): AdminQuizListItemDto[] {
+    const query = this.quizSearch.value.trim().toLowerCase();
+    const category = this.quizCategory.value;
+
+    const filtered = this.quizzes.filter((q) => {
+      const title = (q.title ?? '').toLowerCase();
+      const cat = (q.categoryName ?? '').trim();
+
+      const matchesQuery = !query || title.includes(query);
+      const matchesCategory = category === 'all' || cat === category;
+      return matchesQuery && matchesCategory;
+    });
+
+    return this.sortQuizzes(filtered);
+  }
+
+  get filteredQuestions(): AdminQuestionDto[] {
+    const quiz = this.selectedQuiz;
+    if (!quiz) return [];
+
+    const query = this.questionSearch.value.trim().toLowerCase();
+    if (!query) return quiz.questions;
+
+    return quiz.questions.filter((q) => (q.prompt ?? '').toLowerCase().includes(query));
+  }
+
+  private sortQuizzes(list: AdminQuizListItemDto[]): AdminQuizListItemDto[] {
+    const sort = this.quizSort.value;
+
+    const byTitle = (a: AdminQuizListItemDto, b: AdminQuizListItemDto) =>
+      (a.title ?? '').localeCompare(b.title ?? '', undefined, { sensitivity: 'base' });
+    const byCategory = (a: AdminQuizListItemDto, b: AdminQuizListItemDto) =>
+      (a.categoryName ?? '').localeCompare(b.categoryName ?? '', undefined, { sensitivity: 'base' });
+    const byQuestions = (a: AdminQuizListItemDto, b: AdminQuizListItemDto) => (a.questionCount ?? 0) - (b.questionCount ?? 0);
+
+    const cmp = (() => {
+      switch (sort) {
+        case 'titleAsc':
+          return byTitle;
+        case 'titleDesc':
+          return (a: AdminQuizListItemDto, b: AdminQuizListItemDto) => -byTitle(a, b);
+        case 'categoryAsc':
+          return byCategory;
+        case 'categoryDesc':
+          return (a: AdminQuizListItemDto, b: AdminQuizListItemDto) => -byCategory(a, b);
+        case 'questionsAsc':
+          return byQuestions;
+        case 'questionsDesc':
+          return (a: AdminQuizListItemDto, b: AdminQuizListItemDto) => -byQuestions(a, b);
+        default:
+          return byTitle;
+      }
+    })();
+
+    return list.slice().sort(cmp);
+  }
+
   setTab(tab: 'manage' | 'create'): void {
     this.tab = tab;
     this.error = null;
@@ -105,6 +290,10 @@ export class AdminQuizComponent implements OnInit {
     this.error = null;
     this.loadingQuiz = true;
     this.selectedQuestionId = null;
+    this.questionSearch.setValue('');
+    this.editorTab = 'questions';
+    this.questionPanelMode = 'create';
+    this.lastEditingQuestionId = null;
     this.api.getQuiz(id).subscribe({
       next: (quiz) => {
         this.loadingQuiz = false;
@@ -128,6 +317,15 @@ export class AdminQuizComponent implements OnInit {
         this.error = err?.error?.message ?? 'Failed to load quiz';
       },
     });
+  }
+
+  closeSelectedQuiz(): void {
+    this.selectedQuiz = null;
+    this.selectedQuestionId = null;
+    this.questionSearch.setValue('');
+    this.editorTab = 'questions';
+    this.questionPanelMode = 'create';
+    this.lastEditingQuestionId = null;
   }
 
   saveQuiz(): void {
@@ -166,7 +364,9 @@ export class AdminQuizComponent implements OnInit {
   }
 
   selectQuestion(q: AdminQuestionDto): void {
+    this.questionPanelMode = 'edit';
     this.selectedQuestionId = q.id;
+    this.lastEditingQuestionId = q.id;
     const correctIndex = Math.max(
       0,
       q.options.findIndex((o) => o.correct)
@@ -184,6 +384,42 @@ export class AdminQuizComponent implements OnInit {
       o3: texts[2] ?? '',
       o4: texts[3] ?? '',
     });
+  }
+
+  startAddQuestion(): void {
+    if (!this.selectedQuiz) return;
+    this.error = null;
+    this.questionPanelMode = 'create';
+    this.selectedQuestionId = null;
+    this.addExistingQuestionForm.reset({
+      prompt: '',
+      correctIndex: 0,
+      o1: '',
+      o2: '',
+      o3: '',
+      o4: '',
+    });
+  }
+
+  cancelAddQuestion(): void {
+    if (!this.selectedQuiz) return;
+    this.error = null;
+
+    const previousId = this.lastEditingQuestionId;
+    if (previousId == null) {
+      this.questionPanelMode = 'create';
+      this.selectedQuestionId = null;
+      return;
+    }
+
+    const q = this.selectedQuiz.questions.find((x) => x.id === previousId);
+    if (!q) {
+      this.questionPanelMode = 'create';
+      this.selectedQuestionId = null;
+      return;
+    }
+
+    this.selectQuestion(q);
   }
 
   saveQuestion(): void {
@@ -245,6 +481,7 @@ export class AdminQuizComponent implements OnInit {
       next: () => {
         this.deletingQuestion = false;
         this.selectedQuestionId = null;
+        this.lastEditingQuestionId = null;
         this.selectQuiz(quizId);
         this.loadList();
       },
@@ -265,8 +502,30 @@ export class AdminQuizComponent implements OnInit {
     this.api.deleteQuiz(quizId).subscribe({
       next: () => {
         this.deletingQuiz = false;
-        this.selectedQuiz = null;
-        this.selectedQuestionId = null;
+        this.closeSelectedQuiz();
+        this.loadList();
+      },
+      error: (err) => {
+        this.deletingQuiz = false;
+        this.error = err?.error?.message ?? 'Failed to delete quiz';
+      },
+      });
+  }
+
+  deleteQuizFromList(id: number): void {
+    if (this.deletingQuiz) return;
+    this.error = null;
+
+    if (!confirm('Delete this quiz?')) return;
+
+    this.deletingQuiz = true;
+    this.api.deleteQuiz(id).subscribe({
+      next: () => {
+        this.deletingQuiz = false;
+        if (this.selectedQuiz?.id === id) {
+          this.selectedQuiz = null;
+          this.selectedQuestionId = null;
+        }
         this.loadList();
       },
       error: (err) => {
@@ -337,7 +596,6 @@ export class AdminQuizComponent implements OnInit {
       .subscribe({
         next: (quiz) => {
           this.creating = false;
-          this.createdQuiz = quiz;
           this.tab = 'manage';
           this.loadList();
           this.selectQuiz(quiz.id);
@@ -345,45 +603,6 @@ export class AdminQuizComponent implements OnInit {
         error: (err) => {
           this.creating = false;
           this.error = err?.error?.message ?? 'Failed to create quiz';
-        },
-      });
-  }
-
-  addQuestion(): void {
-    this.error = null;
-    if (!this.createdQuiz) return;
-    if (this.questionForm.invalid) return;
-
-    const prompt = this.questionForm.controls.prompt.value.trim();
-    const correctIndex = this.questionForm.controls.correctIndex.value;
-    const texts = [
-      this.questionForm.controls.o1.value.trim(),
-      this.questionForm.controls.o2.value.trim(),
-      this.questionForm.controls.o3.value.trim(),
-      this.questionForm.controls.o4.value.trim(),
-    ];
-
-    this.addingQuestion = true;
-    this.api
-      .addQuestion(this.createdQuiz.id, {
-        prompt,
-        options: texts.map((text, idx) => ({ text, correct: idx === correctIndex })),
-      })
-      .subscribe({
-        next: () => {
-          this.addingQuestion = false;
-          this.questionForm.reset({
-            prompt: '',
-            correctIndex: 0,
-            o1: '',
-            o2: '',
-            o3: '',
-            o4: '',
-          });
-        },
-        error: (err) => {
-          this.addingQuestion = false;
-          this.error = err?.error?.message ?? 'Failed to add question';
         },
       });
   }

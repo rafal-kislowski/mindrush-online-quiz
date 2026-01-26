@@ -293,11 +293,69 @@
   );
 }
 
+.segmented__btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+  filter: none;
+}
+
 .password-row {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 10px;
   align-items: center;
+}
+
+.password-input {
+  position: relative;
+  width: 100%;
+}
+
+.password-input__field {
+  padding-right: 50px;
+}
+
+.password-input__toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 0;
+  background: transparent;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: none;
+  transition: filter 140ms ease, transform 140ms ease;
+}
+
+.password-input__toggle i {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.password-input__toggle:hover {
+  filter: brightness(1.06);
+}
+
+.password-input__toggle:active {
+  transform: translateY(calc(-50% + 1px));
+}
+
+.password-input__toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  filter: none;
+}
+
+.password-input__toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(47, 208, 255, 0.18);
 }
 
 .form {
@@ -360,6 +418,13 @@ select {
   transform: translateY(1px);
 }
 
+.mr-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+}
+
 .mr-select:focus-visible {
   border-color: rgba(47, 208, 255, 0.55);
   box-shadow: 0 0 0 3px rgba(47, 208, 255, 0.18),
@@ -399,6 +464,32 @@ select {
   padding: 6px;
   display: grid;
   gap: 4px;
+  max-height: min(280px, calc(100vh - 24px));
+  overflow: auto;
+
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.mr-select__menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.mr-select__menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mr-select__menu::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.mr-select__menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.26);
 }
 
 .mr-select__item {
@@ -527,5 +618,9 @@ select {
 
   .password-row {
     grid-template-columns: 1fr;
+  }
+
+  .password-input__field {
+    padding-right: 48px;
   }
 }
