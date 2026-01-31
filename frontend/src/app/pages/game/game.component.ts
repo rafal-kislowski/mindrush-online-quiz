@@ -18,7 +18,6 @@ import { StompClientService } from '../../core/ws/stomp-client.service';
 })
 export class GameComponent implements OnInit, OnDestroy {
   private static readonly POLL_FAST_MS = 1500;
-  private static readonly POLL_SLOW_MS = 10_000;
   private static readonly GUEST_QUESTION_MS = 10_000;
   private static readonly GUEST_REVEAL_MS = 3_000;
   private static readonly GUEST_PRE_COUNTDOWN_MS = 4_000;
@@ -72,6 +71,7 @@ export class GameComponent implements OnInit, OnDestroy {
       this.stompClient.state$.subscribe((state) => {
         this.wsConnected = state === 'connected';
         this.updatePollingMode();
+        if (this.wsConnected) this.refreshSilent();
       })
     );
 
@@ -140,8 +140,13 @@ export class GameComponent implements OnInit, OnDestroy {
     });
   }
 
-  private startPolling(): void {
+  private stopPolling(): void {
     this.pollSubscription?.unsubscribe();
+    this.pollSubscription = null;
+  }
+
+  private startPolling(): void {
+    this.stopPolling();
     this.pollSubscription = interval(this.pollMs)
       .pipe(startWith(0))
       .subscribe(() => this.refreshSilent());
@@ -149,12 +154,13 @@ export class GameComponent implements OnInit, OnDestroy {
   }
 
   private updatePollingMode(): void {
-    const desired = this.wsConnected
-      ? GameComponent.POLL_SLOW_MS
-      : GameComponent.POLL_FAST_MS;
-    if (desired === this.pollMs && this.pollSubscription) return;
-    this.pollMs = desired;
-    this.startPolling();
+    if (this.wsConnected) {
+      this.stopPolling();
+      return;
+    }
+
+    this.pollMs = GameComponent.POLL_FAST_MS;
+    if (!this.pollSubscription) this.startPolling();
   }
 
   answer(optionId: number): void {

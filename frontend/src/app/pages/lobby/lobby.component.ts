@@ -23,7 +23,6 @@ import { StompClientService } from '../../core/ws/stomp-client.service';
 })
 export class LobbyComponent implements OnInit, OnDestroy {
   private static readonly POLL_FAST_MS = 1500;
-  private static readonly POLL_SLOW_MS = 10_000;
 
   get authUser$() {
     return this.auth.user$;
@@ -85,6 +84,14 @@ export class LobbyComponent implements OnInit, OnDestroy {
       this.stompClient.state$.subscribe((state) => {
         this.wsConnected = state === 'connected';
         this.updatePollingMode();
+        if (this.wsConnected && this.code) {
+          this.lobbyApi.get(this.code).subscribe({
+            next: (lobby) => this.onLobbyUpdate(lobby),
+            error: () => {
+              // ignore
+            },
+          });
+        }
       })
     );
 
@@ -126,13 +133,18 @@ export class LobbyComponent implements OnInit, OnDestroy {
     }
 
     this.ensureLobbyUpdates();
-    this.startPolling();
+    this.updatePollingMode();
     this.attemptAutoJoinIfPossible(this.lobby);
+  }
+
+  private stopPolling(): void {
+    this.pollSubscription?.unsubscribe();
+    this.pollSubscription = null;
   }
 
   private startPolling(): void {
     if (!this.code) return;
-    this.pollSubscription?.unsubscribe();
+    this.stopPolling();
     this.pollSubscription = interval(this.pollMs)
       .pipe(
         startWith(0),
@@ -154,15 +166,13 @@ export class LobbyComponent implements OnInit, OnDestroy {
   }
 
   private updatePollingMode(): void {
-    const desired =
-      this.wsConnected && this.joinState === 'joined'
-        ? LobbyComponent.POLL_SLOW_MS
-        : LobbyComponent.POLL_FAST_MS;
+    if (this.wsConnected) {
+      this.stopPolling();
+      return;
+    }
 
-    if (desired === this.pollMs) return;
-    this.pollMs = desired;
-
-    if (this.pollSubscription) this.startPolling();
+    this.pollMs = LobbyComponent.POLL_FAST_MS;
+    if (!this.pollSubscription) this.startPolling();
   }
 
   private ensureGameAutoSwitch(): void {
@@ -307,6 +317,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
         },
         error: () => {
           // polling is fallback
+          this.updatePollingMode();
         },
       });
     this.subscriptions.add(this.lobbyEventsSubscription);
@@ -321,7 +332,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
     this.lobbyApi.join(this.code, this.password.trim() || undefined).subscribe({
       next: (lobby) => {
         this.onLobbyUpdate(lobby);
-        this.startPolling();
+        this.updatePollingMode();
       },
       error: (err) => {
         if (err?.status === 409) {
