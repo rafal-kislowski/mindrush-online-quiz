@@ -72,10 +72,10 @@ public class AdminQuizController {
         List<QuizAdminService.AnswerOptionInput> options = req.options() == null
                 ? null
                 : req.options().stream()
-                .map(o -> new QuizAdminService.AnswerOptionInput(o.text(), o.correct()))
+                .map(o -> new QuizAdminService.AnswerOptionInput(o.text(), o.imageUrl(), o.correct()))
                 .toList();
-        QuizQuestion q = adminService.addQuestion(quizId, req.prompt(), options);
-        return ResponseEntity.status(CREATED).body(new QuizQuestionAdminDto(q.getId(), q.getOrderIndex(), q.getPrompt()));
+        QuizQuestion q = adminService.addQuestion(quizId, req.prompt(), req.imageUrl(), options);
+        return ResponseEntity.status(CREATED).body(new QuizQuestionAdminDto(q.getId(), q.getOrderIndex(), q.getPrompt(), q.getImageUrl()));
     }
 
     @PutMapping("/{id}/questions/{questionId}")
@@ -87,9 +87,9 @@ public class AdminQuizController {
         List<QuizAdminService.AnswerOptionUpdateInput> options = req.options() == null
                 ? null
                 : req.options().stream()
-                .map(o -> new QuizAdminService.AnswerOptionUpdateInput(o.id(), o.text(), o.correct()))
+                .map(o -> new QuizAdminService.AnswerOptionUpdateInput(o.id(), o.text(), o.imageUrl(), o.correct()))
                 .toList();
-        adminService.updateQuestion(quizId, questionId, req.prompt(), options);
+        adminService.updateQuestion(quizId, questionId, req.prompt(), req.imageUrl(), options);
         return ResponseEntity.noContent().build();
     }
 
@@ -116,28 +116,32 @@ public class AdminQuizController {
 
     public record AddQuestionRequest(
             @NotBlank @Size(max = 500) String prompt,
+            @Size(max = 500) String imageUrl,
             List<AnswerOptionRequest> options
     ) {}
 
     public record AnswerOptionRequest(
-            @NotBlank @Size(max = 200) String text,
+            @Size(max = 200) String text,
+            @Size(max = 500) String imageUrl,
             boolean correct
     ) {}
 
     public record UpdateQuestionRequest(
             @NotBlank @Size(max = 500) String prompt,
+            @Size(max = 500) String imageUrl,
             List<AnswerOptionUpdateRequest> options
     ) {}
 
     public record AnswerOptionUpdateRequest(
             Long id,
-            @NotBlank @Size(max = 200) String text,
+            @Size(max = 200) String text,
+            @Size(max = 500) String imageUrl,
             boolean correct
     ) {}
 
     public record QuizAdminDto(Long id, String title, String description, String categoryName) {}
 
-    public record QuizQuestionAdminDto(Long id, int orderIndex, String prompt) {}
+    public record QuizQuestionAdminDto(Long id, int orderIndex, String prompt, String imageUrl) {}
 
     public record AdminQuizListItemDto(
             Long id,
@@ -159,6 +163,7 @@ public class AdminQuizController {
             Long id,
             int orderIndex,
             String prompt,
+            String imageUrl,
             List<AdminAnswerOptionDto> options
     ) {}
 
@@ -166,6 +171,7 @@ public class AdminQuizController {
             Long id,
             int orderIndex,
             String text,
+            String imageUrl,
             boolean correct
     ) {}
 
@@ -180,8 +186,9 @@ public class AdminQuizController {
                                 q.id(),
                                 q.orderIndex(),
                                 q.prompt(),
+                                q.imageUrl(),
                                 q.options().stream()
-                                        .map(o -> new AdminAnswerOptionDto(o.id(), o.orderIndex(), o.text(), o.correct()))
+                                        .map(o -> new AdminAnswerOptionDto(o.id(), o.orderIndex(), o.text(), o.imageUrl(), o.correct()))
                                         .toList()
                         ))
                         .toList()

@@ -73,7 +73,7 @@ public class QuizAdminService {
         if (!questionIds.isEmpty()) {
             optionRepository.findAllByQuestionIdInOrderByQuestionIdAscOrderIndexAsc(questionIds).forEach(o -> {
                 optionsByQuestionId.computeIfAbsent(o.getQuestion().getId(), ignored -> new java.util.ArrayList<>())
-                        .add(new AdminAnswerOption(o.getId(), o.getOrderIndex(), o.getText(), o.isCorrect()));
+                        .add(new AdminAnswerOption(o.getId(), o.getOrderIndex(), o.getText(), o.getImageUrl(), o.isCorrect()));
             });
         }
 
@@ -82,6 +82,7 @@ public class QuizAdminService {
                         q.getId(),
                         q.getOrderIndex(),
                         q.getPrompt(),
+                        q.getImageUrl(),
                         optionsByQuestionId.getOrDefault(q.getId(), List.of())
                 ))
                 .toList();
@@ -114,7 +115,7 @@ public class QuizAdminService {
         return quizRepository.save(quiz);
     }
 
-    public QuizQuestion addQuestion(Long quizId, String prompt, List<AnswerOptionInput> options) {
+    public QuizQuestion addQuestion(Long quizId, String prompt, String imageUrl, List<AnswerOptionInput> options) {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
 
@@ -131,21 +132,28 @@ public class QuizAdminService {
         }
         for (AnswerOptionInput o : options) {
             String text = o == null ? "" : (o.text() == null ? "" : o.text().trim());
-            if (text.isBlank()) throw new ResponseStatusException(BAD_REQUEST, "Answer option text is required");
+            String img = o == null ? "" : (o.imageUrl() == null ? "" : o.imageUrl().trim());
+            if (text.isBlank() && img.isBlank()) {
+                throw new ResponseStatusException(BAD_REQUEST, "Each answer option must have text or an image");
+            }
         }
 
         int orderIndex = (int) questionRepository.countByQuizId(quizId);
         QuizQuestion q = questionRepository.save(new QuizQuestion(quiz, p, orderIndex));
+        q.setImageUrl(trimToNull(imageUrl));
 
         for (int i = 0; i < options.size(); i++) {
             AnswerOptionInput in = options.get(i);
-            optionRepository.save(new QuizAnswerOption(q, in.text().trim(), in.correct(), i));
+            String text = in.text() == null ? "" : in.text().trim();
+            QuizAnswerOption opt = new QuizAnswerOption(q, text, in.correct(), i);
+            opt.setImageUrl(trimToNull(in.imageUrl()));
+            optionRepository.save(opt);
         }
 
         return q;
     }
 
-    public void updateQuestion(Long quizId, Long questionId, String prompt, List<AnswerOptionUpdateInput> options) {
+    public void updateQuestion(Long quizId, Long questionId, String prompt, String imageUrl, List<AnswerOptionUpdateInput> options) {
         QuizQuestion question = questionRepository.findByIdAndQuizId(questionId, quizId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Question not found"));
 
@@ -162,11 +170,15 @@ public class QuizAdminService {
         }
         for (AnswerOptionUpdateInput o : options) {
             String text = o == null ? "" : (o.text() == null ? "" : o.text().trim());
-            if (text.isBlank()) throw new ResponseStatusException(BAD_REQUEST, "Answer option text is required");
+            String img = o == null ? "" : (o.imageUrl() == null ? "" : o.imageUrl().trim());
+            if (text.isBlank() && img.isBlank()) {
+                throw new ResponseStatusException(BAD_REQUEST, "Each answer option must have text or an image");
+            }
             if (o.id() == null) throw new ResponseStatusException(BAD_REQUEST, "Answer option id is required");
         }
 
         question.setPrompt(p);
+        question.setImageUrl(trimToNull(imageUrl));
 
         List<QuizAnswerOption> existing = optionRepository.findAllByQuestionIdOrderByOrderIndexAsc(questionId);
         if (existing.size() != 4) {
@@ -185,9 +197,10 @@ public class QuizAdminService {
         for (int i = 0; i < options.size(); i++) {
             AnswerOptionUpdateInput in = options.get(i);
             QuizAnswerOption opt = existingById.get(in.id());
-            opt.setText(in.text().trim());
+            opt.setText(in.text() == null ? "" : in.text().trim());
             opt.setCorrect(in.correct());
             opt.setOrderIndex(i);
+            opt.setImageUrl(trimToNull(in.imageUrl()));
             optionRepository.save(opt);
         }
         questionRepository.save(question);
@@ -210,9 +223,9 @@ public class QuizAdminService {
         quizRepository.delete(quiz);
     }
 
-    public record AnswerOptionInput(String text, boolean correct) {}
+    public record AnswerOptionInput(String text, String imageUrl, boolean correct) {}
 
-    public record AnswerOptionUpdateInput(Long id, String text, boolean correct) {}
+    public record AnswerOptionUpdateInput(Long id, String text, String imageUrl, boolean correct) {}
 
     public record AdminQuizListItem(
             Long id,
@@ -234,6 +247,7 @@ public class QuizAdminService {
             Long id,
             int orderIndex,
             String prompt,
+            String imageUrl,
             List<AdminAnswerOption> options
     ) {}
 
@@ -241,6 +255,13 @@ public class QuizAdminService {
             Long id,
             int orderIndex,
             String text,
+            String imageUrl,
             boolean correct
     ) {}
+
+    private static String trimToNull(String v) {
+        if (v == null) return null;
+        String t = v.trim();
+        return t.isBlank() ? null : t;
+    }
 }

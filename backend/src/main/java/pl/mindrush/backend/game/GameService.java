@@ -325,9 +325,11 @@ public class GameService {
             return new GamePlayerDto(p.getDisplayName(), answered, correct, score);
         }).toList();
 
-        List<GameOptionDto> orderedOptions = shuffledOptions(session.getId(), viewerGuestSessionId, current.question().getId(), current.options()).stream().map(o -> new GameOptionDto(o.getId(), o.getText())).toList();
+        List<GameOptionDto> orderedOptions = shuffledOptions(session.getId(), viewerGuestSessionId, current.question().getId(), current.options()).stream()
+                .map(o -> new GameOptionDto(o.getId(), o.getText(), o.getImageUrl()))
+                .toList();
 
-        GameQuestionDto questionDto = new GameQuestionDto(current.question().getId(), current.question().getPrompt(), orderedOptions);
+        GameQuestionDto questionDto = new GameQuestionDto(current.question().getId(), current.question().getPrompt(), current.question().getImageUrl(), orderedOptions);
 
         Long correctOptionId = null;
         if (reveal) {

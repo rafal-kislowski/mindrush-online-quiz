@@ -68,7 +68,7 @@ public class QuizService {
         if (!questionIds.isEmpty()) {
             optionRepository.findAllByQuestionIdInOrderByQuestionIdAscOrderIndexAsc(questionIds).forEach(o -> {
                 optionsByQuestionId.computeIfAbsent(o.getQuestion().getId(), ignored -> new java.util.ArrayList<>())
-                        .add(new QuizAnswerOptionDto(o.getId(), o.getText()));
+                        .add(new QuizAnswerOptionDto(o.getId(), o.getText(), o.getImageUrl()));
             });
         }
 
@@ -76,6 +76,7 @@ public class QuizService {
                 .map(q -> new QuizQuestionDto(
                         q.getId(),
                         q.getPrompt(),
+                        q.getImageUrl(),
                         optionsByQuestionId.getOrDefault(q.getId(), List.of())
                 ))
                 .toList();

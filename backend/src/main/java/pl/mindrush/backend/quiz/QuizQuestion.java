@@ -25,6 +25,9 @@ public class QuizQuestion {
     @Column(name = "prompt", length = 500, nullable = false)
     private String prompt;
 
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+
     @Column(name = "order_index", nullable = false)
     private int orderIndex;
 
@@ -49,11 +52,19 @@ public class QuizQuestion {
         return prompt;
     }
 
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
     public int getOrderIndex() {
         return orderIndex;
     }
 
     public void setPrompt(String prompt) {
         this.prompt = prompt;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
     }
 }

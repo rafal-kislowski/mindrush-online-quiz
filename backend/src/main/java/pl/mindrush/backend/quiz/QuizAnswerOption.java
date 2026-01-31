@@ -25,6 +25,9 @@ public class QuizAnswerOption {
     @Column(name = "text", length = 200, nullable = false)
     private String text;
 
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+
     @Column(name = "correct", nullable = false)
     private boolean correct;
 
@@ -53,6 +56,10 @@ public class QuizAnswerOption {
         return text;
     }
 
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
     public boolean isCorrect() {
         return correct;
     }
@@ -63,6 +70,10 @@ public class QuizAnswerOption {
 
     public void setText(String text) {
         this.text = text;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
     }
 
     public void setCorrect(boolean correct) {

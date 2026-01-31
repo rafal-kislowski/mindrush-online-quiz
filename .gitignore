@@ -33,4 +33,10 @@ application-local.yml
 # =========================
 frontend/node_modules/
 frontend/dist/
+
+# =========================
+# Uploaded media (local)
+# =========================
+uploads/
+backend/uploads/
 frontend/.angular/
