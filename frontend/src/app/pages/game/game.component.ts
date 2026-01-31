@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subscription, interval, startWith } from 'rxjs';
+import { Subscription } from 'rxjs';
 import { GameApi } from '../../core/api/game.api';
 import { LobbyApi } from '../../core/api/lobby.api';
 import { GameStateDto } from '../../core/models/game.models';
@@ -17,7 +17,6 @@ import { StompClientService } from '../../core/ws/stomp-client.service';
   styleUrl: './game.component.scss',
 })
 export class GameComponent implements OnInit, OnDestroy {
-  private static readonly POLL_FAST_MS = 1500;
   private static readonly GUEST_QUESTION_MS = 10_000;
   private static readonly GUEST_REVEAL_MS = 3_000;
   private static readonly GUEST_PRE_COUNTDOWN_MS = 4_000;
@@ -50,8 +49,6 @@ export class GameComponent implements OnInit, OnDestroy {
   private revealPhase: 'feedback' | 'transition' = 'feedback';
   private revealPhaseTimer: number | null = null;
   private revealKey: string | null = null;
-  private pollSubscription: Subscription | null = null;
-  private pollMs = GameComponent.POLL_FAST_MS;
   private wsConnected = false;
 
   constructor(
@@ -70,7 +67,6 @@ export class GameComponent implements OnInit, OnDestroy {
     this.subscriptions.add(
       this.stompClient.state$.subscribe((state) => {
         this.wsConnected = state === 'connected';
-        this.updatePollingMode();
         if (this.wsConnected) this.refreshSilent();
       })
     );
@@ -97,8 +93,7 @@ export class GameComponent implements OnInit, OnDestroy {
       this.gameEvents.subscribeLobbyGame(this.code).subscribe({
         next: () => this.refresh(),
         error: () => {
-          // polling is fallback
-          this.updatePollingMode();
+          // ignore; user can refresh manually if WS is down
         },
       })
     );
@@ -112,7 +107,6 @@ export class GameComponent implements OnInit, OnDestroy {
     if (this.timerNoAnimRaf !== null) cancelAnimationFrame(this.timerNoAnimRaf);
     this.stopCountdownLoop();
     this.stopRevealPhaseTimer();
-    this.pollSubscription?.unsubscribe();
     this.subscriptions.unsubscribe();
   }
 
@@ -138,29 +132,6 @@ export class GameComponent implements OnInit, OnDestroy {
         // ignore transient errors while reconnecting
       },
     });
-  }
-
-  private stopPolling(): void {
-    this.pollSubscription?.unsubscribe();
-    this.pollSubscription = null;
-  }
-
-  private startPolling(): void {
-    this.stopPolling();
-    this.pollSubscription = interval(this.pollMs)
-      .pipe(startWith(0))
-      .subscribe(() => this.refreshSilent());
-    this.subscriptions.add(this.pollSubscription);
-  }
-
-  private updatePollingMode(): void {
-    if (this.wsConnected) {
-      this.stopPolling();
-      return;
-    }
-
-    this.pollMs = GameComponent.POLL_FAST_MS;
-    if (!this.pollSubscription) this.startPolling();
   }
 
   answer(optionId: number): void {

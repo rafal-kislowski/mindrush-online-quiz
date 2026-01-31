@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, ElementRef, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subscription, interval, startWith, switchMap } from 'rxjs';
+import { Subscription, switchMap } from 'rxjs';
 import { GameApi } from '../../core/api/game.api';
 import { LobbyApi } from '../../core/api/lobby.api';
 import { QuizApi } from '../../core/api/quiz.api';
@@ -22,7 +22,7 @@ import { StompClientService } from '../../core/ws/stomp-client.service';
   styleUrl: './lobby.component.scss',
 })
 export class LobbyComponent implements OnInit, OnDestroy {
-  private static readonly POLL_FAST_MS = 1500;
+  // Real-time updates are handled via WebSocket (/ws + STOMP topics).
 
   get authUser$() {
     return this.auth.user$;
@@ -54,14 +54,11 @@ export class LobbyComponent implements OnInit, OnDestroy {
   quizMenuOpen = false;
 
   private readonly subscriptions = new Subscription();
-  private pollSubscription: Subscription | null = null;
   private gameEventsSubscription: Subscription | null = null;
   private lobbyEventsSubscription: Subscription | null = null;
   private quizzesLoaded = false;
   private unloadHandler: (() => void) | null = null;
   private autoJoinInFlight = false;
-  private pollMs = LobbyComponent.POLL_FAST_MS;
-  private wsConnected = false;
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -82,9 +79,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
 
     this.subscriptions.add(
       this.stompClient.state$.subscribe((state) => {
-        this.wsConnected = state === 'connected';
-        this.updatePollingMode();
-        if (this.wsConnected && this.code) {
+        if (state === 'connected' && this.code) {
           this.lobbyApi.get(this.code).subscribe({
             next: (lobby) => this.onLobbyUpdate(lobby),
             error: () => {
@@ -133,46 +128,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
     }
 
     this.ensureLobbyUpdates();
-    this.updatePollingMode();
     this.attemptAutoJoinIfPossible(this.lobby);
-  }
-
-  private stopPolling(): void {
-    this.pollSubscription?.unsubscribe();
-    this.pollSubscription = null;
-  }
-
-  private startPolling(): void {
-    if (!this.code) return;
-    this.stopPolling();
-    this.pollSubscription = interval(this.pollMs)
-      .pipe(
-        startWith(0),
-        switchMap(() => this.lobbyApi.get(this.code))
-      )
-      .subscribe({
-        next: (lobby) => {
-          this.onLobbyUpdate(lobby);
-          this.attemptAutoJoinIfPossible(lobby);
-          if (this.joinState === 'joined' && lobby.status === 'IN_GAME') {
-            this.router.navigate(['/lobby', this.code, 'game']);
-          }
-        },
-        error: () => {
-          // ignore transient errors while typing/refreshing
-        },
-      });
-    this.subscriptions.add(this.pollSubscription);
-  }
-
-  private updatePollingMode(): void {
-    if (this.wsConnected) {
-      this.stopPolling();
-      return;
-    }
-
-    this.pollMs = LobbyComponent.POLL_FAST_MS;
-    if (!this.pollSubscription) this.startPolling();
   }
 
   private ensureGameAutoSwitch(): void {
@@ -197,8 +153,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
           });
         },
         error: () => {
-          // polling is fallback
-          this.updatePollingMode();
+          // ignore; user can refresh manually if WS is down
         },
       });
     this.subscriptions.add(this.gameEventsSubscription);
@@ -251,7 +206,6 @@ export class LobbyComponent implements OnInit, OnDestroy {
       this.joinState = 'joined';
       this.ensureGameAutoSwitch();
       this.ensureLeaveOnUnload();
-      this.updatePollingMode();
       return;
     }
 
@@ -266,7 +220,6 @@ export class LobbyComponent implements OnInit, OnDestroy {
       this.error = null;
     }
 
-    this.updatePollingMode();
   }
 
   private attemptAutoJoinIfPossible(lobby: LobbyDto | null): void {
@@ -316,8 +269,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
           });
         },
         error: () => {
-          // polling is fallback
-          this.updatePollingMode();
+          // ignore; user can refresh manually if WS is down
         },
       });
     this.subscriptions.add(this.lobbyEventsSubscription);
@@ -332,7 +284,6 @@ export class LobbyComponent implements OnInit, OnDestroy {
     this.lobbyApi.join(this.code, this.password.trim() || undefined).subscribe({
       next: (lobby) => {
         this.onLobbyUpdate(lobby);
-        this.updatePollingMode();
       },
       error: (err) => {
         if (err?.status === 409) {
