@@ -66,11 +66,16 @@ export class AdminQuizComponent implements OnInit {
 
   readonly addExistingQuestionForm = new FormGroup({
     prompt: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(500)] }),
+    imageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
     correctIndex: new FormControl(0, { nonNullable: true }),
-    o1: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
-    o2: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
-    o3: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
-    o4: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
+    o1: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
+    o1ImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
+    o2: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
+    o2ImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
+    o3: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
+    o3ImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
+    o4: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
+    o4ImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
   });
 
   readonly editQuizForm = new FormGroup({
@@ -81,11 +86,16 @@ export class AdminQuizComponent implements OnInit {
 
   readonly editQuestionForm = new FormGroup({
     prompt: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(500)] }),
+    imageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
     correctIndex: new FormControl(0, { nonNullable: true }),
-    o1: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
-    o2: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
-    o3: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
-    o4: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
+    o1: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
+    o1ImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
+    o2: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
+    o2ImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
+    o3: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
+    o3ImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
+    o4: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
+    o4ImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
   });
 
   constructor(private readonly api: AdminQuizApi) {}
@@ -305,11 +315,16 @@ export class AdminQuizComponent implements OnInit {
         });
         this.addExistingQuestionForm.reset({
           prompt: '',
+          imageUrl: null,
           correctIndex: 0,
           o1: '',
+          o1ImageUrl: null,
           o2: '',
+          o2ImageUrl: null,
           o3: '',
+          o3ImageUrl: null,
           o4: '',
+          o4ImageUrl: null,
         });
       },
       error: (err) => {
@@ -371,18 +386,25 @@ export class AdminQuizComponent implements OnInit {
       0,
       q.options.findIndex((o) => o.correct)
     );
-    const texts = q.options
+    const optsSorted = q.options
       .slice()
       .sort((a, b) => a.orderIndex - b.orderIndex)
-      .map((o) => o.text);
+
+    const texts = optsSorted.map((o) => o.text ?? '');
+    const images = optsSorted.map((o) => o.imageUrl ?? null);
 
     this.editQuestionForm.setValue({
       prompt: q.prompt,
+      imageUrl: q.imageUrl ?? null,
       correctIndex: correctIndex < 0 ? 0 : correctIndex,
       o1: texts[0] ?? '',
+      o1ImageUrl: images[0] ?? null,
       o2: texts[1] ?? '',
+      o2ImageUrl: images[1] ?? null,
       o3: texts[2] ?? '',
+      o3ImageUrl: images[2] ?? null,
       o4: texts[3] ?? '',
+      o4ImageUrl: images[3] ?? null,
     });
   }
 
@@ -393,11 +415,16 @@ export class AdminQuizComponent implements OnInit {
     this.selectedQuestionId = null;
     this.addExistingQuestionForm.reset({
       prompt: '',
+      imageUrl: null,
       correctIndex: 0,
       o1: '',
+      o1ImageUrl: null,
       o2: '',
+      o2ImageUrl: null,
       o3: '',
+      o3ImageUrl: null,
       o4: '',
+      o4ImageUrl: null,
     });
   }
 
@@ -434,6 +461,7 @@ export class AdminQuizComponent implements OnInit {
     if (!q) return;
 
     const prompt = this.editQuestionForm.controls.prompt.value.trim();
+    const questionImageUrl = this.normalizeNullableUrl(this.editQuestionForm.controls.imageUrl.value);
     const correctIndex = this.editQuestionForm.controls.correctIndex.value;
     const texts = [
       this.editQuestionForm.controls.o1.value.trim(),
@@ -441,11 +469,20 @@ export class AdminQuizComponent implements OnInit {
       this.editQuestionForm.controls.o3.value.trim(),
       this.editQuestionForm.controls.o4.value.trim(),
     ];
+    const images = [
+      this.normalizeNullableUrl(this.editQuestionForm.controls.o1ImageUrl.value),
+      this.normalizeNullableUrl(this.editQuestionForm.controls.o2ImageUrl.value),
+      this.normalizeNullableUrl(this.editQuestionForm.controls.o3ImageUrl.value),
+      this.normalizeNullableUrl(this.editQuestionForm.controls.o4ImageUrl.value),
+    ];
+
+    if (!this.validateOptions(texts, images)) return;
 
     const optionsSorted = q.options.slice().sort((a, b) => a.orderIndex - b.orderIndex);
     const payloadOptions = optionsSorted.map((o, idx) => ({
       id: o.id,
-      text: texts[idx],
+      text: this.normalizeNullableText(texts[idx]),
+      imageUrl: images[idx],
       correct: idx === correctIndex,
     }));
 
@@ -453,6 +490,7 @@ export class AdminQuizComponent implements OnInit {
     this.api
       .updateQuestion(quiz.id, q.id, {
         prompt,
+        imageUrl: questionImageUrl,
         options: payloadOptions,
       })
       .subscribe({
@@ -542,6 +580,7 @@ export class AdminQuizComponent implements OnInit {
     if (this.addExistingQuestionForm.invalid) return;
 
     const prompt = this.addExistingQuestionForm.controls.prompt.value.trim();
+    const questionImageUrl = this.normalizeNullableUrl(this.addExistingQuestionForm.controls.imageUrl.value);
     const correctIndex = this.addExistingQuestionForm.controls.correctIndex.value;
     const texts = [
       this.addExistingQuestionForm.controls.o1.value.trim(),
@@ -549,12 +588,25 @@ export class AdminQuizComponent implements OnInit {
       this.addExistingQuestionForm.controls.o3.value.trim(),
       this.addExistingQuestionForm.controls.o4.value.trim(),
     ];
+    const images = [
+      this.normalizeNullableUrl(this.addExistingQuestionForm.controls.o1ImageUrl.value),
+      this.normalizeNullableUrl(this.addExistingQuestionForm.controls.o2ImageUrl.value),
+      this.normalizeNullableUrl(this.addExistingQuestionForm.controls.o3ImageUrl.value),
+      this.normalizeNullableUrl(this.addExistingQuestionForm.controls.o4ImageUrl.value),
+    ];
+
+    if (!this.validateOptions(texts, images)) return;
 
     this.addingExistingQuestion = true;
     this.api
       .addQuestion(this.selectedQuiz.id, {
         prompt,
-        options: texts.map((text, idx) => ({ text, correct: idx === correctIndex })),
+        imageUrl: questionImageUrl,
+        options: texts.map((text, idx) => ({
+          text: this.normalizeNullableText(text),
+          imageUrl: images[idx],
+          correct: idx === correctIndex,
+        })),
       })
       .subscribe({
         next: () => {
@@ -562,11 +614,16 @@ export class AdminQuizComponent implements OnInit {
           const quizId = this.selectedQuiz!.id;
           this.addExistingQuestionForm.reset({
             prompt: '',
+            imageUrl: null,
             correctIndex: 0,
             o1: '',
+            o1ImageUrl: null,
             o2: '',
+            o2ImageUrl: null,
             o3: '',
+            o3ImageUrl: null,
             o4: '',
+            o4ImageUrl: null,
           });
           this.selectQuiz(quizId);
           this.loadList();
@@ -605,5 +662,131 @@ export class AdminQuizComponent implements OnInit {
           this.error = err?.error?.message ?? 'Failed to create quiz';
         },
       });
+  }
+
+  uploadingImage = false;
+
+  uploadQuestionImage(mode: 'create' | 'edit', ev: Event): void {
+    const input = ev.target as HTMLInputElement | null;
+    const file = input?.files?.[0] ?? null;
+    if (input) input.value = '';
+    if (!file) return;
+
+    const form = this.getQuestionForm(mode);
+    if (!form) return;
+
+    if (this.uploadingImage) return;
+    this.uploadingImage = true;
+    this.error = null;
+
+    this.api.uploadImage(file).subscribe({
+      next: (res) => {
+        this.uploadingImage = false;
+        form.controls.imageUrl.setValue(res.url);
+      },
+      error: (err) => {
+        this.uploadingImage = false;
+        this.error = err?.error?.message ?? 'Failed to upload image';
+      },
+    });
+  }
+
+  clearQuestionImage(mode: 'create' | 'edit'): void {
+    const form = this.getQuestionForm(mode);
+    if (!form) return;
+    form.controls.imageUrl.setValue(null);
+  }
+
+  uploadOptionImage(mode: 'create' | 'edit', index: number, ev: Event): void {
+    const input = ev.target as HTMLInputElement | null;
+    const file = input?.files?.[0] ?? null;
+    if (input) input.value = '';
+    if (!file) return;
+
+    const form = this.getQuestionForm(mode);
+    if (!form) return;
+
+    const key = this.optionImageKey(index);
+    if (!key) return;
+
+    if (this.uploadingImage) return;
+    this.uploadingImage = true;
+    this.error = null;
+
+    this.api.uploadImage(file).subscribe({
+      next: (res) => {
+        this.uploadingImage = false;
+        form.controls[key].setValue(res.url);
+      },
+      error: (err) => {
+        this.uploadingImage = false;
+        this.error = err?.error?.message ?? 'Failed to upload image';
+      },
+    });
+  }
+
+  clearOptionImage(mode: 'create' | 'edit', index: number): void {
+    const form = this.getQuestionForm(mode);
+    if (!form) return;
+    const key = this.optionImageKey(index);
+    if (!key) return;
+    form.controls[key].setValue(null);
+  }
+
+  questionImageUrl(mode: 'create' | 'edit'): string | null {
+    const form = this.getQuestionForm(mode);
+    if (!form) return null;
+    return this.normalizeNullableUrl(form.controls.imageUrl.value);
+  }
+
+  optionImageUrl(mode: 'create' | 'edit', index: number): string | null {
+    const form = this.getQuestionForm(mode);
+    if (!form) return null;
+    const key = this.optionImageKey(index);
+    if (!key) return null;
+    return this.normalizeNullableUrl(form.controls[key].value);
+  }
+
+  private getQuestionForm(mode: 'create' | 'edit') {
+    return mode === 'create' ? this.addExistingQuestionForm : this.editQuestionForm;
+  }
+
+  private optionImageKey(
+    index: number
+  ): 'o1ImageUrl' | 'o2ImageUrl' | 'o3ImageUrl' | 'o4ImageUrl' | null {
+    switch (index) {
+      case 0:
+        return 'o1ImageUrl';
+      case 1:
+        return 'o2ImageUrl';
+      case 2:
+        return 'o3ImageUrl';
+      case 3:
+        return 'o4ImageUrl';
+      default:
+        return null;
+    }
+  }
+
+  private normalizeNullableText(text: string): string | null {
+    const t = (text ?? '').trim();
+    return t ? t : null;
+  }
+
+  private normalizeNullableUrl(url: string | null): string | null {
+    const t = (url ?? '').trim();
+    return t ? t : null;
+  }
+
+  private validateOptions(texts: string[], imageUrls: Array<string | null>): boolean {
+    for (let i = 0; i < 4; i++) {
+      const t = this.normalizeNullableText(texts[i] ?? '');
+      const u = this.normalizeNullableUrl(imageUrls[i] ?? null);
+      if (!t && !u) {
+        this.error = `Option ${i + 1} must have text or an image.`;
+        return false;
+      }
+    }
+    return true;
   }
 }

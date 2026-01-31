@@ -355,12 +355,36 @@ h2 {
 }
 
 .editor-pane--questionform {
-  overflow: visible;
+  overflow: hidden;
 }
 
 .editor-pane--questionform .editor-pane__body {
-  overflow: visible;
-  padding-right: 0;
+  overflow: auto;
+  padding-right: 4px;
+
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.editor-pane--questionform .editor-pane__body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.editor-pane--questionform .editor-pane__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.editor-pane--questionform .editor-pane__body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.editor-pane--questionform .editor-pane__body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.26);
 }
 
 .field {
@@ -413,6 +437,109 @@ h2 {
 .opt input {
   width: 100%;
   min-width: 0;
+}
+
+/* Media upload / preview (admin question editor). */
+.media-block {
+  margin-top: 4px;
+}
+
+.media-block__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.media-block__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.82);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 140ms ease, filter 140ms ease, color 140ms ease;
+}
+
+.icon-btn:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.icon-btn:active {
+  transform: translateY(0);
+}
+
+.icon-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+}
+
+.icon-btn.danger {
+  color: rgba(255, 90, 122, 0.9);
+}
+
+.media-img {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin-top: 10px;
+}
+
+.opt__content {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.opt__top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.opt__top input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.answer-img {
+  display: block;
+  width: 100%;
+  max-height: 150px;
+  object-fit: contain;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* "Single correct option" UI: keep radio semantics, but render as checkbox-like ✅/❌ indicator. */

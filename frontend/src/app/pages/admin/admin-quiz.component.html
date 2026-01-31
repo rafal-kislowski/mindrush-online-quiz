@@ -321,13 +321,82 @@
                   <input formControlName="prompt" />
                 </label>
 
+                <div class="media-block">
+                  <div class="media-block__head">
+                    <span class="field__label">Question image (optional)</span>
+                    <div class="media-block__actions">
+                      <input
+                        #editQuestionImageInput
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        (change)="uploadQuestionImage('edit', $event)"
+                      />
+                      <button class="icon-btn" type="button" (click)="editQuestionImageInput.click()" [disabled]="uploadingImage">
+                        <i class="fa-solid fa-upload" aria-hidden="true"></i>
+                        <span class="sr-only">Upload question image</span>
+                      </button>
+                      <button
+                        class="icon-btn danger"
+                        type="button"
+                        *ngIf="questionImageUrl('edit')"
+                        (click)="clearQuestionImage('edit')"
+                      >
+                        <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                        <span class="sr-only">Remove question image</span>
+                      </button>
+                    </div>
+                  </div>
+                  <img
+                    class="media-img"
+                    *ngIf="questionImageUrl('edit') as url"
+                    [src]="url"
+                    alt="Question image"
+                    loading="lazy"
+                  />
+                </div>
+
                 <div class="options">
                   <div class="opt" *ngFor="let key of ['o1','o2','o3','o4']; let i = index">
                     <label class="opt__radio">
                       <input type="radio" [value]="i" formControlName="correctIndex" />
                       <span>Correct</span>
                     </label>
-                    <input [formControlName]="key" [placeholder]="'Option ' + (i + 1)" />
+
+                    <div class="opt__content">
+                      <div class="opt__top">
+                        <input [formControlName]="key" [placeholder]="'Option ' + (i + 1) + ' (text optional if image set)'" />
+
+                        <input
+                          #editOptImageInput
+                          type="file"
+                          accept="image/*"
+                          hidden
+                          (change)="uploadOptionImage('edit', i, $event)"
+                        />
+                        <button class="icon-btn" type="button" (click)="editOptImageInput.click()" [disabled]="uploadingImage">
+                          <i class="fa-solid fa-image" aria-hidden="true"></i>
+                          <span class="sr-only">Upload option image</span>
+                        </button>
+                        <button
+                          class="icon-btn danger"
+                          type="button"
+                          *ngIf="optionImageUrl('edit', i)"
+                          (click)="clearOptionImage('edit', i)"
+                        >
+                          <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                          <span class="sr-only">Remove option image</span>
+                        </button>
+                      </div>
+
+                      <img
+                        class="answer-img"
+                        *ngIf="optionImageUrl('edit', i) as optUrl"
+                        [src]="optUrl"
+                        alt="Answer option image"
+                        loading="lazy"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -348,13 +417,82 @@
                 <input formControlName="prompt" placeholder="Question text..." />
               </label>
 
+              <div class="media-block">
+                <div class="media-block__head">
+                  <span class="field__label">Question image (optional)</span>
+                  <div class="media-block__actions">
+                    <input
+                      #createQuestionImageInput
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      (change)="uploadQuestionImage('create', $event)"
+                    />
+                    <button class="icon-btn" type="button" (click)="createQuestionImageInput.click()" [disabled]="uploadingImage">
+                      <i class="fa-solid fa-upload" aria-hidden="true"></i>
+                      <span class="sr-only">Upload question image</span>
+                    </button>
+                    <button
+                      class="icon-btn danger"
+                      type="button"
+                      *ngIf="questionImageUrl('create')"
+                      (click)="clearQuestionImage('create')"
+                    >
+                      <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                      <span class="sr-only">Remove question image</span>
+                    </button>
+                  </div>
+                </div>
+                <img
+                  class="media-img"
+                  *ngIf="questionImageUrl('create') as url"
+                  [src]="url"
+                  alt="Question image"
+                  loading="lazy"
+                />
+              </div>
+
               <div class="options">
                 <div class="opt" *ngFor="let key of ['o1','o2','o3','o4']; let i = index">
                   <label class="opt__radio">
                     <input type="radio" [value]="i" formControlName="correctIndex" />
                     <span>Correct</span>
                   </label>
-                  <input [formControlName]="key" [placeholder]="'Option ' + (i + 1)" />
+
+                  <div class="opt__content">
+                    <div class="opt__top">
+                      <input [formControlName]="key" [placeholder]="'Option ' + (i + 1) + ' (text optional if image set)'" />
+
+                      <input
+                        #createOptImageInput
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        (change)="uploadOptionImage('create', i, $event)"
+                      />
+                      <button class="icon-btn" type="button" (click)="createOptImageInput.click()" [disabled]="uploadingImage">
+                        <i class="fa-solid fa-image" aria-hidden="true"></i>
+                        <span class="sr-only">Upload option image</span>
+                      </button>
+                      <button
+                        class="icon-btn danger"
+                        type="button"
+                        *ngIf="optionImageUrl('create', i)"
+                        (click)="clearOptionImage('create', i)"
+                      >
+                        <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                        <span class="sr-only">Remove option image</span>
+                      </button>
+                    </div>
+
+                    <img
+                      class="answer-img"
+                      *ngIf="optionImageUrl('create', i) as optUrl"
+                      [src]="optUrl"
+                      alt="Answer option image"
+                      loading="lazy"
+                    />
+                  </div>
                 </div>
               </div>
 

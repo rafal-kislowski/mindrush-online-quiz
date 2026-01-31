@@ -1,11 +1,13 @@
 export interface GameOptionDto {
   id: number;
-  text: string;
+  text: string | null;
+  imageUrl?: string | null;
 }
 
 export interface GameQuestionDto {
   id: number;
   prompt: string;
+  imageUrl?: string | null;
   options: GameOptionDto[];
 }
 

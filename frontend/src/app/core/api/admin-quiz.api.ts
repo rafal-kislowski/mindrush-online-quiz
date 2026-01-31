@@ -21,12 +21,14 @@ export interface AdminQuizQuestionDto {
   id: number;
   orderIndex: number;
   prompt: string;
+  imageUrl: string | null;
 }
 
 export interface AdminAnswerOptionDto {
   id: number;
   orderIndex: number;
   text: string;
+  imageUrl: string | null;
   correct: boolean;
 }
 
@@ -34,6 +36,7 @@ export interface AdminQuestionDto {
   id: number;
   orderIndex: number;
   prompt: string;
+  imageUrl: string | null;
   options: AdminAnswerOptionDto[];
 }
 
@@ -48,6 +51,15 @@ export interface AdminQuizDetailDto {
 @Injectable({ providedIn: 'root' })
 export class AdminQuizApi {
   constructor(private readonly http: HttpClient) {}
+
+  uploadImage(file: File): Observable<{ url: string }> {
+    const form = new FormData();
+    form.append('file', file);
+
+    return this.http.post<{ url: string }>('/api/admin/media', form, {
+      withCredentials: true,
+    });
+  }
 
   listQuizzes(): Observable<AdminQuizListItemDto[]> {
     return this.http.get<AdminQuizListItemDto[]>('/api/admin/quizzes', {
@@ -87,7 +99,8 @@ export class AdminQuizApi {
     quizId: number,
     input: {
       prompt: string;
-      options: Array<{ text: string; correct: boolean }>;
+      imageUrl?: string | null;
+      options: Array<{ text?: string | null; imageUrl?: string | null; correct: boolean }>;
     }
   ): Observable<AdminQuizQuestionDto> {
     return this.http.post<AdminQuizQuestionDto>(
@@ -102,7 +115,8 @@ export class AdminQuizApi {
     questionId: number,
     input: {
       prompt: string;
-      options: Array<{ id: number; text: string; correct: boolean }>;
+      imageUrl?: string | null;
+      options: Array<{ id: number; text?: string | null; imageUrl?: string | null; correct: boolean }>;
     }
   ): Observable<void> {
     return this.http.put<void>(

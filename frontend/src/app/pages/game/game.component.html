@@ -27,6 +27,10 @@
           <div class="quiz-title">{{ q.prompt }}</div>
         </div>
 
+        <div class="quiz-media" *ngIf="q.imageUrl as imgUrl">
+          <img class="quiz-media__img" [src]="imgUrl" alt="Question image" loading="lazy" />
+        </div>
+
         <div
           class="quiz-timer"
           [class.quiz-timer--hidden]="lastQuestionRemainingSeconds === null"
@@ -50,7 +54,8 @@
             [class.wrong]="optionState(o.id) === 'wrong'"
           >
             <span class="answer-label">{{ optionLabel(i) }}</span>
-            <span class="answer-text">{{ o.text }}</span>
+            <span class="answer-text" *ngIf="o.text">{{ o.text }}</span>
+            <img class="answer-media__img" *ngIf="o.imageUrl as optUrl" [src]="optUrl" alt="" loading="lazy" />
           </button>
         </div>
       </div>
@@ -91,6 +96,10 @@
 
         </div>
 
+        <div class="quiz-media" *ngIf="q.imageUrl as imgUrl">
+          <img class="quiz-media__img" [src]="imgUrl" alt="Question image" loading="lazy" />
+        </div>
+
         <div
           class="quiz-timer"
           [class.quiz-timer--hidden]="remainingSeconds === null"
@@ -114,7 +123,8 @@
             (click)="answer(o.id)"
           >
             <span class="answer-label">{{ optionLabel(i) }}</span>
-            <span class="answer-text">{{ o.text }}</span>
+            <span class="answer-text" *ngIf="o.text">{{ o.text }}</span>
+            <img class="answer-media__img" *ngIf="o.imageUrl as optUrl" [src]="optUrl" alt="" loading="lazy" />
           </button>
         </div>
       </div>
