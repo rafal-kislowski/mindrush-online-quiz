@@ -163,10 +163,23 @@
                 [class.s]="i === 1"
                 [class.b]="i === 2"
               ></span>
-              {{ p.displayName }}
-              <span class="tag" *ngIf="p.displayName === meDisplayName"
-                >You</span
-              >
+              <span class="name-info">
+                <span class="name-main">
+                  {{ p.displayName }}
+                  <span class="tag" *ngIf="p.displayName === meDisplayName">You</span>
+                </span>
+                <span class="name-meta muted">
+                  Correct: <b>{{ p.correctAnswers ?? 0 }}</b>
+                  &nbsp;·&nbsp; Time: <b>{{ formatMs(p.totalAnswerTimeMs) }}</b>
+                  <ng-container *ngIf="p.xpDelta != null || p.rankPointsDelta != null">
+                    &nbsp;·&nbsp;
+                    <span *ngIf="p.xpDelta != null">+{{ p.xpDelta }} XP</span>
+                    <span *ngIf="p.rankPointsDelta != null" class="rp">
+                      &nbsp;({{ p.rankPointsDelta >= 0 ? '+' : '' }}{{ p.rankPointsDelta }} RP)
+                    </span>
+                  </ng-container>
+                </span>
+              </span>
             </span>
             <span class="points right">{{ p.score }}</span>
           </div>

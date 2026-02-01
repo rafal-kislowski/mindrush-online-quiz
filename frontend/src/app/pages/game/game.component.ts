@@ -194,7 +194,25 @@ export class GameComponent implements OnInit, OnDestroy {
 
   get sortedPlayers() {
     const players = this.state?.players ?? [];
-    return [...players].sort((a, b) => b.score - a.score);
+    return [...players].sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const bCorrect = b.correctAnswers ?? 0;
+      const aCorrect = a.correctAnswers ?? 0;
+      if (bCorrect !== aCorrect) return bCorrect - aCorrect;
+      const aTime = a.totalCorrectAnswerTimeMs ?? Number.MAX_SAFE_INTEGER;
+      const bTime = b.totalCorrectAnswerTimeMs ?? Number.MAX_SAFE_INTEGER;
+      return aTime - bTime;
+    });
+  }
+
+  formatMs(ms: number | null | undefined): string {
+    if (ms == null || !Number.isFinite(ms)) return '-';
+    const totalSeconds = ms / 1000;
+    if (totalSeconds < 60) return `${totalSeconds.toFixed(2)}s`;
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds - minutes * 60;
+    const secStr = seconds.toFixed(2).padStart(5, '0');
+    return `${minutes}:${secStr}`;
   }
 
   get answeredCount(): number {

@@ -16,6 +16,12 @@ export interface GamePlayerDto {
   answered: boolean;
   correct: boolean | null;
   score: number;
+  correctAnswers?: number;
+  totalAnswerTimeMs?: number;
+  totalCorrectAnswerTimeMs?: number;
+  xpDelta?: number | null;
+  rankPointsDelta?: number | null;
+  winner?: boolean | null;
 }
 
 export interface GameStateDto {

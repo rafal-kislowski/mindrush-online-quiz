@@ -709,6 +709,35 @@
   text-overflow: ellipsis;
 }
 
+.name-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.name-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.name-meta {
+  font-weight: 800;
+  font-size: 12px;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rp {
+  color: rgba(255, 154, 53, 0.92);
+}
+
 .points {
   font-weight: 900;
   color: rgba(255, 154, 53, 0.95);
