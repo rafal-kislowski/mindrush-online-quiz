@@ -28,6 +28,15 @@ public class GuestSession {
     @Column(name = "display_name", length = 32)
     private String displayName;
 
+    @Column(name = "user_id")
+    private Long userId;
+
+    @Column(name = "rank_points", nullable = false, columnDefinition = "integer not null default 0")
+    private int rankPoints;
+
+    @Column(name = "xp", nullable = false, columnDefinition = "integer not null default 0")
+    private int xp;
+
     @Column(name = "revoked", nullable = false)
     private boolean revoked;
 
@@ -79,12 +88,39 @@ public class GuestSession {
         this.revoked = revoked;
     }
 
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
+    }
+
+    public int getRankPoints() {
+        return rankPoints;
+    }
+
+    public void setRankPoints(int rankPoints) {
+        this.rankPoints = Math.max(0, rankPoints);
+    }
+
+    public int getXp() {
+        return xp;
+    }
+
+    public void setXp(int xp) {
+        this.xp = Math.max(0, xp);
+    }
+
     public static GuestSession createNew(Instant now, Instant expiresAt) {
         GuestSession session = new GuestSession();
         session.id = UUID.randomUUID().toString();
         session.createdAt = now;
         session.lastSeenAt = now;
         session.expiresAt = expiresAt;
+        session.userId = null;
+        session.rankPoints = 0;
+        session.xp = 0;
         session.revoked = false;
         return session;
     }

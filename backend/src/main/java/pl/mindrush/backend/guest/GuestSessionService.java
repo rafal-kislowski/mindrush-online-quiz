@@ -52,10 +52,14 @@ public class GuestSessionService {
     }
 
     public Result ensureSession(HttpServletRequest request) {
-        return ensureSession(request, null);
+        return ensureSession(request, null, null);
     }
 
     public Result ensureSession(HttpServletRequest request, String preferredDisplayName) {
+        return ensureSession(request, preferredDisplayName, null);
+    }
+
+    public Result ensureSession(HttpServletRequest request, String preferredDisplayName, Long userId) {
         Instant now = Instant.now();
         String sessionId = readCookie(request, cookieName).orElse(null);
         GuestSession session = null;
@@ -80,6 +84,7 @@ public class GuestSessionService {
             session.setDisplayName(generateGuestDisplayName());
         }
 
+        session.setUserId(userId);
         repository.save(session);
 
         ResponseCookie cookie = ResponseCookie.from(cookieName, session.getId())
@@ -144,6 +149,10 @@ public class GuestSessionService {
     }
 
     public void heartbeat(HttpServletRequest request, String preferredDisplayName) {
+        heartbeat(request, preferredDisplayName, null);
+    }
+
+    public void heartbeat(HttpServletRequest request, String preferredDisplayName, Long userId) {
         Instant now = Instant.now();
         GuestSession session = requireValidSession(request);
         session.setLastSeenAt(now);
@@ -151,6 +160,7 @@ public class GuestSessionService {
         if (preferredDisplayName != null && !preferredDisplayName.isBlank()) {
             session.setDisplayName(preferredDisplayName.trim());
         }
+        session.setUserId(userId);
         repository.save(session);
     }
 

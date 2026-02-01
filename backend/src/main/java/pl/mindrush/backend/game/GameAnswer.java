@@ -46,16 +46,33 @@ public class GameAnswer {
     @Column(name = "answered_at", nullable = false, updatable = false)
     private Instant answeredAt;
 
+    @Column(name = "answer_time_ms", nullable = false, updatable = false, columnDefinition = "integer not null default 0")
+    private int answerTimeMs;
+
+    @Column(name = "points", nullable = false, updatable = false, columnDefinition = "integer not null default 0")
+    private int points;
+
     protected GameAnswer() {
     }
 
-    public static GameAnswer create(GameSession session, Long questionId, String guestSessionId, Long selectedOptionId, boolean correct, Instant now) {
+    public static GameAnswer create(
+            GameSession session,
+            Long questionId,
+            String guestSessionId,
+            Long selectedOptionId,
+            boolean correct,
+            int answerTimeMs,
+            int points,
+            Instant now
+    ) {
         GameAnswer a = new GameAnswer();
         a.gameSession = session;
         a.questionId = questionId;
         a.guestSessionId = guestSessionId;
         a.selectedOptionId = selectedOptionId;
         a.correct = correct;
+        a.answerTimeMs = Math.max(0, answerTimeMs);
+        a.points = Math.max(0, points);
         a.answeredAt = now;
         return a;
     }
@@ -86,5 +103,13 @@ public class GameAnswer {
 
     public Instant getAnsweredAt() {
         return answeredAt;
+    }
+
+    public int getAnswerTimeMs() {
+        return answerTimeMs;
+    }
+
+    public int getPoints() {
+        return points;
     }
 }

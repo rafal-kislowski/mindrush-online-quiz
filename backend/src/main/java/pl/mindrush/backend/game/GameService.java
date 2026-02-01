@@ -6,12 +6,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import pl.mindrush.backend.AppUserRepository;
 import pl.mindrush.backend.game.dto.GameOptionDto;
 import pl.mindrush.backend.game.dto.GamePlayerDto;
 import pl.mindrush.backend.game.dto.GameQuestionDto;
 import pl.mindrush.backend.game.dto.GameStateDto;
 import pl.mindrush.backend.game.events.GameEventPublisher;
 import pl.mindrush.backend.guest.GuestSession;
+import pl.mindrush.backend.guest.GuestSessionRepository;
 import pl.mindrush.backend.guest.GuestSessionService;
 import pl.mindrush.backend.lobby.*;
 import pl.mindrush.backend.quiz.*;
@@ -43,6 +45,8 @@ public class GameService {
     private final GameAnswerRepository gameAnswerRepository;
     private final GamePlayerRepository gamePlayerRepository;
     private final GameEventPublisher gameEventPublisher;
+    private final GuestSessionRepository guestSessionRepository;
+    private final AppUserRepository appUserRepository;
 
     public GameService(
             Clock clock,
@@ -59,7 +63,9 @@ public class GameService {
             GameSessionRepository gameSessionRepository,
             GameAnswerRepository gameAnswerRepository,
             GamePlayerRepository gamePlayerRepository,
-            GameEventPublisher gameEventPublisher
+            GameEventPublisher gameEventPublisher,
+            GuestSessionRepository guestSessionRepository,
+            AppUserRepository appUserRepository
     ) {
         this.clock = clock;
         this.guestQuestionDuration = guestQuestionDuration;
@@ -76,6 +82,41 @@ public class GameService {
         this.gameAnswerRepository = gameAnswerRepository;
         this.gamePlayerRepository = gamePlayerRepository;
         this.gameEventPublisher = gameEventPublisher;
+        this.guestSessionRepository = guestSessionRepository;
+        this.appUserRepository = appUserRepository;
+    }
+
+    private long questionDurationMs() {
+        long ms = guestQuestionDuration.toMillis();
+        return ms <= 0 ? 10_000L : ms;
+    }
+
+    private int clampInt(long v, int min, int max) {
+        if (v < min) return min;
+        if (v > max) return max;
+        return (int) v;
+    }
+
+    private int computeAnswerTimeMs(GameSession session, Instant answeredAt) {
+        if (session.getStage() != GameStage.QUESTION || session.getStageEndsAt() == null) {
+            return (int) questionDurationMs();
+        }
+
+        Instant stageStart = session.getStageEndsAt().minus(guestQuestionDuration);
+        long ms = Duration.between(stageStart, answeredAt).toMillis();
+        return clampInt(ms, 0, (int) questionDurationMs());
+    }
+
+    private int computePoints(boolean correct, int answerTimeMs) {
+        if (!correct) return 0;
+
+        long durationMs = questionDurationMs();
+        if (durationMs <= 0) return 100;
+
+        double ratio = 1.0 - (Math.min(Math.max(answerTimeMs, 0), durationMs) / (double) durationMs);
+        int bonus = (int) Math.round(50.0 * ratio);
+        bonus = Math.max(0, Math.min(50, bonus));
+        return 100 + bonus;
     }
 
     private static List<QuizAnswerOption> shuffledOptions(String gameSessionId, String guestSessionId, Long questionId, List<QuizAnswerOption> options) {
@@ -206,8 +247,10 @@ public class GameService {
 
         boolean correct = selected.isCorrect();
         Instant now = clock.instant();
+        int answerTimeMs = computeAnswerTimeMs(session, now);
+        int points = computePoints(correct, answerTimeMs);
         try {
-            gameAnswerRepository.save(GameAnswer.create(session, questionId, guestSession.getId(), optionId, correct, now));
+            gameAnswerRepository.save(GameAnswer.create(session, questionId, guestSession.getId(), optionId, correct, answerTimeMs, points, now));
         } catch (DataIntegrityViolationException ignored) {
         }
 
@@ -235,12 +278,64 @@ public class GameService {
 
     private void finishGame(Lobby lobby, GameSession session) {
         Instant now = clock.instant();
+        if (session.getStatus() == GameStatus.FINISHED) return;
+
+        List<GamePlayer> players = gamePlayerRepository.findAllByGameSessionIdOrderByOrderIndexAsc(session.getId());
+
+        // If an admin ends the game mid-question, treat missing answers as timeouts for the current question
+        // to keep scoring consistent.
+        if (session.getStage() == GameStage.QUESTION) {
+            try {
+                CurrentQuestion current = currentQuestion(session);
+                ensureTimeoutAnswers(session, current.question().getId(), now);
+            } catch (Exception ignored) {
+            }
+        }
+
         session.setStatus(GameStatus.FINISHED);
         session.setEndedAt(now);
         gameSessionRepository.save(session);
 
+        applyRewardsIfNeeded(session, players, now);
+
         lobby.setStatus(LobbyStatus.OPEN);
         lobbyRepository.save(lobby);
+    }
+
+    private void applyRewardsIfNeeded(GameSession session, List<GamePlayer> players, Instant now) {
+        if (session.isRewardsApplied()) return;
+
+        Map<String, PlayerTotals> totalsByGuest = computeTotalsByGuest(session.getId());
+        List<PlayerStanding> standings = computeStandings(players, totalsByGuest);
+        Map<String, PlayerRewards> rewards = computeRewards(standings);
+
+        for (GamePlayer p : players) {
+            PlayerRewards r = rewards.get(p.getGuestSessionId());
+            if (r == null) continue;
+            applyRewardsToPlayer(p.getGuestSessionId(), r);
+        }
+
+        session.setRewardsApplied(true);
+        session.setRewardsAppliedAt(now);
+        gameSessionRepository.save(session);
+    }
+
+    private void applyRewardsToPlayer(String guestSessionId, PlayerRewards rewards) {
+        guestSessionRepository.findById(guestSessionId).ifPresent(gs -> {
+            Long userId = gs.getUserId();
+            if (userId != null) {
+                appUserRepository.findById(userId).ifPresent(u -> {
+                    u.setXp(u.getXp() + rewards.xpDelta());
+                    u.setRankPoints(u.getRankPoints() + rewards.rankPointsDelta());
+                    appUserRepository.save(u);
+                });
+                return;
+            }
+
+            gs.setXp(gs.getXp() + rewards.xpDelta());
+            gs.setRankPoints(gs.getRankPoints() + rewards.rankPointsDelta());
+            guestSessionRepository.save(gs);
+        });
     }
 
     public void tickDueSessions() {
@@ -258,17 +353,31 @@ public class GameService {
 
     private GameStateDto buildState(Lobby lobby, GameSession session, String viewerGuestSessionId) {
         List<GamePlayer> players = gamePlayerRepository.findAllByGameSessionIdOrderByOrderIndexAsc(session.getId());
+        Map<String, PlayerTotals> totalsByGuest = computeTotalsByGuest(session.getId());
 
         long totalQuestions = questionRepository.countByQuizId(session.getQuizId());
         int questionIndex = session.getCurrentQuestionIndex();
         if (session.getStatus() == GameStatus.FINISHED || questionIndex >= totalQuestions) {
+            List<PlayerStanding> standings = computeStandings(players, totalsByGuest);
+            Map<String, PlayerRewards> rewards = computeRewards(standings);
+
             List<GamePlayerDto> playersDto = players.stream()
-                    .map(p -> new GamePlayerDto(
-                            p.getDisplayName(),
-                            false,
-                            null,
-                            gameAnswerRepository.countCorrectByGameSessionIdAndGuestSessionId(session.getId(), p.getGuestSessionId())
-                    ))
+                    .map(p -> {
+                        PlayerTotals t = totalsByGuest.getOrDefault(p.getGuestSessionId(), PlayerTotals.empty());
+                        PlayerRewards r = rewards.get(p.getGuestSessionId());
+                        return new GamePlayerDto(
+                                p.getDisplayName(),
+                                false,
+                                null,
+                                t.totalPoints(),
+                                t.correctAnswers(),
+                                t.totalAnswerTimeMs(),
+                                t.totalCorrectAnswerTimeMs(),
+                                r == null ? null : r.xpDelta(),
+                                r == null ? null : r.rankPointsDelta(),
+                                r == null ? null : r.winner()
+                        );
+                    })
                     .toList();
 
             return new GameStateDto(
@@ -288,12 +397,21 @@ public class GameService {
 
         if (session.getStage() == GameStage.PRE_COUNTDOWN) {
             List<GamePlayerDto> playersDto = players.stream()
-                    .map(p -> new GamePlayerDto(
-                            p.getDisplayName(),
-                            false,
-                            null,
-                            gameAnswerRepository.countCorrectByGameSessionIdAndGuestSessionId(session.getId(), p.getGuestSessionId())
-                    ))
+                    .map(p -> {
+                        PlayerTotals t = totalsByGuest.getOrDefault(p.getGuestSessionId(), PlayerTotals.empty());
+                        return new GamePlayerDto(
+                                p.getDisplayName(),
+                                false,
+                                null,
+                                t.totalPoints(),
+                                t.correctAnswers(),
+                                t.totalAnswerTimeMs(),
+                                t.totalCorrectAnswerTimeMs(),
+                                null,
+                                null,
+                                null
+                        );
+                    })
                     .toList();
 
             return new GameStateDto(
@@ -321,8 +439,19 @@ public class GameService {
             GameAnswer answer = answersByGuestSessionId.get(p.getGuestSessionId());
             boolean answered = answer != null && answer.getSelectedOptionId() != null;
             Boolean correct = reveal && answer != null ? answer.isCorrect() : null;
-            long score = gameAnswerRepository.countCorrectByGameSessionIdAndGuestSessionId(session.getId(), p.getGuestSessionId());
-            return new GamePlayerDto(p.getDisplayName(), answered, correct, score);
+            PlayerTotals t = totalsByGuest.getOrDefault(p.getGuestSessionId(), PlayerTotals.empty());
+            return new GamePlayerDto(
+                    p.getDisplayName(),
+                    answered,
+                    correct,
+                    t.totalPoints(),
+                    t.correctAnswers(),
+                    t.totalAnswerTimeMs(),
+                    t.totalCorrectAnswerTimeMs(),
+                    null,
+                    null,
+                    null
+            );
         }).toList();
 
         List<GameOptionDto> orderedOptions = shuffledOptions(session.getId(), viewerGuestSessionId, current.question().getId(), current.options()).stream()
@@ -353,6 +482,117 @@ public class GameService {
                 session.getId(),
                 correctOptionId
         );
+    }
+
+    private record PlayerTotals(long totalPoints, long correctAnswers, long totalAnswerTimeMs,
+                                long totalCorrectAnswerTimeMs) {
+        static PlayerTotals empty() {
+            return new PlayerTotals(0, 0, 0, 0);
+        }
+    }
+
+    private Map<String, PlayerTotals> computeTotalsByGuest(String gameSessionId) {
+        List<GameAnswer> all = gameAnswerRepository.findAllByGameSessionId(gameSessionId);
+        Map<String, long[]> acc = new HashMap<>();
+
+        for (GameAnswer a : all) {
+            long[] t = acc.computeIfAbsent(a.getGuestSessionId(), k -> new long[4]);
+            t[0] += Math.max(0, a.getPoints());
+            if (a.isCorrect()) {
+                t[1] += 1;
+                t[3] += Math.max(0, a.getAnswerTimeMs());
+            }
+            t[2] += Math.max(0, a.getAnswerTimeMs());
+        }
+
+        Map<String, PlayerTotals> out = new HashMap<>();
+        for (Map.Entry<String, long[]> e : acc.entrySet()) {
+            long[] t = e.getValue();
+            out.put(e.getKey(), new PlayerTotals(t[0], t[1], t[2], t[3]));
+        }
+        return out;
+    }
+
+    private record PlayerStanding(String guestSessionId, PlayerTotals totals, int rank) {
+    }
+
+    private List<PlayerStanding> computeStandings(List<GamePlayer> players, Map<String, PlayerTotals> totalsByGuest) {
+        record SortKey(String guestSessionId, PlayerTotals totals, int orderIndex) {
+        }
+
+        List<SortKey> list = new ArrayList<>();
+        for (GamePlayer p : players) {
+            list.add(new SortKey(p.getGuestSessionId(), totalsByGuest.getOrDefault(p.getGuestSessionId(), PlayerTotals.empty()), p.getOrderIndex()));
+        }
+
+        list.sort((a, b) -> {
+            int cmpPoints = Long.compare(b.totals().totalPoints(), a.totals().totalPoints());
+            if (cmpPoints != 0) return cmpPoints;
+            int cmpCorrect = Long.compare(b.totals().correctAnswers(), a.totals().correctAnswers());
+            if (cmpCorrect != 0) return cmpCorrect;
+            int cmpTime = Long.compare(a.totals().totalCorrectAnswerTimeMs(), b.totals().totalCorrectAnswerTimeMs());
+            if (cmpTime != 0) return cmpTime;
+            return Integer.compare(a.orderIndex(), b.orderIndex());
+        });
+
+        List<PlayerStanding> standings = new ArrayList<>();
+        int rank = 1;
+        for (int i = 0; i < list.size(); i++) {
+            if (i > 0) {
+                SortKey prev = list.get(i - 1);
+                SortKey cur = list.get(i);
+                boolean tied =
+                        prev.totals().totalPoints() == cur.totals().totalPoints() &&
+                        prev.totals().correctAnswers() == cur.totals().correctAnswers() &&
+                        prev.totals().totalCorrectAnswerTimeMs() == cur.totals().totalCorrectAnswerTimeMs();
+                if (!tied) rank = i + 1;
+            }
+            SortKey cur = list.get(i);
+            standings.add(new PlayerStanding(cur.guestSessionId(), cur.totals(), rank));
+        }
+        return standings;
+    }
+
+    private record PlayerRewards(int xpDelta, int rankPointsDelta, boolean winner) {
+    }
+
+    private Map<String, PlayerRewards> computeRewards(List<PlayerStanding> standings) {
+        int n = standings.size();
+        if (n == 0) return Map.of();
+
+        Map<String, PlayerRewards> out = new HashMap<>();
+
+        boolean isTwoPlayer = n == 2;
+        boolean drawForFirst = false;
+        if (n >= 2) {
+            PlayerStanding a = standings.get(0);
+            PlayerStanding b = standings.get(1);
+            drawForFirst = a.rank() == b.rank();
+        }
+
+        for (PlayerStanding s : standings) {
+            long points = s.totals().totalPoints();
+            long correct = s.totals().correctAnswers();
+
+            int xp = (int) Math.min(50_000, 50 + (int) (points / 10) + (int) (correct * 10));
+            boolean winner = s.rank() == 1 && !drawForFirst;
+            if (winner) xp += 50;
+            else if (drawForFirst && s.rank() == 1) xp += 20;
+
+            int rp;
+            if (isTwoPlayer) {
+                if (drawForFirst) rp = 5;
+                else rp = winner ? 25 : -15;
+            } else {
+                // rank=1 => positive, last => negative; ties share the same rank-based reward.
+                rp = (n - s.rank()) * 10 - 10;
+                if (drawForFirst && s.rank() == 1) rp = 5;
+            }
+
+            out.put(s.guestSessionId(), new PlayerRewards(xp, rp, winner));
+        }
+
+        return out;
     }
 
     private Lobby requireLobbyByCode(String code) {
@@ -437,7 +677,8 @@ public class GameService {
         for (GamePlayer p : gamePlayerRepository.findAllByGameSessionIdOrderByOrderIndexAsc(session.getId())) {
             if (answeredGuestIds.contains(p.getGuestSessionId())) continue;
             try {
-                gameAnswerRepository.save(GameAnswer.create(session, questionId, p.getGuestSessionId(), null, false, now));
+                int answerTimeMs = (int) questionDurationMs();
+                gameAnswerRepository.save(GameAnswer.create(session, questionId, p.getGuestSessionId(), null, false, answerTimeMs, 0, now));
             } catch (DataIntegrityViolationException ignored) {
             }
         }

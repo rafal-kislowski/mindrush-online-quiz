@@ -26,9 +26,8 @@ public class GuestSessionController {
     @PostMapping
     public ResponseEntity<Map<String, Object>> ensureSession(HttpServletRequest request, Authentication authentication) {
         String preferred = displayNameFrom(authentication);
-        GuestSessionService.Result result = preferred == null
-                ? service.ensureSession(request)
-                : service.ensureSession(request, preferred);
+        Long userId = userIdFrom(authentication);
+        GuestSessionService.Result result = service.ensureSession(request, preferred, userId);
         GuestSession session = result.session();
 
         return ResponseEntity
@@ -63,11 +62,8 @@ public class GuestSessionController {
     @PostMapping("/heartbeat")
     public ResponseEntity<Void> heartbeat(HttpServletRequest request, Authentication authentication) {
         String preferred = displayNameFrom(authentication);
-        if (preferred != null) {
-            service.heartbeat(request, preferred);
-        } else {
-            service.heartbeat(request);
-        }
+        Long userId = userIdFrom(authentication);
+        service.heartbeat(request, preferred, userId);
         return ResponseEntity.noContent().build();
     }
 
@@ -77,6 +73,15 @@ public class GuestSessionController {
         if (p instanceof JwtCookieAuthenticationFilter.AuthenticatedUser au) {
             String d = au.displayName();
             return d == null || d.isBlank() ? null : d.trim();
+        }
+        return null;
+    }
+
+    private static Long userIdFrom(Authentication authentication) {
+        if (authentication == null) return null;
+        Object p = authentication.getPrincipal();
+        if (p instanceof JwtCookieAuthenticationFilter.AuthenticatedUser au) {
+            return au.id();
         }
         return null;
     }

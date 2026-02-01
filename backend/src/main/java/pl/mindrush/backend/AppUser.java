@@ -39,6 +39,12 @@ public class AppUser {
     @Column(name = "display_name", length = 32)
     private String displayName;
 
+    @Column(name = "rank_points", nullable = false, columnDefinition = "integer not null default 0")
+    private int rankPoints;
+
+    @Column(name = "xp", nullable = false, columnDefinition = "integer not null default 0")
+    private int xp;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "app_user_roles", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "role", length = 32, nullable = false)
@@ -55,6 +61,8 @@ public class AppUser {
         this.email = email;
         this.passwordHash = passwordHash;
         this.displayName = displayName;
+        this.rankPoints = 0;
+        this.xp = 0;
         this.roles = roles == null ? new HashSet<>() : new HashSet<>(roles);
         this.createdAt = createdAt;
     }
@@ -75,6 +83,14 @@ public class AppUser {
         return displayName;
     }
 
+    public int getRankPoints() {
+        return rankPoints;
+    }
+
+    public int getXp() {
+        return xp;
+    }
+
     public Set<AppRole> getRoles() {
         return Collections.unmodifiableSet(roles);
     }
@@ -89,6 +105,14 @@ public class AppUser {
 
     public void setDisplayName(String displayName) {
         this.displayName = displayName;
+    }
+
+    public void setRankPoints(int rankPoints) {
+        this.rankPoints = Math.max(0, rankPoints);
+    }
+
+    public void setXp(int xp) {
+        this.xp = Math.max(0, xp);
     }
 
     public void setRoles(Set<AppRole> roles) {

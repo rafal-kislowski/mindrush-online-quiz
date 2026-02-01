@@ -13,11 +13,15 @@ public interface GameAnswerRepository extends JpaRepository<GameAnswer, Long> {
 
     long countByGameSessionIdAndQuestionId(String gameSessionId, Long questionId);
 
+    List<GameAnswer> findAllByGameSessionId(String gameSessionId);
+
     List<GameAnswer> findAllByGameSessionIdAndQuestionId(String gameSessionId, Long questionId);
 
     Optional<GameAnswer> findByGameSessionIdAndQuestionIdAndGuestSessionId(String gameSessionId, Long questionId, String guestSessionId);
 
     @Query("select count(a.id) from GameAnswer a where a.gameSession.id = :gameSessionId and a.guestSessionId = :guestSessionId and a.correct = true")
     long countCorrectByGameSessionIdAndGuestSessionId(@Param("gameSessionId") String gameSessionId, @Param("guestSessionId") String guestSessionId);
-}
 
+    @Query("select coalesce(sum(a.points), 0) from GameAnswer a where a.gameSession.id = :gameSessionId and a.guestSessionId = :guestSessionId")
+    long sumPointsByGameSessionIdAndGuestSessionId(@Param("gameSessionId") String gameSessionId, @Param("guestSessionId") String guestSessionId);
+}

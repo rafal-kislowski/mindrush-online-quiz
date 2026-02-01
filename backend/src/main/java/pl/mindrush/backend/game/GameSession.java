@@ -48,6 +48,12 @@ public class GameSession {
     @Column(name = "ended_at")
     private Instant endedAt;
 
+    @Column(name = "rewards_applied", nullable = false, columnDefinition = "boolean not null default false")
+    private boolean rewardsApplied;
+
+    @Column(name = "rewards_applied_at")
+    private Instant rewardsAppliedAt;
+
     protected GameSession() {
     }
 
@@ -63,6 +69,8 @@ public class GameSession {
         session.createdAt = now;
         session.startedAt = now;
         session.endedAt = null;
+        session.rewardsApplied = false;
+        session.rewardsAppliedAt = null;
         return session;
     }
 
@@ -124,5 +132,21 @@ public class GameSession {
 
     public void setEndedAt(Instant endedAt) {
         this.endedAt = endedAt;
+    }
+
+    public boolean isRewardsApplied() {
+        return rewardsApplied;
+    }
+
+    public void setRewardsApplied(boolean rewardsApplied) {
+        this.rewardsApplied = rewardsApplied;
+    }
+
+    public Instant getRewardsAppliedAt() {
+        return rewardsAppliedAt;
+    }
+
+    public void setRewardsAppliedAt(Instant rewardsAppliedAt) {
+        this.rewardsAppliedAt = rewardsAppliedAt;
     }
 }
