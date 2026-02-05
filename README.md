@@ -108,6 +108,16 @@ Endpoints:
 Notes:
 - The UI shows `displayName` (nickname) in game/lobby instead of email.
 
+## Progression (XP / RP / coins)
+Both guests and authenticated users accumulate:
+- `xp` (experience, used to calculate level; max level is 99 in UI)
+- `rankPoints` (RP, used for ranks/leaderboards)
+- `coins` (simple in-game currency)
+
+These values are returned by:
+- `GET /api/auth/me` (authenticated user)
+- `GET /api/guest/session` (guest session)
+
 ### Bootstrap admin (local only)
 To create an admin account automatically on startup, set:
 ```properties
@@ -175,6 +185,7 @@ Endpoints (requires a valid `guestSessionId` cookie and being in the lobby):
 Notes:
 - Both players get the same question; answer options are shuffled per player.
 - The response includes per-player correctness only in `REVEAL` stage (after everyone answers).
+- Scoring uses a base score + a speed bonus for correct answers (faster answers give more points). Ties are broken by total points, then correct answers, then total correct answer time.
 - Guest games are time-boxed: `QUESTION` defaults to 10s and `REVEAL` to 3s (configurable via `game.guest.question-duration` / `game.guest.reveal-duration`). The response exposes `stageEndsAt` for countdowns.
 - If a player doesn't answer before `stageEndsAt`, the server records it as a wrong answer and the game continues normally.
 - Auto-advance can be driven by polling `GET /state`, or by the built-in scheduler (`game.scheduler.enabled=true`).

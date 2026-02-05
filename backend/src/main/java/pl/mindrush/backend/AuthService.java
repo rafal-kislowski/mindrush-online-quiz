@@ -118,7 +118,10 @@ public class AuthService {
                 user.getId(),
                 user.getEmail(),
                 displayName,
-                user.getRoles().stream().map(Enum::name).sorted().toList()
+                user.getRoles().stream().map(Enum::name).sorted().toList(),
+                user.getRankPoints(),
+                user.getXp(),
+                user.getCoins()
         );
         return new AuthResult(dto, new ResponseCookies(accessCookie, refreshCookie));
     }
@@ -157,7 +160,10 @@ public class AuthService {
                 user.getId(),
                 user.getEmail(),
                 displayName,
-                user.getRoles().stream().map(Enum::name).sorted().toList()
+                user.getRoles().stream().map(Enum::name).sorted().toList(),
+                user.getRankPoints(),
+                user.getXp(),
+                user.getCoins()
         );
         return new AuthResult(dto, new ResponseCookies(accessCookie, refreshCookie));
     }
@@ -200,7 +206,7 @@ public class AuthService {
         }
     }
 
-    public record AuthUserDto(Long id, String email, String displayName, java.util.List<String> roles) {}
+    public record AuthUserDto(Long id, String email, String displayName, java.util.List<String> roles, int rankPoints, int xp, int coins) {}
 
     public record AuthResult(AuthUserDto user, ResponseCookies cookies) {}
 

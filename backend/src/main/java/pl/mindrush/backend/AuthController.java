@@ -21,9 +21,11 @@ import static org.springframework.http.HttpStatus.CREATED;
 public class AuthController {
 
     private final AuthService authService;
+    private final AppUserRepository userRepository;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, AppUserRepository userRepository) {
         this.authService = authService;
+        this.userRepository = userRepository;
     }
 
     @PostMapping("/register")
@@ -62,7 +64,17 @@ public class AuthController {
         }
         Object p = authentication.getPrincipal();
         if (p instanceof JwtCookieAuthenticationFilter.AuthenticatedUser au) {
-            return ResponseEntity.ok(new AuthService.AuthUserDto(au.id(), au.email(), au.displayName(), au.roles()));
+            return userRepository.findById(au.id())
+                    .map(u -> ResponseEntity.ok(new AuthService.AuthUserDto(
+                            u.getId(),
+                            u.getEmail(),
+                            u.getDisplayName(),
+                            u.getRoles().stream().map(Enum::name).sorted().toList(),
+                            u.getRankPoints(),
+                            u.getXp(),
+                            u.getCoins()
+                    )))
+                    .orElseGet(() -> ResponseEntity.status(401).build());
         }
         return ResponseEntity.status(401).build();
     }

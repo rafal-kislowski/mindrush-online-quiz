@@ -327,6 +327,7 @@ public class GameService {
                 appUserRepository.findById(userId).ifPresent(u -> {
                     u.setXp(u.getXp() + rewards.xpDelta());
                     u.setRankPoints(u.getRankPoints() + rewards.rankPointsDelta());
+                    u.setCoins(u.getCoins() + rewards.coinsDelta());
                     appUserRepository.save(u);
                 });
                 return;
@@ -334,6 +335,7 @@ public class GameService {
 
             gs.setXp(gs.getXp() + rewards.xpDelta());
             gs.setRankPoints(gs.getRankPoints() + rewards.rankPointsDelta());
+            gs.setCoins(gs.getCoins() + rewards.coinsDelta());
             guestSessionRepository.save(gs);
         });
     }
@@ -553,7 +555,7 @@ public class GameService {
         return standings;
     }
 
-    private record PlayerRewards(int xpDelta, int rankPointsDelta, boolean winner) {
+    private record PlayerRewards(int xpDelta, int rankPointsDelta, int coinsDelta, boolean winner) {
     }
 
     private Map<String, PlayerRewards> computeRewards(List<PlayerStanding> standings) {
@@ -589,7 +591,8 @@ public class GameService {
                 if (drawForFirst && s.rank() == 1) rp = 5;
             }
 
-            out.put(s.guestSessionId(), new PlayerRewards(xp, rp, winner));
+            int coins = (int) Math.min(50_000, Math.max(0, (int) (points / 20) + (winner ? 20 : 5)));
+            out.put(s.guestSessionId(), new PlayerRewards(xp, rp, coins, winner));
         }
 
         return out;

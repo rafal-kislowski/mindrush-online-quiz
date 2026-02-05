@@ -46,7 +46,10 @@ public class GuestSessionController {
         return ResponseEntity.ok(Map.of(
                 "status", "OK",
                 "displayName", session.getDisplayName(),
-                "expiresAt", session.getExpiresAt().toString()
+                "expiresAt", session.getExpiresAt().toString(),
+                "rankPoints", session.getRankPoints(),
+                "xp", session.getXp(),
+                "coins", session.getCoins()
         ));
     }
 

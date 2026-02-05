@@ -65,7 +65,10 @@ class GuestSessionControllerTest {
         mockMvc.perform(get("/api/guest/session").cookie(new Cookie("guestSessionId", sessionId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.displayName", not(emptyOrNullString())))
-                .andExpect(jsonPath("$.expiresAt", not(emptyOrNullString())));
+                .andExpect(jsonPath("$.expiresAt", not(emptyOrNullString())))
+                .andExpect(jsonPath("$.rankPoints").value(0))
+                .andExpect(jsonPath("$.xp").value(0))
+                .andExpect(jsonPath("$.coins").value(0));
     }
 
     @Test

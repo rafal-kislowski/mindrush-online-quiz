@@ -45,6 +45,9 @@ public class AppUser {
     @Column(name = "xp", nullable = false, columnDefinition = "integer not null default 0")
     private int xp;
 
+    @Column(name = "coins", nullable = false, columnDefinition = "integer not null default 0")
+    private int coins;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "app_user_roles", joinColumns = @JoinColumn(name = "user_id"))
     @Column(name = "role", length = 32, nullable = false)
@@ -63,6 +66,7 @@ public class AppUser {
         this.displayName = displayName;
         this.rankPoints = 0;
         this.xp = 0;
+        this.coins = 0;
         this.roles = roles == null ? new HashSet<>() : new HashSet<>(roles);
         this.createdAt = createdAt;
     }
@@ -91,6 +95,10 @@ public class AppUser {
         return xp;
     }
 
+    public int getCoins() {
+        return coins;
+    }
+
     public Set<AppRole> getRoles() {
         return Collections.unmodifiableSet(roles);
     }
@@ -113,6 +121,10 @@ public class AppUser {
 
     public void setXp(int xp) {
         this.xp = Math.max(0, xp);
+    }
+
+    public void setCoins(int coins) {
+        this.coins = Math.max(0, coins);
     }
 
     public void setRoles(Set<AppRole> roles) {

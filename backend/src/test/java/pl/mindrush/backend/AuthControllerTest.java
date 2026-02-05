@@ -71,6 +71,9 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("admin@example.com"))
                 .andExpect(jsonPath("$.displayName").value("Admin"))
+                .andExpect(jsonPath("$.rankPoints").value(0))
+                .andExpect(jsonPath("$.xp").value(0))
+                .andExpect(jsonPath("$.coins").value(0))
                 .andReturn();
 
         String setCookie = String.join("\n", loginRes.getResponse().getHeaders(HttpHeaders.SET_COOKIE));
@@ -81,7 +84,10 @@ class AuthControllerTest {
 
         mockMvc.perform(get("/api/auth/me").cookie(new jakarta.servlet.http.Cookie("accessToken", access)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.email").value("admin@example.com"));
+                .andExpect(jsonPath("$.email").value("admin@example.com"))
+                .andExpect(jsonPath("$.rankPoints").value(0))
+                .andExpect(jsonPath("$.xp").value(0))
+                .andExpect(jsonPath("$.coins").value(0));
     }
 
     @Test

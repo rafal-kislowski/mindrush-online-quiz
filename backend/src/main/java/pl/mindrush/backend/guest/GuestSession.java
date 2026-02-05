@@ -37,6 +37,9 @@ public class GuestSession {
     @Column(name = "xp", nullable = false, columnDefinition = "integer not null default 0")
     private int xp;
 
+    @Column(name = "coins", nullable = false, columnDefinition = "integer not null default 0")
+    private int coins;
+
     @Column(name = "revoked", nullable = false)
     private boolean revoked;
 
@@ -112,6 +115,14 @@ public class GuestSession {
         this.xp = Math.max(0, xp);
     }
 
+    public int getCoins() {
+        return coins;
+    }
+
+    public void setCoins(int coins) {
+        this.coins = Math.max(0, coins);
+    }
+
     public static GuestSession createNew(Instant now, Instant expiresAt) {
         GuestSession session = new GuestSession();
         session.id = UUID.randomUUID().toString();
@@ -121,6 +132,7 @@ public class GuestSession {
         session.userId = null;
         session.rankPoints = 0;
         session.xp = 0;
+        session.coins = 0;
         session.revoked = false;
         return session;
     }
