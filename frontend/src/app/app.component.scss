@@ -117,9 +117,14 @@
 
 .user__avatar {
   position: relative;
-  width: 88px;
-  height: 88px;
+  --avatar: 122px;
+  --face-inset: 10px;
+  width: var(--avatar);
+  height: var(--avatar);
   margin: 0 auto 10px;
+  --ring-strong: rgba(255, 153, 52, 0.95);
+  --ring-dim: rgba(255, 153, 52, 0.1);
+  --lvl-color: #ff9a35;
 }
 
 .ring {
@@ -129,8 +134,8 @@
 
   background: conic-gradient(
     from 205deg,
-    rgba(255, 153, 52, 0.95) calc(var(--p) * 1turn),
-    rgba(255, 153, 52, 0.1) 0
+    var(--ring-strong) calc(var(--p) * 1turn),
+    var(--ring-dim) 0
   );
 
   -webkit-mask: radial-gradient(circle, transparent 58%, #000 60%);
@@ -139,9 +144,26 @@
   filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35));
 }
 
+.ring::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px;
+  border-radius: 999px;
+  background: var(--ring-strong);
+  box-shadow:
+    0 0 0 4px rgba(0, 0, 0, 0.16),
+    0 10px 22px rgba(0, 0, 0, 0.22);
+  transform: rotate(calc(205deg + (var(--p) * 1turn)))
+    translateY(calc(var(--avatar) / -2 + (var(--face-inset) / 2)));
+}
+
 .face {
   position: absolute;
-  inset: 10px;
+  inset: var(--face-inset);
   border-radius: 999px;
 
   background: radial-gradient(
@@ -155,12 +177,66 @@
   overflow: hidden;
   display: grid;
   place-items: center;
+  transition: filter 180ms ease;
 }
 
 .avatar-svg {
   width: 100%;
   height: 100%;
   opacity: 0.9;
+  transition: opacity 180ms ease;
+}
+
+.face__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 180ms ease, transform 180ms ease;
+  text-align: center;
+}
+
+.face__overlayLabel {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+
+.face__overlayValue {
+  font-size: 10px;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.95);
+  line-height: 1.1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.face__overlaySub {
+  font-size: 9px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.user__avatar:hover .avatar-svg {
+  opacity: 0.45;
+}
+
+.user__avatar:hover .face__overlay {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .level {
@@ -168,45 +244,109 @@
   bottom: -6px;
   left: 50%;
   transform: translateX(-50%);
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border-radius: 999px;
   display: grid;
   place-items: center;
 
   font-weight: 900;
   font-size: 13px;
-  color: #ff9a35;
+  color: var(--lvl-color);
 
   background: rgba(6, 16, 38, 0.92);
-  border: 1px solid rgba(255, 154, 53, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .user__name {
   font-weight: 800;
-  font-size: 13px;
+  font-size: 14px;
   color: rgba(255, 255, 255, 0.9);
 }
 
-.user__score {
+.user__nameRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  max-width: 100%;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-weight: 900;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.94);
+  background: linear-gradient(135deg, rgba(255, 70, 92, 0.94), rgba(255, 138, 74, 0.78));
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.22),
+    0 0 0 4px rgba(255, 70, 92, 0.10);
+}
+
+.user__rank {
   margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 900;
+  font-size: 12px;
+  letter-spacing: 0.15px;
+  color: rgba(255, 255, 255, 0.82);
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.rank-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  color: var(--rank);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.rank-points {
+  font-variant-numeric: tabular-nums;
+}
+
+.user__coins {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   font-weight: 800;
   font-size: 12px;
-  color: rgba(255, 154, 53, 0.95);
+  color: rgba(255, 255, 255, 0.7);
+  width: 100%;
 }
+
 
 .coin {
   display: inline-block;
-  width: 10px;
-  height: 10px;
-  margin-left: 6px;
+  width: 9px;
+  height: 9px;
   border-radius: 999px;
   background: linear-gradient(
     135deg,
     rgba(255, 205, 77, 0.95),
     rgba(255, 138, 43, 0.75)
   );
-  box-shadow: 0 0 0 4px rgba(255, 138, 43, 0.12);
+  box-shadow: 0 0 0 3px rgba(255, 138, 43, 0.12);
 }
 
 /* ===== SECTION DIVIDERS ===== */

@@ -84,6 +84,21 @@ export class AuthService {
     return this.refreshInFlight;
   }
 
+  reloadMe(): Observable<AuthUserDto | null> {
+    return this.api.me().pipe(
+      catchError((err: unknown) => {
+        if (err instanceof HttpErrorResponse && err.status === 401) {
+          return this.refreshOnce().pipe(catchError(() => of(null)));
+        }
+        return of(null);
+      }),
+      tap((u) => {
+        this.loaded = true;
+        this.userSubject.next(u);
+      })
+    );
+  }
+
   logout(): Observable<void> {
     return this.api.logout().pipe(
       tap(() => {

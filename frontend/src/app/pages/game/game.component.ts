@@ -4,6 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { GameApi } from '../../core/api/game.api';
 import { LobbyApi } from '../../core/api/lobby.api';
+import { AuthService } from '../../core/auth/auth.service';
 import { GameStateDto } from '../../core/models/game.models';
 import { SessionService } from '../../core/session/session.service';
 import { GameEventsService } from '../../core/ws/game-events.service';
@@ -58,7 +59,8 @@ export class GameComponent implements OnInit, OnDestroy {
     private readonly lobbyApi: LobbyApi,
     private readonly gameEvents: GameEventsService,
     private readonly sessionService: SessionService,
-    private readonly stompClient: StompClientService
+    private readonly stompClient: StompClientService,
+    private readonly authService: AuthService
   ) {}
 
   ngOnInit(): void {
@@ -295,6 +297,11 @@ export class GameComponent implements OnInit, OnDestroy {
     const questionChanged = this.lastQuestionIndexSeen !== state.questionIndex;
     this.lastStageSeen = state.stage;
     this.lastQuestionIndexSeen = state.questionIndex;
+
+    if (stageChanged && state.stage === 'FINISHED') {
+      this.sessionService.refresh().subscribe({ error: () => {} });
+      this.authService.reloadMe().subscribe({ error: () => {} });
+    }
 
     const newGameSessionId = state.gameSessionId ?? null;
     if (newGameSessionId !== this.currentGameSessionId) {

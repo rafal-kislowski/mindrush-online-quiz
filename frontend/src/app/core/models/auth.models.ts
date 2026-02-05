@@ -3,4 +3,7 @@ export interface AuthUserDto {
   email: string;
   displayName: string;
   roles: string[];
+  rankPoints: number;
+  xp: number;
+  coins: number;
 }

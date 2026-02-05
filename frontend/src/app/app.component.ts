@@ -7,10 +7,10 @@ import {
   RouterLinkActive,
   RouterOutlet,
 } from '@angular/router';
-import { filter } from 'rxjs';
-import { map } from 'rxjs';
+import { combineLatest, filter, map } from 'rxjs';
 import { AuthService } from './core/auth/auth.service';
 import { SessionService } from './core/session/session.service';
+import { computeLevelProgress, levelTheme, rankForPoints } from './core/progression/progression';
 
 @Component({
   selector: 'app-root',
@@ -26,6 +26,44 @@ export class AppComponent implements OnInit {
   readonly session$ = this.sessionService.session$;
   readonly authUser$ = this.authService.user$;
   readonly isAdmin$ = this.authService.user$.pipe(map(u => !!u?.roles?.includes('ADMIN')));
+
+  readonly profileVm$ = combineLatest([this.authService.user$, this.sessionService.session$]).pipe(
+    map(([user, session]) => {
+      const isAuthenticated = !!user;
+      const displayName = user?.displayName ?? session?.displayName ?? 'Guest';
+      const roles = user?.roles ?? [];
+      const isAdmin = roles.includes('ADMIN');
+
+      const rankPoints = user?.rankPoints ?? session?.rankPoints ?? 0;
+      const xp = user?.xp ?? session?.xp ?? 0;
+      const coins = user?.coins ?? session?.coins ?? 0;
+
+      const lvl = computeLevelProgress(xp);
+      const theme = levelTheme(lvl.level);
+      const rank = rankForPoints(rankPoints);
+
+      return {
+        isAuthenticated,
+        isAdmin,
+        displayName,
+        roles,
+        rankPoints,
+        rankName: rank.name,
+        rankColor: rank.color,
+        xp,
+        coins,
+        level: lvl.level,
+        levelTextColor: theme.text,
+        ringStrong: theme.ringStrong,
+        ringDim: theme.ringDim,
+        progress: lvl.progress,
+        xpInLevel: lvl.xpInLevel,
+        levelXpNeeded: Math.max(0, lvl.levelXpEnd - lvl.levelXpStart),
+        xpToNext: lvl.xpToNext,
+        maxLevel: lvl.maxLevel,
+      };
+    })
+  );
 
   sidebarOpen = false;
   contentWide = false;
@@ -71,5 +109,10 @@ export class AppComponent implements OnInit {
     this.authService.logout().subscribe(() => {
       this.router.navigate(['/']);
     });
+  }
+
+  formatInt(n: number | null | undefined): string {
+    const v = Math.max(0, Math.floor(n ?? 0));
+    return new Intl.NumberFormat('en-US').format(v);
   }
 }
