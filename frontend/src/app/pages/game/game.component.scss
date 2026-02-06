@@ -371,16 +371,8 @@
     max-height: 220px;
   }
 
-  .quiz-answer {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .answer-media__img {
-    margin-left: 0;
-    max-width: 100%;
-    width: 100%;
-    max-height: 160px;
+  .quiz-timer {
+    margin: 0 0 18px;
   }
 }
 
@@ -785,3 +777,5 @@
   );
   border: 1px solid rgba(255, 154, 53, 0.35);
 }
+
+/* Mobile: answers stay the same as desktop (just 1 column via .quiz-answers at <=720px). */
