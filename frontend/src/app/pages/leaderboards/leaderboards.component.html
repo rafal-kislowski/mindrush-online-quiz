@@ -1,0 +1,129 @@
+<section class="page">
+  <div class="page__top">
+    <button class="back" type="button" (click)="goHome()">
+      <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+      <span>Back to menu</span>
+    </button>
+  </div>
+
+  <div class="card" aria-label="Leaderboards">
+    <div class="card__top">
+      <div class="title">
+        <div class="title__h">Leaderboards</div>
+        <div class="title__sub">Ranking based on RP (rank points).</div>
+      </div>
+    </div>
+
+    <div class="table-wrap" [class.is-loading]="loading">
+      <div class="head">
+        <span>User</span>
+        <span class="right">RP</span>
+      </div>
+
+      <div class="empty" *ngIf="!loading && !rows.length && !error">
+        No players yet.
+      </div>
+      <div class="empty error" *ngIf="!!error">{{ error }}</div>
+
+      <div class="row" *ngFor="let p of rows; let i = index" [class.is-me]="me?.userId === p.userId">
+        <div class="left">
+          <span class="pos" aria-hidden="true">
+            <i
+              *ngIf="trophyClassByPosition(rowPosition(i)) as tc; else numberPos"
+              [class]="'fa-solid fa-trophy ' + tc"
+            ></i>
+            <ng-template #numberPos>
+              <span class="pos__n">{{ rowPosition(i) }}</span>
+            </ng-template>
+          </span>
+
+          <span
+            class="avatar"
+            [style.background]="avatarGradient(p.userId)"
+            aria-hidden="true"
+            >{{ p.initials }}</span
+          >
+
+          <span class="name">{{ p.displayName }}</span>
+          <span class="rank-pill" [style.--rank-color]="p.rankColor">
+            {{ p.rankName }}
+          </span>
+        </div>
+
+        <div class="right">
+          <span class="rp">{{ p.rankPoints | number }}</span>
+        </div>
+      </div>
+
+      <ng-container *ngIf="me as meVm">
+        <div class="row row--my is-me" *ngIf="showMeRow">
+          <div class="left">
+            <span class="pos" aria-hidden="true">
+              <i
+                *ngIf="trophyClassByPosition(meVm.position) as tc; else myNumberPos"
+                [class]="'fa-solid fa-trophy ' + tc"
+              ></i>
+              <ng-template #myNumberPos>
+                <span class="pos__n">{{ meVm.position }}</span>
+              </ng-template>
+            </span>
+
+            <span
+              class="avatar avatar--me"
+              [style.background]="avatarGradient(meVm.userId)"
+              aria-hidden="true"
+              >{{ meVm.initials }}</span
+            >
+
+            <span class="name">
+              {{ meVm.displayName }}
+            </span>
+            <span class="rank-pill" [style.--rank-color]="meVm.rankColor">
+              {{ meVm.rankName }}
+            </span>
+          </div>
+
+          <div class="right">
+            <span class="rp">{{ meVm.rankPoints | number }}</span>
+          </div>
+        </div>
+      </ng-container>
+    </div>
+
+    <div class="pager">
+      <button class="pager__btn" type="button" (click)="prev()" [disabled]="!canPrev()">
+        <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+        Prev
+      </button>
+
+      <div class="pager__mid">
+        <div class="pager__meta">
+          Page <b>{{ page }}</b> / <b>{{ totalPages }}</b>
+        </div>
+        <div class="pager__meta soft" *ngIf="totalPlayers">
+          {{ totalPlayers | number }} players
+        </div>
+      </div>
+
+      <button class="pager__btn" type="button" (click)="next()" [disabled]="!canNext()">
+        Next
+        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+      </button>
+
+      <div class="pager__size">
+        <span class="pager__label">Show</span>
+        <select
+          class="pager__select"
+          [value]="pageSize"
+          (change)="onPageSizeChange($any($event.target).value)"
+          aria-label="Rows per page"
+        >
+          <option [value]="10">10</option>
+          <option [value]="25">25</option>
+          <option [value]="50">50</option>
+          <option [value]="100">100</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</section>

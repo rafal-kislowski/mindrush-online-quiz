@@ -168,15 +168,21 @@
       <div class="leader__title">Leaderboards</div>
       <div class="leader__meta">
         <div class="meta-box">
-          <div class="meta__big">1000</div>
+          <div class="meta__big">
+            {{ leaderboardStats ? (leaderboardStats.players | number) : '—' }}
+          </div>
           <div class="meta__small">Players</div>
         </div>
         <div class="meta-box">
-          <div class="meta__big">10 000</div>
+          <div class="meta__big">
+            {{ leaderboardStats ? (leaderboardStats.matches | number) : '—' }}
+          </div>
           <div class="meta__small">Matches</div>
         </div>
         <div class="meta-box">
-          <div class="meta__big">30 000</div>
+          <div class="meta__big">
+            {{ leaderboardStats ? (leaderboardStats.answers | number) : '—' }}
+          </div>
           <div class="meta__small">Answers</div>
         </div>
       </div>
@@ -185,27 +191,42 @@
     <div class="leader__table">
       <div class="row-head">
         <span>User</span>
-        <span class="right">Points</span>
+        <span class="right">RP</span>
       </div>
 
-      <div class="row-item" *ngFor="let p of leaderboard; let i = index">
+      <div class="error" *ngIf="leaderboardError">{{ leaderboardError }}</div>
+      <div class="row-item" *ngFor="let p of leaderboardRows; let i = index" [class.is-me]="currentUserId === p.userId">
         <div class="left">
-          <span class="rank">{{ i + 1 }}</span>
+          <span class="pos" aria-hidden="true">
+            <i
+              *ngIf="trophyClass(i) as tc; else numberPos"
+              [class]="'fa-solid fa-trophy ' + tc"
+            ></i>
+            <ng-template #numberPos>
+              <span class="pos__n">{{ i + 1 }}</span>
+            </ng-template>
+          </span>
+
           <span
-            class="badge"
-            [attr.data-badge]="p.badge"
+            class="avatar"
+            [style.background]="avatarGradient(p.userId)"
             aria-hidden="true"
-          ></span>
-          <span class="name">{{ p.name }}</span>
+            >{{ p.initials }}</span
+          >
+
+          <span class="name">{{ p.displayName }}</span>
+          <span class="rank-pill" [style.--rank-color]="p.rankColor">
+            {{ p.rankName }}
+          </span>
         </div>
         <div class="right">
-          <span class="points">{{ p.points | number }}</span>
+          <span class="points">{{ p.rankPoints | number }}</span>
         </div>
       </div>
     </div>
 
     <div class="leader__footer">
-      <a routerLink="/rewards">Show more</a>
+      <a routerLink="/leaderboards">Show more</a>
     </div>
   </article>
 

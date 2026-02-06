@@ -9,6 +9,7 @@ export const routes: Routes = [
   { path: 'shop', loadComponent: () => import('./pages/placeholder/placeholder.component').then(m => m.PlaceholderComponent), data: { title: 'Shop' } },
   { path: 'news', loadComponent: () => import('./pages/placeholder/placeholder.component').then(m => m.PlaceholderComponent), data: { title: 'News' } },
   { path: 'settings', loadComponent: () => import('./pages/placeholder/placeholder.component').then(m => m.PlaceholderComponent), data: { title: 'Settings' } },
+  { path: 'leaderboards', loadComponent: () => import('./pages/leaderboards/leaderboards.component').then(m => m.LeaderboardsComponent) },
   { path: 'create-quiz', canActivate: [adminGuard], loadComponent: () => import('./pages/admin/admin-quiz.component').then(m => m.AdminQuizComponent) },
   { path: 'lobby/:code', loadComponent: () => import('./pages/lobby/lobby.component').then(m => m.LobbyComponent) },
   { path: 'lobby/:code/game', loadComponent: () => import('./pages/game/game.component').then(m => m.GameComponent) },
