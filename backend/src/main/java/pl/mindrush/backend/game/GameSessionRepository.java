@@ -12,4 +12,6 @@ public interface GameSessionRepository extends JpaRepository<GameSession, String
     Optional<GameSession> findFirstByLobbyIdOrderByStartedAtDesc(String lobbyId);
 
     List<GameSession> findAllByStatusAndStageEndsAtBefore(GameStatus status, Instant stageEndsAt);
+
+    long countByStatus(GameStatus status);
 }

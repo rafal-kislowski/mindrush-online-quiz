@@ -54,6 +54,9 @@ public class SecurityConfig {
 
                         .requestMatchers(HttpMethod.GET, "/media/**").permitAll()
 
+                        .requestMatchers(HttpMethod.GET, "/api/leaderboard").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/leaderboard/stats").permitAll()
+
                         .requestMatchers(HttpMethod.GET, "/api/lobbies/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/lobbies").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/lobbies/*/join").permitAll()
