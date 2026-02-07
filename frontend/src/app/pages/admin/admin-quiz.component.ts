@@ -17,7 +17,7 @@ import {
 })
 export class AdminQuizComponent implements OnInit {
   tab: 'manage' | 'create' = 'manage';
-  editorTab: 'details' | 'questions' = 'questions';
+  editorTab: 'details' | 'questions' = 'details';
   openMenu: 'category' | 'sort' | 'pageSize' | null = null;
   error: string | null = null;
 
@@ -62,6 +62,11 @@ export class AdminQuizComponent implements OnInit {
     title: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(120)] }),
     description: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(500)] }),
     categoryName: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(64)] }),
+    avatarImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
+    avatarBgStart: new FormControl<string>('#30D0FF', { nonNullable: true, validators: [Validators.maxLength(32)] }),
+    avatarUseGradient: new FormControl<boolean>(true, { nonNullable: true }),
+    avatarBgEnd: new FormControl<string>('#2F86FF', { nonNullable: true, validators: [Validators.maxLength(32)] }),
+    avatarTextColor: new FormControl<string>('#0A0E1C', { nonNullable: true, validators: [Validators.maxLength(32)] }),
   });
 
   readonly addExistingQuestionForm = new FormGroup({
@@ -82,6 +87,11 @@ export class AdminQuizComponent implements OnInit {
     title: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(120)] }),
     description: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(500)] }),
     categoryName: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(64)] }),
+    avatarImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
+    avatarBgStart: new FormControl<string>('#30D0FF', { nonNullable: true, validators: [Validators.maxLength(32)] }),
+    avatarUseGradient: new FormControl<boolean>(true, { nonNullable: true }),
+    avatarBgEnd: new FormControl<string>('#2F86FF', { nonNullable: true, validators: [Validators.maxLength(32)] }),
+    avatarTextColor: new FormControl<string>('#0A0E1C', { nonNullable: true, validators: [Validators.maxLength(32)] }),
   });
 
   readonly editQuestionForm = new FormGroup({
@@ -102,6 +112,8 @@ export class AdminQuizComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadList();
+    this.syncAvatarColorDraft('create');
+    this.syncAvatarColorDraft('edit');
   }
 
   @HostListener('document:click')
@@ -296,12 +308,14 @@ export class AdminQuizComponent implements OnInit {
     });
   }
 
-  selectQuiz(id: number): void {
+  selectQuiz(id: number, openTab: 'details' | 'questions' | 'keep' = 'details'): void {
     this.error = null;
     this.loadingQuiz = true;
     this.selectedQuestionId = null;
     this.questionSearch.setValue('');
-    this.editorTab = 'questions';
+    if (openTab !== 'keep') {
+      this.editorTab = openTab;
+    }
     this.questionPanelMode = 'create';
     this.lastEditingQuestionId = null;
     this.api.getQuiz(id).subscribe({
@@ -312,7 +326,13 @@ export class AdminQuizComponent implements OnInit {
           title: quiz.title ?? '',
           description: quiz.description ?? '',
           categoryName: quiz.categoryName ?? '',
+          avatarImageUrl: quiz.avatarImageUrl ?? null,
+          avatarBgStart: quiz.avatarBgStart ?? '#30D0FF',
+          avatarUseGradient: (quiz.avatarBgEnd ?? null) != null,
+          avatarBgEnd: quiz.avatarBgEnd ?? '#2F86FF',
+          avatarTextColor: quiz.avatarTextColor ?? '#0A0E1C',
         });
+        this.syncAvatarColorDraft('edit');
         this.addExistingQuestionForm.reset({
           prompt: '',
           imageUrl: null,
@@ -338,7 +358,7 @@ export class AdminQuizComponent implements OnInit {
     this.selectedQuiz = null;
     this.selectedQuestionId = null;
     this.questionSearch.setValue('');
-    this.editorTab = 'questions';
+    this.editorTab = 'details';
     this.questionPanelMode = 'create';
     this.lastEditingQuestionId = null;
   }
@@ -352,6 +372,12 @@ export class AdminQuizComponent implements OnInit {
     const title = this.editQuizForm.controls.title.value.trim();
     const description = this.editQuizForm.controls.description.value.trim();
     const categoryName = this.editQuizForm.controls.categoryName.value.trim();
+    const avatarImageUrl = this.normalizeNullableUrl(this.editQuizForm.controls.avatarImageUrl.value);
+    const avatarBgStart = this.normalizeNullableColor(this.editQuizForm.controls.avatarBgStart.value);
+    const avatarBgEnd = this.editQuizForm.controls.avatarUseGradient.value
+      ? this.normalizeNullableColor(this.editQuizForm.controls.avatarBgEnd.value)
+      : null;
+    const avatarTextColor = this.normalizeNullableColor(this.editQuizForm.controls.avatarTextColor.value);
 
     this.savingQuiz = true;
     this.api
@@ -359,6 +385,10 @@ export class AdminQuizComponent implements OnInit {
         title,
         description: description || null,
         categoryName: categoryName || null,
+        avatarImageUrl,
+        avatarBgStart,
+        avatarBgEnd,
+        avatarTextColor,
       })
       .subscribe({
         next: (updated) => {
@@ -368,6 +398,10 @@ export class AdminQuizComponent implements OnInit {
             title: updated.title,
             description: updated.description,
             categoryName: updated.categoryName,
+            avatarImageUrl: updated.avatarImageUrl,
+            avatarBgStart: updated.avatarBgStart,
+            avatarBgEnd: updated.avatarBgEnd,
+            avatarTextColor: updated.avatarTextColor,
           };
           this.loadList();
         },
@@ -496,7 +530,7 @@ export class AdminQuizComponent implements OnInit {
       .subscribe({
         next: () => {
           this.savingQuestion = false;
-          this.selectQuiz(quiz.id);
+          this.selectQuiz(quiz.id, 'keep');
         },
         error: (err) => {
           this.savingQuestion = false;
@@ -520,7 +554,7 @@ export class AdminQuizComponent implements OnInit {
         this.deletingQuestion = false;
         this.selectedQuestionId = null;
         this.lastEditingQuestionId = null;
-        this.selectQuiz(quizId);
+        this.selectQuiz(quizId, 'keep');
         this.loadList();
       },
       error: (err) => {
@@ -625,7 +659,7 @@ export class AdminQuizComponent implements OnInit {
             o4: '',
             o4ImageUrl: null,
           });
-          this.selectQuiz(quizId);
+          this.selectQuiz(quizId, 'keep');
           this.loadList();
         },
         error: (err) => {
@@ -642,6 +676,12 @@ export class AdminQuizComponent implements OnInit {
     const title = this.quizForm.controls.title.value.trim();
     const description = this.quizForm.controls.description.value.trim();
     const categoryName = this.quizForm.controls.categoryName.value.trim();
+    const avatarImageUrl = this.normalizeNullableUrl(this.quizForm.controls.avatarImageUrl.value);
+    const avatarBgStart = this.normalizeNullableColor(this.quizForm.controls.avatarBgStart.value);
+    const avatarBgEnd = this.quizForm.controls.avatarUseGradient.value
+      ? this.normalizeNullableColor(this.quizForm.controls.avatarBgEnd.value)
+      : null;
+    const avatarTextColor = this.normalizeNullableColor(this.quizForm.controls.avatarTextColor.value);
 
     this.creating = true;
     this.api
@@ -649,13 +689,17 @@ export class AdminQuizComponent implements OnInit {
         title,
         description: description || null,
         categoryName: categoryName || null,
+        avatarImageUrl,
+        avatarBgStart,
+        avatarBgEnd,
+        avatarTextColor,
       })
       .subscribe({
         next: (quiz) => {
           this.creating = false;
           this.tab = 'manage';
           this.loadList();
-          this.selectQuiz(quiz.id);
+          this.selectQuiz(quiz.id, 'details');
         },
         error: (err) => {
           this.creating = false;
@@ -665,6 +709,7 @@ export class AdminQuizComponent implements OnInit {
   }
 
   uploadingImage = false;
+  uploadingQuizAvatar = false;
 
   uploadQuestionImage(mode: 'create' | 'edit', ev: Event): void {
     const input = ev.target as HTMLInputElement | null;
@@ -689,6 +734,105 @@ export class AdminQuizComponent implements OnInit {
         this.error = err?.error?.message ?? 'Failed to upload image';
       },
     });
+  }
+
+  uploadQuizAvatarImage(mode: 'create' | 'edit', ev: Event): void {
+    const input = ev.target as HTMLInputElement | null;
+    const file = input?.files?.[0] ?? null;
+    if (input) input.value = '';
+    if (!file) return;
+
+    const form = mode === 'create' ? this.quizForm : this.editQuizForm;
+    if (form.invalid) return;
+
+    if (this.uploadingQuizAvatar) return;
+    this.uploadingQuizAvatar = true;
+    this.error = null;
+
+    this.api.uploadImage(file).subscribe({
+      next: (res) => {
+        this.uploadingQuizAvatar = false;
+        form.controls.avatarImageUrl.setValue(res.url);
+      },
+      error: (err) => {
+        this.uploadingQuizAvatar = false;
+        this.error = err?.error?.message ?? 'Failed to upload image';
+      },
+    });
+  }
+
+  clearQuizAvatarImage(mode: 'create' | 'edit'): void {
+    const form = mode === 'create' ? this.quizForm : this.editQuizForm;
+    form.controls.avatarImageUrl.setValue(null);
+  }
+
+  quizAvatarStyle(mode: 'create' | 'edit'): { [key: string]: string } {
+    const form = mode === 'create' ? this.quizForm : this.editQuizForm;
+    const imageUrl = this.normalizeNullableUrl(form.controls.avatarImageUrl.value);
+    const bgStart = this.normalizeNullableColor(form.controls.avatarBgStart.value) ?? '#30D0FF';
+    const bgEnd = form.controls.avatarUseGradient.value
+      ? this.normalizeNullableColor(form.controls.avatarBgEnd.value)
+      : null;
+    const textColor = this.normalizeNullableColor(form.controls.avatarTextColor.value) ?? '#0A0E1C';
+
+    if (imageUrl) {
+      return {
+        'background-image': `url(${imageUrl})`,
+        'background-size': 'cover',
+        'background-position': 'center',
+        'color': textColor,
+      };
+    }
+
+    if (bgEnd) {
+      return {
+        'background-image': `linear-gradient(180deg, ${bgStart}, ${bgEnd})`,
+        'color': textColor,
+      };
+    }
+
+    return {
+      'background': bgStart,
+      'color': textColor,
+    };
+  }
+
+  quizListAvatarStyle(q: AdminQuizListItemDto): { [key: string]: string } {
+    const imageUrl = this.normalizeNullableUrl(q.avatarImageUrl ?? null);
+    const bgStart = this.normalizeNullableColor(q.avatarBgStart ?? null) ?? '#30D0FF';
+    const bgEnd = this.normalizeNullableColor(q.avatarBgEnd ?? null);
+    const textColor = this.normalizeNullableColor(q.avatarTextColor ?? null) ?? '#0A0E1C';
+
+    if (imageUrl) {
+      return {
+        'background-image': `url(${imageUrl})`,
+        'background-size': 'cover',
+        'background-position': 'center',
+        'color': textColor,
+      };
+    }
+
+    if (bgEnd) {
+      return {
+        'background-image': `linear-gradient(180deg, ${bgStart}, ${bgEnd})`,
+        'color': textColor,
+      };
+    }
+
+    return {
+      'background': bgStart,
+      'color': textColor,
+    };
+  }
+
+  avatarGradientEnabled(mode: 'create' | 'edit'): boolean {
+    const form = mode === 'create' ? this.quizForm : this.editQuizForm;
+    return form.controls.avatarUseGradient.value;
+  }
+
+  setAvatarGradient(mode: 'create' | 'edit', enabled: boolean): void {
+    const form = mode === 'create' ? this.quizForm : this.editQuizForm;
+    form.controls.avatarUseGradient.setValue(enabled);
   }
 
   clearQuestionImage(mode: 'create' | 'edit'): void {
@@ -778,6 +922,11 @@ export class AdminQuizComponent implements OnInit {
     return t ? t : null;
   }
 
+  private normalizeNullableColor(color: string | null): string | null {
+    const t = (color ?? '').trim();
+    return t ? t : null;
+  }
+
   private validateOptions(texts: string[], imageUrls: Array<string | null>): boolean {
     for (let i = 0; i < 4; i++) {
       const t = this.normalizeNullableText(texts[i] ?? '');
@@ -788,5 +937,91 @@ export class AdminQuizComponent implements OnInit {
       }
     }
     return true;
+  }
+
+  avatarSwatches: ReadonlyArray<{ start: string; end?: string; text: string }> = [
+    { start: '#30D0FF', end: '#2F86FF', text: '#0A0E1C' },
+    { start: '#FFB454', end: '#FF6B6B', text: '#1A0F0F' },
+    { start: '#33D9A0', end: '#1EC8FF', text: '#07131A' },
+    { start: '#A77BFF', end: '#FF5BD6', text: '#120815' },
+    { start: '#2B2F44', end: '#151A2D', text: '#FFFFFF' },
+  ];
+
+  applyAvatarSwatch(mode: 'create' | 'edit', sw: { start: string; end?: string; text: string }): void {
+    const form = mode === 'create' ? this.quizForm : this.editQuizForm;
+    form.controls.avatarBgStart.setValue(sw.start);
+    form.controls.avatarUseGradient.setValue(!!sw.end);
+    form.controls.avatarBgEnd.setValue(sw.end ?? sw.start);
+    form.controls.avatarTextColor.setValue(sw.text);
+    form.controls.avatarImageUrl.setValue(null);
+    this.syncAvatarColorDraft(mode);
+  }
+
+  private readonly avatarColorDraft: Record<
+    'create' | 'edit',
+    Record<'avatarBgStart' | 'avatarBgEnd' | 'avatarTextColor', string>
+  > = {
+    create: { avatarBgStart: '', avatarBgEnd: '', avatarTextColor: '' },
+    edit: { avatarBgStart: '', avatarBgEnd: '', avatarTextColor: '' },
+  };
+
+  avatarColorText(mode: 'create' | 'edit', field: 'avatarBgStart' | 'avatarBgEnd' | 'avatarTextColor'): string {
+    return this.avatarColorDraft[mode][field];
+  }
+
+  onAvatarColorPicker(mode: 'create' | 'edit', field: 'avatarBgStart' | 'avatarBgEnd' | 'avatarTextColor', value: string): void {
+    const normalized = this.normalizeHexColor(value) ?? value;
+    const form = mode === 'create' ? this.quizForm : this.editQuizForm;
+    this.avatarColorDraft[mode][field] = normalized;
+    if (normalized !== form.controls[field].value) {
+      form.controls[field].setValue(normalized);
+    }
+  }
+
+  onAvatarColorTextInput(mode: 'create' | 'edit', field: 'avatarBgStart' | 'avatarBgEnd' | 'avatarTextColor', raw: string): void {
+    const form = mode === 'create' ? this.quizForm : this.editQuizForm;
+    this.avatarColorDraft[mode][field] = raw;
+    const normalized = this.normalizeHexColor(raw);
+    if (normalized) {
+      this.avatarColorDraft[mode][field] = normalized;
+      if (normalized !== form.controls[field].value) {
+        form.controls[field].setValue(normalized);
+      }
+    }
+  }
+
+  onAvatarColorTextBlur(mode: 'create' | 'edit', field: 'avatarBgStart' | 'avatarBgEnd' | 'avatarTextColor'): void {
+    const form = mode === 'create' ? this.quizForm : this.editQuizForm;
+    const normalized = this.normalizeHexColor(this.avatarColorDraft[mode][field]);
+    if (normalized) {
+      this.avatarColorDraft[mode][field] = normalized;
+      if (normalized !== form.controls[field].value) {
+        form.controls[field].setValue(normalized);
+      }
+      return;
+    }
+    this.avatarColorDraft[mode][field] = this.normalizeHexColor(form.controls[field].value) ?? (form.controls[field].value ?? '');
+  }
+
+  private syncAvatarColorDraft(mode: 'create' | 'edit'): void {
+    const form = mode === 'create' ? this.quizForm : this.editQuizForm;
+    this.avatarColorDraft[mode].avatarBgStart = this.normalizeHexColor(form.controls.avatarBgStart.value) ?? form.controls.avatarBgStart.value;
+    this.avatarColorDraft[mode].avatarBgEnd = this.normalizeHexColor(form.controls.avatarBgEnd.value) ?? form.controls.avatarBgEnd.value;
+    this.avatarColorDraft[mode].avatarTextColor =
+      this.normalizeHexColor(form.controls.avatarTextColor.value) ?? form.controls.avatarTextColor.value;
+  }
+
+  private normalizeHexColor(raw: string | null | undefined): string | null {
+    const t = (raw ?? '').trim();
+    if (!t) return null;
+    let hex = t.startsWith('#') ? t.slice(1) : t;
+    if (/^[0-9a-fA-F]{3}$/.test(hex)) {
+      hex = hex
+        .split('')
+        .map((c) => c + c)
+        .join('');
+    }
+    if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null;
+    return `#${hex.toUpperCase()}`;
   }
 }

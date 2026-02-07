@@ -131,13 +131,12 @@
               <div
                 class="qrow"
                 role="row"
-                tabindex="0"
                 *ngFor="let q of pagedQuizzes"
-                (click)="selectQuiz(q.id)"
-                (keydown.enter)="selectQuiz(q.id)"
               >
                 <div class="cell title" role="cell">
-                  <span class="avatar" aria-hidden="true">{{ titleInitial(q.title) }}</span>
+                  <span class="avatar" [ngStyle]="quizListAvatarStyle(q)" aria-hidden="true">
+                    <ng-container *ngIf="!q.avatarImageUrl">{{ titleInitial(q.title) }}</ng-container>
+                  </span>
                   <div class="title__text">
                     <div class="title__name">{{ q.title }}</div>
                     <div class="muted title__meta">{{ q.questionCount }} questions</div>
@@ -154,13 +153,13 @@
                 </div>
 
                 <div class="cell right actions col-action" role="cell">
-                  <button class="icon-btn" type="button" (click)="$event.stopPropagation(); selectQuiz(q.id)" aria-label="Edit quiz">
+                  <button class="icon-btn" type="button" (click)="selectQuiz(q.id, 'details')" aria-label="Edit quiz">
                     <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
                   </button>
                   <button
                     class="icon-btn danger"
                     type="button"
-                    (click)="$event.stopPropagation(); deleteQuizFromList(q.id)"
+                    (click)="deleteQuizFromList(q.id)"
                     [disabled]="deletingQuiz"
                     aria-label="Delete quiz"
                   >
@@ -239,19 +238,139 @@
         </div>
 
         <form class="form form--quiz" [formGroup]="editQuizForm" (ngSubmit)="saveQuiz()">
-          <label class="field">
-            <span class="field__label">Title</span>
-            <input formControlName="title" />
-          </label>
-          <label class="field">
-            <span class="field__label">Category</span>
-            <input formControlName="categoryName" />
-          </label>
-          <label class="field">
-            <span class="field__label">Description</span>
-            <input formControlName="description" />
-          </label>
-          <button class="btn primary" type="submit" [disabled]="savingQuiz || editQuizForm.invalid">Save quiz</button>
+          <div class="quiz-details__left">
+            <label class="field">
+              <span class="field__label">Title</span>
+              <input formControlName="title" />
+            </label>
+            <label class="field">
+              <span class="field__label">Category</span>
+              <input formControlName="categoryName" />
+            </label>
+            <label class="field">
+              <span class="field__label">Description</span>
+              <input formControlName="description" />
+            </label>
+          </div>
+
+          <div class="quiz-details__right">
+            <div class="avatar-panel" aria-label="Quiz avatar settings">
+              <div class="avatar-preview" aria-label="Avatar preview">
+                <div class="avatar-preview__circle" [ngStyle]="quizAvatarStyle('edit')">
+                  <span class="avatar-preview__initial" *ngIf="!editQuizForm.controls.avatarImageUrl.value">
+                    {{ titleInitial(editQuizForm.controls.title.value || 'M') }}
+                  </span>
+                </div>
+                <div class="avatar-preview__actions">
+                  <input
+                    #editQuizAvatarInput
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    (change)="uploadQuizAvatarImage('edit', $event)"
+                  />
+                  <button class="icon-btn" type="button" (click)="editQuizAvatarInput.click()" [disabled]="uploadingQuizAvatar">
+                    <i class="fa-solid fa-upload" aria-hidden="true"></i>
+                    <span class="sr-only">Upload quiz avatar image</span>
+                  </button>
+                  <button
+                    class="icon-btn danger"
+                    type="button"
+                    *ngIf="editQuizForm.controls.avatarImageUrl.value"
+                    (click)="clearQuizAvatarImage('edit')"
+                  >
+                    <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                    <span class="sr-only">Remove quiz avatar image</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="avatar-editor">
+                <div class="avatar-editor__top">
+                  <div class="avatar-editor__title">Quiz avatar</div>
+                  <label class="toggle" title="Use gradient background">
+                    <input
+                      type="checkbox"
+                      [checked]="avatarGradientEnabled('edit')"
+                      (change)="setAvatarGradient('edit', $any($event.target).checked)"
+                    />
+                    <span>Gradient</span>
+                  </label>
+                </div>
+
+                <div class="swatches" role="list" aria-label="Avatar presets">
+                  <button
+                    class="swatch"
+                    type="button"
+                    *ngFor="let sw of avatarSwatches"
+                    (click)="applyAvatarSwatch('edit', sw)"
+                    [style.--sw1]="sw.start"
+                    [style.--sw2]="sw.end || sw.start"
+                    [style.--swt]="sw.text"
+                    aria-label="Apply preset"
+                  ></button>
+                </div>
+
+                <div class="color-grid">
+                  <label class="color-field">
+                    <span class="field__label">Bg 1</span>
+                    <input
+                      type="color"
+                      formControlName="avatarBgStart"
+                      (input)="onAvatarColorPicker('edit', 'avatarBgStart', $any($event.target).value)"
+                    />
+                    <input
+                      class="color-field__text"
+                      type="text"
+                      [value]="avatarColorText('edit', 'avatarBgStart')"
+                      (input)="onAvatarColorTextInput('edit', 'avatarBgStart', $any($event.target).value)"
+                      (blur)="onAvatarColorTextBlur('edit', 'avatarBgStart')"
+                    />
+                  </label>
+
+                  <label class="color-field">
+                    <span class="field__label">Bg 2</span>
+                    <input
+                      type="color"
+                      formControlName="avatarBgEnd"
+                      [disabled]="!avatarGradientEnabled('edit')"
+                      (input)="onAvatarColorPicker('edit', 'avatarBgEnd', $any($event.target).value)"
+                    />
+                    <input
+                      class="color-field__text"
+                      type="text"
+                      [value]="avatarColorText('edit', 'avatarBgEnd')"
+                      [disabled]="!avatarGradientEnabled('edit')"
+                      (input)="onAvatarColorTextInput('edit', 'avatarBgEnd', $any($event.target).value)"
+                      (blur)="onAvatarColorTextBlur('edit', 'avatarBgEnd')"
+                    />
+                  </label>
+
+                  <label class="color-field">
+                    <span class="field__label">Text</span>
+                    <input
+                      type="color"
+                      formControlName="avatarTextColor"
+                      (input)="onAvatarColorPicker('edit', 'avatarTextColor', $any($event.target).value)"
+                    />
+                    <input
+                      class="color-field__text"
+                      type="text"
+                      [value]="avatarColorText('edit', 'avatarTextColor')"
+                      (input)="onAvatarColorTextInput('edit', 'avatarTextColor', $any($event.target).value)"
+                      (blur)="onAvatarColorTextBlur('edit', 'avatarTextColor')"
+                    />
+                  </label>
+                </div>
+
+          
+              </div>
+            </div>
+          </div>
+
+          <button class="btn primary quiz-details__save" type="submit" [disabled]="savingQuiz || editQuizForm.invalid">
+            Save quiz
+          </button>
         </form>
       </div>
 
@@ -508,26 +627,143 @@
     <!-- CREATE -->
     <div class="block" *ngIf="tab === 'create'">
       <h2>Create quiz</h2>
-      <form class="form" [formGroup]="quizForm" (ngSubmit)="createQuiz()">
-        <label class="field">
-          <span class="field__label">Title</span>
-          <input formControlName="title" placeholder="e.g. Java Basics" />
-        </label>
+      <form class="form form--quiz" [formGroup]="quizForm" (ngSubmit)="createQuiz()">
+        <div class="quiz-details__left">
+          <label class="field">
+            <span class="field__label">Title</span>
+            <input formControlName="title" placeholder="e.g. Java Basics" />
+          </label>
 
-        <label class="field">
-          <span class="field__label">Description</span>
-          <input formControlName="description" placeholder="Optional" />
-        </label>
+          <label class="field">
+            <span class="field__label">Category</span>
+            <input formControlName="categoryName" placeholder="Optional (e.g. Programming)" />
+          </label>
 
-        <label class="field">
-          <span class="field__label">Category</span>
-          <input formControlName="categoryName" placeholder="Optional (e.g. Programming)" />
-        </label>
+          <label class="field">
+            <span class="field__label">Description</span>
+            <input formControlName="description" placeholder="Optional" />
+          </label>
+        </div>
 
-        <button class="btn primary" type="submit" [disabled]="creating || quizForm.invalid">Create</button>
+        <div class="quiz-details__right">
+          <div class="avatar-panel" aria-label="Quiz avatar settings">
+            <div class="avatar-preview" aria-label="Avatar preview">
+              <div class="avatar-preview__circle" [ngStyle]="quizAvatarStyle('create')">
+                <span class="avatar-preview__initial" *ngIf="!quizForm.controls.avatarImageUrl.value">
+                  {{ titleInitial(quizForm.controls.title.value || 'M') }}
+                </span>
+              </div>
+              <div class="avatar-preview__actions">
+                <input
+                  #createQuizAvatarInput
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  (change)="uploadQuizAvatarImage('create', $event)"
+                />
+                <button class="icon-btn" type="button" (click)="createQuizAvatarInput.click()" [disabled]="uploadingQuizAvatar">
+                  <i class="fa-solid fa-upload" aria-hidden="true"></i>
+                  <span class="sr-only">Upload quiz avatar image</span>
+                </button>
+                <button
+                  class="icon-btn danger"
+                  type="button"
+                  *ngIf="quizForm.controls.avatarImageUrl.value"
+                  (click)="clearQuizAvatarImage('create')"
+                >
+                  <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                  <span class="sr-only">Remove quiz avatar image</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="avatar-editor">
+              <div class="avatar-editor__top">
+                <div class="avatar-editor__title">Quiz avatar</div>
+                <label class="toggle" title="Use gradient background">
+                  <input
+                    type="checkbox"
+                    [checked]="avatarGradientEnabled('create')"
+                    (change)="setAvatarGradient('create', $any($event.target).checked)"
+                  />
+                  <span>Gradient</span>
+                </label>
+              </div>
+
+              <div class="swatches" role="list" aria-label="Avatar presets">
+                <button
+                  class="swatch"
+                  type="button"
+                  *ngFor="let sw of avatarSwatches"
+                  (click)="applyAvatarSwatch('create', sw)"
+                  [style.--sw1]="sw.start"
+                  [style.--sw2]="sw.end || sw.start"
+                  [style.--swt]="sw.text"
+                  aria-label="Apply preset"
+                ></button>
+              </div>
+
+              <div class="color-grid">
+                <label class="color-field">
+                  <span class="field__label">Bg 1</span>
+                  <input
+                    type="color"
+                    formControlName="avatarBgStart"
+                    (input)="onAvatarColorPicker('create', 'avatarBgStart', $any($event.target).value)"
+                  />
+                  <input
+                    class="color-field__text"
+                    type="text"
+                    [value]="avatarColorText('create', 'avatarBgStart')"
+                    (input)="onAvatarColorTextInput('create', 'avatarBgStart', $any($event.target).value)"
+                    (blur)="onAvatarColorTextBlur('create', 'avatarBgStart')"
+                  />
+                </label>
+
+                <label class="color-field">
+                  <span class="field__label">Bg 2</span>
+                  <input
+                    type="color"
+                    formControlName="avatarBgEnd"
+                    [disabled]="!avatarGradientEnabled('create')"
+                    (input)="onAvatarColorPicker('create', 'avatarBgEnd', $any($event.target).value)"
+                  />
+                  <input
+                    class="color-field__text"
+                    type="text"
+                    [value]="avatarColorText('create', 'avatarBgEnd')"
+                    [disabled]="!avatarGradientEnabled('create')"
+                    (input)="onAvatarColorTextInput('create', 'avatarBgEnd', $any($event.target).value)"
+                    (blur)="onAvatarColorTextBlur('create', 'avatarBgEnd')"
+                  />
+                </label>
+
+                <label class="color-field">
+                  <span class="field__label">Text</span>
+                  <input
+                    type="color"
+                    formControlName="avatarTextColor"
+                    (input)="onAvatarColorPicker('create', 'avatarTextColor', $any($event.target).value)"
+                  />
+                  <input
+                    class="color-field__text"
+                    type="text"
+                    [value]="avatarColorText('create', 'avatarTextColor')"
+                    (input)="onAvatarColorTextInput('create', 'avatarTextColor', $any($event.target).value)"
+                    (blur)="onAvatarColorTextBlur('create', 'avatarTextColor')"
+                  />
+                </label>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <button class="btn primary quiz-details__save" type="submit" [disabled]="creating || quizForm.invalid">
+          Create
+        </button>
       </form>
 
-      <p class="muted hint">After creating, you will be redirected to Manage to add questions.</p>
     </div>
   </div>
 </section>
