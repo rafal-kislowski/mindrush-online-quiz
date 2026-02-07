@@ -7,6 +7,10 @@ export interface AdminQuizDto {
   title: string;
   description: string | null;
   categoryName: string | null;
+  avatarImageUrl: string | null;
+  avatarBgStart: string | null;
+  avatarBgEnd: string | null;
+  avatarTextColor: string | null;
 }
 
 export interface AdminQuizListItemDto {
@@ -14,6 +18,10 @@ export interface AdminQuizListItemDto {
   title: string;
   description: string | null;
   categoryName: string | null;
+  avatarImageUrl: string | null;
+  avatarBgStart: string | null;
+  avatarBgEnd: string | null;
+  avatarTextColor: string | null;
   questionCount: number;
 }
 
@@ -45,6 +53,10 @@ export interface AdminQuizDetailDto {
   title: string;
   description: string | null;
   categoryName: string | null;
+  avatarImageUrl: string | null;
+  avatarBgStart: string | null;
+  avatarBgEnd: string | null;
+  avatarTextColor: string | null;
   questions: AdminQuestionDto[];
 }
 
@@ -78,6 +90,10 @@ export class AdminQuizApi {
     title: string;
     description?: string | null;
     categoryName?: string | null;
+    avatarImageUrl?: string | null;
+    avatarBgStart?: string | null;
+    avatarBgEnd?: string | null;
+    avatarTextColor?: string | null;
   }): Observable<AdminQuizDto> {
     return this.http.post<AdminQuizDto>('/api/admin/quizzes', input, {
       withCredentials: true,
@@ -86,7 +102,15 @@ export class AdminQuizApi {
 
   updateQuiz(
     id: number,
-    input: { title: string; description?: string | null; categoryName?: string | null }
+    input: {
+      title: string;
+      description?: string | null;
+      categoryName?: string | null;
+      avatarImageUrl?: string | null;
+      avatarBgStart?: string | null;
+      avatarBgEnd?: string | null;
+      avatarTextColor?: string | null;
+    }
   ): Observable<AdminQuizDto> {
     return this.http.put<AdminQuizDto>(
       `/api/admin/quizzes/${encodeURIComponent(String(id))}`,

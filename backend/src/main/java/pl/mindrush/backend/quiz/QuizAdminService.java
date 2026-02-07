@@ -22,6 +22,9 @@ public class QuizAdminService {
     private final QuizQuestionRepository questionRepository;
     private final QuizAnswerOptionRepository optionRepository;
 
+    private static final java.util.regex.Pattern HEX_COLOR =
+            java.util.regex.Pattern.compile("^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$");
+
     public QuizAdminService(
             QuizRepository quizRepository,
             QuizCategoryRepository categoryRepository,
@@ -34,7 +37,15 @@ public class QuizAdminService {
         this.optionRepository = optionRepository;
     }
 
-    public Quiz createQuiz(String title, String description, String categoryName) {
+    public Quiz createQuiz(
+            String title,
+            String description,
+            String categoryName,
+            String avatarImageUrl,
+            String avatarBgStart,
+            String avatarBgEnd,
+            String avatarTextColor
+    ) {
         String t = title == null ? "" : title.trim();
         if (t.isBlank()) throw new ResponseStatusException(BAD_REQUEST, "Title is required");
 
@@ -45,6 +56,7 @@ public class QuizAdminService {
         }
 
         Quiz quiz = new Quiz(t, description == null ? null : description.trim(), category);
+        applyAvatar(quiz, avatarImageUrl, avatarBgStart, avatarBgEnd, avatarTextColor);
         return quizRepository.save(quiz);
     }
 
@@ -56,6 +68,10 @@ public class QuizAdminService {
                         q.getTitle(),
                         q.getDescription(),
                         q.getCategory() == null ? null : q.getCategory().getName(),
+                        q.getAvatarImageUrl(),
+                        q.getAvatarBgStart(),
+                        q.getAvatarBgEnd(),
+                        q.getAvatarTextColor(),
                         questionRepository.countByQuizId(q.getId())
                 ))
                 .toList();
@@ -92,11 +108,24 @@ public class QuizAdminService {
                 quiz.getTitle(),
                 quiz.getDescription(),
                 quiz.getCategory() == null ? null : quiz.getCategory().getName(),
+                quiz.getAvatarImageUrl(),
+                quiz.getAvatarBgStart(),
+                quiz.getAvatarBgEnd(),
+                quiz.getAvatarTextColor(),
                 qDtos
         );
     }
 
-    public Quiz updateQuiz(Long quizId, String title, String description, String categoryName) {
+    public Quiz updateQuiz(
+            Long quizId,
+            String title,
+            String description,
+            String categoryName,
+            String avatarImageUrl,
+            String avatarBgStart,
+            String avatarBgEnd,
+            String avatarTextColor
+    ) {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
 
@@ -112,6 +141,7 @@ public class QuizAdminService {
         quiz.setTitle(t);
         quiz.setDescription(description == null ? null : description.trim());
         quiz.setCategory(category);
+        applyAvatar(quiz, avatarImageUrl, avatarBgStart, avatarBgEnd, avatarTextColor);
         return quizRepository.save(quiz);
     }
 
@@ -232,6 +262,10 @@ public class QuizAdminService {
             String title,
             String description,
             String categoryName,
+            String avatarImageUrl,
+            String avatarBgStart,
+            String avatarBgEnd,
+            String avatarTextColor,
             long questionCount
     ) {}
 
@@ -240,6 +274,10 @@ public class QuizAdminService {
             String title,
             String description,
             String categoryName,
+            String avatarImageUrl,
+            String avatarBgStart,
+            String avatarBgEnd,
+            String avatarTextColor,
             List<AdminQuestion> questions
     ) {}
 
@@ -263,5 +301,27 @@ public class QuizAdminService {
         if (v == null) return null;
         String t = v.trim();
         return t.isBlank() ? null : t;
+    }
+
+    private static String trimToNullColor(String v) {
+        String t = trimToNull(v);
+        if (t == null) return null;
+        if (!HEX_COLOR.matcher(t).matches()) {
+            throw new ResponseStatusException(BAD_REQUEST, "Invalid color: " + t);
+        }
+        return t;
+    }
+
+    private static void applyAvatar(
+            Quiz quiz,
+            String avatarImageUrl,
+            String avatarBgStart,
+            String avatarBgEnd,
+            String avatarTextColor
+    ) {
+        quiz.setAvatarImageUrl(trimToNull(avatarImageUrl));
+        quiz.setAvatarBgStart(trimToNullColor(avatarBgStart));
+        quiz.setAvatarBgEnd(trimToNullColor(avatarBgEnd));
+        quiz.setAvatarTextColor(trimToNullColor(avatarTextColor));
     }
 }

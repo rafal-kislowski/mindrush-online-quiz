@@ -31,7 +31,17 @@ public class AdminQuizController {
     public ResponseEntity<List<AdminQuizListItemDto>> list() {
         return ResponseEntity.ok(
                 adminService.listQuizzes().stream()
-                        .map(q -> new AdminQuizListItemDto(q.id(), q.title(), q.description(), q.categoryName(), q.questionCount()))
+                        .map(q -> new AdminQuizListItemDto(
+                                q.id(),
+                                q.title(),
+                                q.description(),
+                                q.categoryName(),
+                                q.avatarImageUrl(),
+                                q.avatarBgStart(),
+                                q.avatarBgEnd(),
+                                q.avatarTextColor(),
+                                q.questionCount()
+                        ))
                         .toList()
         );
     }
@@ -44,23 +54,48 @@ public class AdminQuizController {
 
     @PostMapping
     public ResponseEntity<QuizAdminDto> create(@Valid @RequestBody CreateQuizRequest req) {
-        Quiz quiz = adminService.createQuiz(req.title(), req.description(), req.categoryName());
+        Quiz quiz = adminService.createQuiz(
+                req.title(),
+                req.description(),
+                req.categoryName(),
+                req.avatarImageUrl(),
+                req.avatarBgStart(),
+                req.avatarBgEnd(),
+                req.avatarTextColor()
+        );
         return ResponseEntity.status(CREATED).body(new QuizAdminDto(
                 quiz.getId(),
                 quiz.getTitle(),
                 quiz.getDescription(),
-                quiz.getCategory() == null ? null : quiz.getCategory().getName()
+                quiz.getCategory() == null ? null : quiz.getCategory().getName(),
+                quiz.getAvatarImageUrl(),
+                quiz.getAvatarBgStart(),
+                quiz.getAvatarBgEnd(),
+                quiz.getAvatarTextColor()
         ));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<QuizAdminDto> update(@PathVariable("id") Long quizId, @Valid @RequestBody CreateQuizRequest req) {
-        Quiz quiz = adminService.updateQuiz(quizId, req.title(), req.description(), req.categoryName());
+        Quiz quiz = adminService.updateQuiz(
+                quizId,
+                req.title(),
+                req.description(),
+                req.categoryName(),
+                req.avatarImageUrl(),
+                req.avatarBgStart(),
+                req.avatarBgEnd(),
+                req.avatarTextColor()
+        );
         return ResponseEntity.ok(new QuizAdminDto(
                 quiz.getId(),
                 quiz.getTitle(),
                 quiz.getDescription(),
-                quiz.getCategory() == null ? null : quiz.getCategory().getName()
+                quiz.getCategory() == null ? null : quiz.getCategory().getName(),
+                quiz.getAvatarImageUrl(),
+                quiz.getAvatarBgStart(),
+                quiz.getAvatarBgEnd(),
+                quiz.getAvatarTextColor()
         ));
     }
 
@@ -111,7 +146,11 @@ public class AdminQuizController {
     public record CreateQuizRequest(
             @NotBlank @Size(max = 120) String title,
             @Size(max = 500) String description,
-            @Size(max = 64) String categoryName
+            @Size(max = 64) String categoryName,
+            @Size(max = 500) String avatarImageUrl,
+            @Size(max = 32) String avatarBgStart,
+            @Size(max = 32) String avatarBgEnd,
+            @Size(max = 32) String avatarTextColor
     ) {}
 
     public record AddQuestionRequest(
@@ -139,7 +178,16 @@ public class AdminQuizController {
             boolean correct
     ) {}
 
-    public record QuizAdminDto(Long id, String title, String description, String categoryName) {}
+    public record QuizAdminDto(
+            Long id,
+            String title,
+            String description,
+            String categoryName,
+            String avatarImageUrl,
+            String avatarBgStart,
+            String avatarBgEnd,
+            String avatarTextColor
+    ) {}
 
     public record QuizQuestionAdminDto(Long id, int orderIndex, String prompt, String imageUrl) {}
 
@@ -148,6 +196,10 @@ public class AdminQuizController {
             String title,
             String description,
             String categoryName,
+            String avatarImageUrl,
+            String avatarBgStart,
+            String avatarBgEnd,
+            String avatarTextColor,
             long questionCount
     ) {}
 
@@ -156,6 +208,10 @@ public class AdminQuizController {
             String title,
             String description,
             String categoryName,
+            String avatarImageUrl,
+            String avatarBgStart,
+            String avatarBgEnd,
+            String avatarTextColor,
             List<AdminQuestionDto> questions
     ) {}
 
@@ -181,6 +237,10 @@ public class AdminQuizController {
                 quiz.title(),
                 quiz.description(),
                 quiz.categoryName(),
+                quiz.avatarImageUrl(),
+                quiz.avatarBgStart(),
+                quiz.avatarBgEnd(),
+                quiz.avatarTextColor(),
                 quiz.questions().stream()
                         .map(q -> new AdminQuestionDto(
                                 q.id(),
