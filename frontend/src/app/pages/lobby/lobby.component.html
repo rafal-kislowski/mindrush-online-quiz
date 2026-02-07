@@ -1,15 +1,10 @@
 <div class="lobby-page" *ngIf="lobby as l; else loading">
   <header class="lobby-header">
+    <div class="lobby-header__top">
     <div class="lobby-title">
       <h1>
         Lobby <span class="code">{{ l.code }}</span>
       </h1>
-      <div class="lobby-meta" *ngIf="l.status && l.players && l.maxPlayers">
-        <span class="pill" [attr.data-status]="l.status">{{ l.status }}</span>
-        <span class="muted"
-          >Players: {{ l.players.length }}/{{ l.maxPlayers }}</span
-        >
-      </div>
     </div>
 
     <div class="lobby-actions">
@@ -23,6 +18,12 @@
         <span class="leave-btn__text">Leave lobby</span>
         <span class="leave-btn__icon" aria-hidden="true">×</span>
       </button>
+    </div>
+    </div>
+
+    <div class="lobby-meta" *ngIf="l.status && l.players && l.maxPlayers">
+      <span class="pill" [attr.data-status]="l.status">{{ l.status }}</span>
+      <span class="muted">Players: {{ l.players.length }}/{{ l.maxPlayers }}</span>
     </div>
   </header>
 

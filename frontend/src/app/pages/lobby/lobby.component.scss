@@ -9,17 +9,28 @@
 }
 
 .lobby-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  display: grid;
   gap: 14px;
   margin-bottom: 16px;
+}
+
+.lobby-header__top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.lobby-title {
+  min-width: 0;
 }
 
 .lobby-actions {
   display: flex;
   gap: 10px;
   align-items: center;
+  margin-left: auto;
 }
 
 .leave-btn__icon {
@@ -47,7 +58,6 @@
 }
 
 .lobby-meta {
-  margin-top: 10px;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -577,13 +587,7 @@ select {
   }
 
   .lobby-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .lobby-actions {
-    display: flex;
-    justify-content: flex-end;
+    gap: 12px;
   }
 
   .lobby-grid {
