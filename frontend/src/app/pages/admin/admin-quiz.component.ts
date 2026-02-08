@@ -1,12 +1,32 @@
 import { CommonModule } from '@angular/common';
 import { Component, HostListener, OnInit } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, FormControl, FormGroup, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import {
   AdminQuestionDto,
   AdminQuizApi,
   AdminQuizDetailDto,
   AdminQuizListItemDto,
+  GameMode,
+  QuizStatus,
 } from '../../core/api/admin-quiz.api';
+
+const MIN_QUESTION_TIME_LIMIT_SECONDS = 5;
+const MAX_QUESTION_TIME_LIMIT_SECONDS = 600;
+const DEFAULT_QUESTION_TIME_LIMIT_SECONDS = 15;
+
+function questionTimeLimitValidator(control: AbstractControl): ValidationErrors | null {
+  const v = control.value;
+  if (v == null || v === '') return null;
+
+  const n = Number(v);
+  if (!Number.isFinite(n)) return { timeLimit: true };
+  if (n <= 0) return { timeLimitRange: true };
+  if (!Number.isInteger(n)) return { timeLimit: true };
+  if (n < MIN_QUESTION_TIME_LIMIT_SECONDS || n > MAX_QUESTION_TIME_LIMIT_SECONDS) {
+    return { timeLimitRange: true };
+  }
+  return null;
+}
 
 @Component({
   selector: 'app-admin-quiz',
@@ -18,7 +38,10 @@ import {
 export class AdminQuizComponent implements OnInit {
   tab: 'manage' | 'create' = 'manage';
   editorTab: 'details' | 'questions' = 'details';
-  openMenu: 'category' | 'sort' | 'pageSize' | null = null;
+  openMenu: 'category' | 'sort' | 'pageSize' | 'gameModeCreate' | 'gameModeEdit' | null = null;
+  openQuizActionsId: number | null = null;
+  quizActionsMenuStyle: Record<string, string> | null = null;
+  private lastQuizActionsOpenedAtMs = 0;
   error: string | null = null;
 
   quizzes: AdminQuizListItemDto[] = [];
@@ -38,6 +61,7 @@ export class AdminQuizComponent implements OnInit {
 
   readonly quizSearch = new FormControl('', { nonNullable: true });
   readonly quizCategory = new FormControl<string>('all', { nonNullable: true });
+  readonly quizStatusTab = new FormControl<QuizStatus>('ACTIVE', { nonNullable: true });
   readonly questionSearch = new FormControl('', { nonNullable: true });
   readonly pageSize = new FormControl<number>(8, { nonNullable: true });
   readonly quizSort = new FormControl<'titleAsc' | 'titleDesc' | 'questionsDesc' | 'questionsAsc' | 'categoryAsc' | 'categoryDesc'>(
@@ -62,6 +86,10 @@ export class AdminQuizComponent implements OnInit {
     title: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(120)] }),
     description: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(500)] }),
     categoryName: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(64)] }),
+    gameMode: new FormControl<GameMode>('CASUAL', { nonNullable: true }),
+    includeInRanking: new FormControl<boolean>(false, { nonNullable: true }),
+    xpEnabled: new FormControl<boolean>(true, { nonNullable: true }),
+    questionTimeLimitSeconds: new FormControl<number | null>(DEFAULT_QUESTION_TIME_LIMIT_SECONDS, { validators: [questionTimeLimitValidator] }),
     avatarImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
     avatarBgStart: new FormControl<string>('#30D0FF', { nonNullable: true, validators: [Validators.maxLength(32)] }),
     avatarUseGradient: new FormControl<boolean>(true, { nonNullable: true }),
@@ -87,6 +115,10 @@ export class AdminQuizComponent implements OnInit {
     title: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(120)] }),
     description: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(500)] }),
     categoryName: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(64)] }),
+    gameMode: new FormControl<GameMode>('CASUAL', { nonNullable: true }),
+    includeInRanking: new FormControl<boolean>(false, { nonNullable: true }),
+    xpEnabled: new FormControl<boolean>(true, { nonNullable: true }),
+    questionTimeLimitSeconds: new FormControl<number | null>(DEFAULT_QUESTION_TIME_LIMIT_SECONDS, { validators: [questionTimeLimitValidator] }),
     avatarImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
     avatarBgStart: new FormControl<string>('#30D0FF', { nonNullable: true, validators: [Validators.maxLength(32)] }),
     avatarUseGradient: new FormControl<boolean>(true, { nonNullable: true }),
@@ -114,26 +146,54 @@ export class AdminQuizComponent implements OnInit {
     this.loadList();
     this.syncAvatarColorDraft('create');
     this.syncAvatarColorDraft('edit');
+    this.enforceGameModeRules('create');
+    this.enforceGameModeRules('edit');
   }
 
   @HostListener('document:click')
   onDocumentClick(): void {
     this.openMenu = null;
+    this.closeQuizActions();
   }
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
     this.openMenu = null;
+    this.closeQuizActions();
   }
 
-  toggleMenu(menu: 'category' | 'sort' | 'pageSize', ev?: Event): void {
+  @HostListener('window:resize')
+  onWindowResize(): void {
+    this.openMenu = null;
+    this.closeQuizActions();
+  }
+
+  @HostListener('window:scroll')
+  onWindowScroll(): void {
+    if (this.openQuizActionsId != null && Date.now() - this.lastQuizActionsOpenedAtMs < 250) {
+      return;
+    }
+    this.openMenu = null;
+    this.closeQuizActions();
+  }
+
+  toggleMenu(menu: 'category' | 'sort' | 'pageSize' | 'gameModeCreate' | 'gameModeEdit', ev?: Event): void {
     ev?.stopPropagation();
+    this.closeQuizActions();
     this.openMenu = this.openMenu === menu ? null : menu;
   }
 
   setQuizCategory(value: string, ev?: Event): void {
     ev?.stopPropagation();
     this.quizCategory.setValue(value);
+    this.resetQuizPage();
+    this.openMenu = null;
+  }
+
+  setQuizStatusTab(value: QuizStatus, ev?: Event): void {
+    ev?.stopPropagation();
+    this.quizStatusTab.setValue(value);
+    this.quizCategory.setValue('all');
     this.resetQuizPage();
     this.openMenu = null;
   }
@@ -153,6 +213,14 @@ export class AdminQuizComponent implements OnInit {
     this.pageSize.setValue(size);
     this.resetQuizPage();
     this.openMenu = null;
+  }
+
+  setGameMode(mode: 'create' | 'edit', value: GameMode, ev?: Event): void {
+    ev?.stopPropagation();
+    const form = mode === 'create' ? this.quizForm : this.editQuizForm;
+    form.controls.gameMode.setValue(value);
+    this.openMenu = null;
+    this.onGameModeChange(mode);
   }
 
   get quizCategoryLabel(): string {
@@ -222,8 +290,10 @@ export class AdminQuizComponent implements OnInit {
   }
 
   get categories(): string[] {
+    const status = this.quizStatusTab.value;
     const set = new Set<string>();
     for (const q of this.quizzes) {
+      if (q.status !== status) continue;
       const c = (q.categoryName ?? '').trim();
       if (c) set.add(c);
     }
@@ -233,8 +303,10 @@ export class AdminQuizComponent implements OnInit {
   get filteredQuizzes(): AdminQuizListItemDto[] {
     const query = this.quizSearch.value.trim().toLowerCase();
     const category = this.quizCategory.value;
+    const status = this.quizStatusTab.value;
 
     const filtered = this.quizzes.filter((q) => {
+      if (q.status !== status) return false;
       const title = (q.title ?? '').toLowerCase();
       const cat = (q.categoryName ?? '').trim();
 
@@ -244,6 +316,99 @@ export class AdminQuizComponent implements OnInit {
     });
 
     return this.sortQuizzes(filtered);
+  }
+
+  toggleQuizActions(id: number, ev?: Event): void {
+    ev?.stopPropagation();
+    if (this.openQuizActionsId === id) {
+      this.closeQuizActions();
+      return;
+    }
+    this.openMenu = null;
+    this.openQuizActionsId = id;
+    this.lastQuizActionsOpenedAtMs = Date.now();
+
+    const button = ev?.currentTarget instanceof HTMLElement ? ev.currentTarget : null;
+    this.quizActionsMenuStyle = button ? this.computeQuizActionsMenuStyle(button) : null;
+  }
+
+  closeQuizActions(): void {
+    this.openQuizActionsId = null;
+    this.quizActionsMenuStyle = null;
+  }
+
+  private computeQuizActionsMenuStyle(button: HTMLElement): Record<string, string> {
+    const menuWidth = 210;
+    const gap = 8;
+    const viewportPad = 12;
+    const estimatedMenuHeight = 260;
+
+    const r = button.getBoundingClientRect();
+
+    let left = r.right - menuWidth;
+    left = Math.max(viewportPad, Math.min(left, window.innerWidth - menuWidth - viewportPad));
+
+    const viewportH = window.innerHeight;
+    const maxTop = Math.max(viewportPad, viewportH - estimatedMenuHeight - viewportPad);
+
+    let top = r.bottom + gap;
+    if (top > maxTop) {
+      top = r.top - gap - estimatedMenuHeight;
+    }
+    top = Math.max(viewportPad, Math.min(top, maxTop));
+
+    return {
+      position: 'fixed',
+      left: `${left}px`,
+      top: `${top}px`,
+      width: `${menuWidth}px`,
+      maxHeight: `${Math.max(120, viewportH - viewportPad * 2)}px`,
+      zIndex: '9999',
+    };
+  }
+
+  setQuizStatus(quizId: number, status: QuizStatus): void {
+    if (this.deletingQuiz) return;
+    this.error = null;
+
+    if (status === 'TRASHED' && !confirm('Move this quiz to trash?')) return;
+
+    this.deletingQuiz = true;
+    this.api.setStatus(quizId, status).subscribe({
+      next: (updated) => {
+        this.deletingQuiz = false;
+        if (this.selectedQuiz?.id === quizId) {
+          this.selectedQuiz = { ...this.selectedQuiz, status: updated.status };
+        }
+        this.loadList();
+      },
+      error: (err) => {
+        this.deletingQuiz = false;
+        this.error = err?.error?.message ?? 'Failed to update quiz status';
+      },
+    });
+  }
+
+  purgeQuiz(quizId: number): void {
+    if (this.deletingQuiz) return;
+    this.error = null;
+
+    if (!confirm('Permanently delete this quiz and all its questions/images?')) return;
+
+    this.deletingQuiz = true;
+    this.api.purgeQuiz(quizId).subscribe({
+      next: () => {
+        this.deletingQuiz = false;
+        if (this.selectedQuiz?.id === quizId) {
+          this.closeSelectedQuiz();
+        }
+        this.loadList();
+      },
+      error: (err) => {
+        this.deletingQuiz = false;
+        this.error = err?.error?.message ?? 'Failed to delete quiz permanently';
+      },
+    });
   }
 
   get filteredQuestions(): AdminQuestionDto[] {
@@ -326,12 +491,17 @@ export class AdminQuizComponent implements OnInit {
           title: quiz.title ?? '',
           description: quiz.description ?? '',
           categoryName: quiz.categoryName ?? '',
+          gameMode: quiz.gameMode ?? 'CASUAL',
+          includeInRanking: !!quiz.includeInRanking,
+          xpEnabled: quiz.xpEnabled ?? true,
+          questionTimeLimitSeconds: quiz.questionTimeLimitSeconds ?? DEFAULT_QUESTION_TIME_LIMIT_SECONDS,
           avatarImageUrl: quiz.avatarImageUrl ?? null,
           avatarBgStart: quiz.avatarBgStart ?? '#30D0FF',
           avatarUseGradient: (quiz.avatarBgEnd ?? null) != null,
           avatarBgEnd: quiz.avatarBgEnd ?? '#2F86FF',
           avatarTextColor: quiz.avatarTextColor ?? '#0A0E1C',
         });
+        this.enforceGameModeRules('edit');
         this.syncAvatarColorDraft('edit');
         this.addExistingQuestionForm.reset({
           prompt: '',
@@ -372,6 +542,11 @@ export class AdminQuizComponent implements OnInit {
     const title = this.editQuizForm.controls.title.value.trim();
     const description = this.editQuizForm.controls.description.value.trim();
     const categoryName = this.editQuizForm.controls.categoryName.value.trim();
+    const gameMode = this.editQuizForm.controls.gameMode.value;
+    const includeInRanking =
+      gameMode === 'RANKED' ? true : !!this.editQuizForm.controls.includeInRanking.value;
+    const xpEnabled = !!this.editQuizForm.controls.xpEnabled.value;
+    const questionTimeLimitSeconds = this.normalizeQuestionTimeLimit(this.editQuizForm.controls.questionTimeLimitSeconds.value);
     const avatarImageUrl = this.normalizeNullableUrl(this.editQuizForm.controls.avatarImageUrl.value);
     const avatarBgStart = this.normalizeNullableColor(this.editQuizForm.controls.avatarBgStart.value);
     const avatarBgEnd = this.editQuizForm.controls.avatarUseGradient.value
@@ -385,6 +560,10 @@ export class AdminQuizComponent implements OnInit {
         title,
         description: description || null,
         categoryName: categoryName || null,
+        gameMode,
+        includeInRanking,
+        xpEnabled,
+        questionTimeLimitSeconds,
         avatarImageUrl,
         avatarBgStart,
         avatarBgEnd,
@@ -402,6 +581,11 @@ export class AdminQuizComponent implements OnInit {
             avatarBgStart: updated.avatarBgStart,
             avatarBgEnd: updated.avatarBgEnd,
             avatarTextColor: updated.avatarTextColor,
+            gameMode: updated.gameMode,
+            includeInRanking: updated.includeInRanking,
+            xpEnabled: updated.xpEnabled,
+            questionTimeLimitSeconds: updated.questionTimeLimitSeconds,
+            status: updated.status,
           };
           this.loadList();
         },
@@ -440,6 +624,46 @@ export class AdminQuizComponent implements OnInit {
       o4: texts[3] ?? '',
       o4ImageUrl: images[3] ?? null,
     });
+  }
+
+  onGameModeChange(mode: 'create' | 'edit'): void {
+    this.enforceGameModeRules(mode);
+  }
+
+  onTimeLimitBlur(mode: 'create' | 'edit'): void {
+    const form = mode === 'create' ? this.quizForm : this.editQuizForm;
+    const v = form.controls.questionTimeLimitSeconds.value;
+    if (v == null || !Number.isFinite(Number(v)) || Number(v) <= 0) {
+      form.controls.questionTimeLimitSeconds.setValue(DEFAULT_QUESTION_TIME_LIMIT_SECONDS);
+    }
+  }
+
+  private enforceGameModeRules(mode: 'create' | 'edit'): void {
+    const form = mode === 'create' ? this.quizForm : this.editQuizForm;
+    const isRanked = form.controls.gameMode.value === 'RANKED';
+
+    if (isRanked) {
+      if (form.controls.includeInRanking.enabled) {
+        form.controls.includeInRanking.setValue(true, { emitEvent: false });
+        form.controls.includeInRanking.disable({ emitEvent: false });
+      } else {
+        form.controls.includeInRanking.setValue(true, { emitEvent: false });
+      }
+      return;
+    }
+
+    if (form.controls.includeInRanking.disabled) {
+      form.controls.includeInRanking.enable({ emitEvent: false });
+    }
+  }
+
+  private normalizeQuestionTimeLimit(raw: number | null): number | null {
+    if (raw == null) return DEFAULT_QUESTION_TIME_LIMIT_SECONDS;
+
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return null;
+    if (n <= 0) return DEFAULT_QUESTION_TIME_LIMIT_SECONDS;
+    return Math.trunc(n);
   }
 
   startAddQuestion(): void {
@@ -566,45 +790,18 @@ export class AdminQuizComponent implements OnInit {
 
   deleteSelectedQuiz(): void {
     if (!this.selectedQuiz) return;
-    if (this.deletingQuiz) return;
-    this.error = null;
-
     const quizId = this.selectedQuiz.id;
-    this.deletingQuiz = true;
-    this.api.deleteQuiz(quizId).subscribe({
-      next: () => {
-        this.deletingQuiz = false;
-        this.closeSelectedQuiz();
-        this.loadList();
-      },
-      error: (err) => {
-        this.deletingQuiz = false;
-        this.error = err?.error?.message ?? 'Failed to delete quiz';
-      },
-      });
+
+    if (this.selectedQuiz.status === 'TRASHED') {
+      this.purgeQuiz(quizId);
+      return;
+    }
+
+    this.setQuizStatus(quizId, 'TRASHED');
   }
 
   deleteQuizFromList(id: number): void {
-    if (this.deletingQuiz) return;
-    this.error = null;
-
-    if (!confirm('Delete this quiz?')) return;
-
-    this.deletingQuiz = true;
-    this.api.deleteQuiz(id).subscribe({
-      next: () => {
-        this.deletingQuiz = false;
-        if (this.selectedQuiz?.id === id) {
-          this.selectedQuiz = null;
-          this.selectedQuestionId = null;
-        }
-        this.loadList();
-      },
-      error: (err) => {
-        this.deletingQuiz = false;
-        this.error = err?.error?.message ?? 'Failed to delete quiz';
-      },
-    });
+    this.setQuizStatus(id, 'TRASHED');
   }
 
   addQuestionToSelectedQuiz(): void {
@@ -676,6 +873,10 @@ export class AdminQuizComponent implements OnInit {
     const title = this.quizForm.controls.title.value.trim();
     const description = this.quizForm.controls.description.value.trim();
     const categoryName = this.quizForm.controls.categoryName.value.trim();
+    const gameMode = this.quizForm.controls.gameMode.value;
+    const includeInRanking = gameMode === 'RANKED' ? true : !!this.quizForm.controls.includeInRanking.value;
+    const xpEnabled = !!this.quizForm.controls.xpEnabled.value;
+    const questionTimeLimitSeconds = this.normalizeQuestionTimeLimit(this.quizForm.controls.questionTimeLimitSeconds.value);
     const avatarImageUrl = this.normalizeNullableUrl(this.quizForm.controls.avatarImageUrl.value);
     const avatarBgStart = this.normalizeNullableColor(this.quizForm.controls.avatarBgStart.value);
     const avatarBgEnd = this.quizForm.controls.avatarUseGradient.value
@@ -689,6 +890,10 @@ export class AdminQuizComponent implements OnInit {
         title,
         description: description || null,
         categoryName: categoryName || null,
+        gameMode,
+        includeInRanking,
+        xpEnabled,
+        questionTimeLimitSeconds,
         avatarImageUrl,
         avatarBgStart,
         avatarBgEnd,
@@ -699,7 +904,7 @@ export class AdminQuizComponent implements OnInit {
           this.creating = false;
           this.tab = 'manage';
           this.loadList();
-          this.selectQuiz(quiz.id, 'details');
+          this.selectQuiz(quiz.id, 'questions');
         },
         error: (err) => {
           this.creating = false;

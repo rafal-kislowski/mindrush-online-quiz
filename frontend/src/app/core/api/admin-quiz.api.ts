@@ -2,6 +2,9 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
+export type GameMode = 'CASUAL' | 'RANKED';
+export type QuizStatus = 'DRAFT' | 'ACTIVE' | 'TRASHED';
+
 export interface AdminQuizDto {
   id: number;
   title: string;
@@ -11,6 +14,11 @@ export interface AdminQuizDto {
   avatarBgStart: string | null;
   avatarBgEnd: string | null;
   avatarTextColor: string | null;
+  gameMode: GameMode;
+  includeInRanking: boolean;
+  xpEnabled: boolean;
+  questionTimeLimitSeconds: number | null;
+  status: QuizStatus;
 }
 
 export interface AdminQuizListItemDto {
@@ -22,6 +30,11 @@ export interface AdminQuizListItemDto {
   avatarBgStart: string | null;
   avatarBgEnd: string | null;
   avatarTextColor: string | null;
+  gameMode: GameMode;
+  includeInRanking: boolean;
+  xpEnabled: boolean;
+  questionTimeLimitSeconds: number | null;
+  status: QuizStatus;
   questionCount: number;
 }
 
@@ -57,6 +70,11 @@ export interface AdminQuizDetailDto {
   avatarBgStart: string | null;
   avatarBgEnd: string | null;
   avatarTextColor: string | null;
+  gameMode: GameMode;
+  includeInRanking: boolean;
+  xpEnabled: boolean;
+  questionTimeLimitSeconds: number | null;
+  status: QuizStatus;
   questions: AdminQuestionDto[];
 }
 
@@ -94,6 +112,10 @@ export class AdminQuizApi {
     avatarBgStart?: string | null;
     avatarBgEnd?: string | null;
     avatarTextColor?: string | null;
+    gameMode?: GameMode | null;
+    includeInRanking?: boolean | null;
+    xpEnabled?: boolean | null;
+    questionTimeLimitSeconds?: number | null;
   }): Observable<AdminQuizDto> {
     return this.http.post<AdminQuizDto>('/api/admin/quizzes', input, {
       withCredentials: true,
@@ -110,6 +132,10 @@ export class AdminQuizApi {
       avatarBgStart?: string | null;
       avatarBgEnd?: string | null;
       avatarTextColor?: string | null;
+      gameMode?: GameMode | null;
+      includeInRanking?: boolean | null;
+      xpEnabled?: boolean | null;
+      questionTimeLimitSeconds?: number | null;
     }
   ): Observable<AdminQuizDto> {
     return this.http.put<AdminQuizDto>(
@@ -160,6 +186,21 @@ export class AdminQuizApi {
   deleteQuiz(quizId: number): Observable<void> {
     return this.http.delete<void>(
       `/api/admin/quizzes/${encodeURIComponent(String(quizId))}`,
+      { withCredentials: true }
+    );
+  }
+
+  purgeQuiz(quizId: number): Observable<void> {
+    return this.http.delete<void>(
+      `/api/admin/quizzes/${encodeURIComponent(String(quizId))}/purge`,
+      { withCredentials: true }
+    );
+  }
+
+  setStatus(quizId: number, status: QuizStatus): Observable<AdminQuizDto> {
+    return this.http.put<AdminQuizDto>(
+      `/api/admin/quizzes/${encodeURIComponent(String(quizId))}/status`,
+      { status },
       { withCredentials: true }
     );
   }

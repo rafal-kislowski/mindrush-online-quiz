@@ -12,9 +12,28 @@
         </button>
       </div>
 
-      <div class="tabs" role="tablist" aria-label="Admin tabs" *ngIf="!selectedQuiz; else editorTabs">
-        <button class="tab" type="button" [class.active]="tab === 'manage'" (click)="setTab('manage')">Manage</button>
-        <button class="tab" type="button" [class.active]="tab === 'create'" (click)="setTab('create')">Create new quiz</button>
+      <div
+        class="tabs"
+        role="tablist"
+        aria-label="Admin tabs"
+        *ngIf="!selectedQuiz; else editorTabs"
+      >
+        <button
+          class="tab"
+          type="button"
+          [class.active]="tab === 'manage'"
+          (click)="setTab('manage')"
+        >
+          Manage
+        </button>
+        <button
+          class="tab"
+          type="button"
+          [class.active]="tab === 'create'"
+          (click)="setTab('create')"
+        >
+          Create new quiz
+        </button>
       </div>
 
       <ng-template #editorTabs>
@@ -44,14 +63,56 @@
     <!-- MANAGE -->
     <div class="panel panel--table" *ngIf="tab === 'manage' && !selectedQuiz">
       <div class="panel__left">
+        <div
+          class="tabs"
+          role="tablist"
+          aria-label="Quiz status"
+          style="margin: 6px 0 10px"
+        >
+          <button
+            class="tab tab--active"
+            type="button"
+            role="tab"
+            [class.active]="quizStatusTab.value === 'ACTIVE'"
+            (click)="setQuizStatusTab('ACTIVE', $event)"
+          >
+            Active
+          </button>
+          <button
+            class="tab tab--drafts"
+            type="button"
+            role="tab"
+            [class.active]="quizStatusTab.value === 'DRAFT'"
+            (click)="setQuizStatusTab('DRAFT', $event)"
+          >
+            Drafts
+          </button>
+          <button
+            class="tab tab--trash"
+            type="button"
+            role="tab"
+            [class.active]="quizStatusTab.value === 'TRASHED'"
+            (click)="setQuizStatusTab('TRASHED', $event)"
+          >
+            Trash
+          </button>
+        </div>
+
         <div class="toolbar" *ngIf="quizzes.length">
           <div class="search">
             <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-            <input [formControl]="quizSearch" (input)="resetQuizPage()" placeholder="Search quizzes..." />
+            <input
+              [formControl]="quizSearch"
+              (input)="resetQuizPage()"
+              placeholder="Search quizzes..."
+            />
           </div>
 
           <div class="toolbar__right">
-            <div class="mr-select-wrap" [class.menu-open]="openMenu === 'category'">
+            <div
+              class="mr-select-wrap"
+              [class.menu-open]="openMenu === 'category'"
+            >
               <button
                 class="mr-select"
                 type="button"
@@ -63,7 +124,12 @@
                 <span class="mr-select__label">{{ quizCategoryLabel }}</span>
                 <span class="mr-select__caret" aria-hidden="true"></span>
               </button>
-              <div class="mr-select__menu" role="listbox" *ngIf="openMenu === 'category'" (click)="$event.stopPropagation()">
+              <div
+                class="mr-select__menu"
+                role="listbox"
+                *ngIf="openMenu === 'category'"
+                (click)="$event.stopPropagation()"
+              >
                 <button
                   class="mr-select__item"
                   type="button"
@@ -98,7 +164,12 @@
                 <span class="mr-select__label">{{ quizSortLabel }}</span>
                 <span class="mr-select__caret" aria-hidden="true"></span>
               </button>
-              <div class="mr-select__menu" role="listbox" *ngIf="openMenu === 'sort'" (click)="$event.stopPropagation()">
+              <div
+                class="mr-select__menu"
+                role="listbox"
+                *ngIf="openMenu === 'sort'"
+                (click)="$event.stopPropagation()"
+              >
                 <button
                   class="mr-select__item"
                   type="button"
@@ -120,51 +191,181 @@
               <div class="qrow" role="row">
                 <div class="cell">Name</div>
                 <div class="cell category col-category">Category</div>
-                <div class="cell right col-questions">Questions</div>
                 <div class="cell right actions col-action">Action</div>
               </div>
             </div>
 
             <div class="qtable__body" role="rowgroup">
-              <div class="muted qtable__empty" *ngIf="!pagedQuizzes.length">No results.</div>
+              <div class="muted qtable__empty" *ngIf="!pagedQuizzes.length">
+                No results.
+              </div>
 
-              <div
-                class="qrow"
-                role="row"
-                *ngFor="let q of pagedQuizzes"
-              >
+              <div class="qrow" role="row" *ngFor="let q of pagedQuizzes">
                 <div class="cell title" role="cell">
-                  <span class="avatar" [ngStyle]="quizListAvatarStyle(q)" aria-hidden="true">
-                    <ng-container *ngIf="!q.avatarImageUrl">{{ titleInitial(q.title) }}</ng-container>
+                  <span
+                    class="avatar"
+                    [ngStyle]="quizListAvatarStyle(q)"
+                    aria-hidden="true"
+                  >
+                    <ng-container *ngIf="!q.avatarImageUrl">{{
+                      titleInitial(q.title)
+                    }}</ng-container>
                   </span>
                   <div class="title__text">
                     <div class="title__name">{{ q.title }}</div>
-                    <div class="muted title__meta">{{ q.questionCount }} questions</div>
+                    <div class="muted title__meta">
+                      <span class="mr-meta-row mr-meta-row--top"
+                        ><span
+                          class="mr-flag"
+                          [class.mr-flag--on]="q.xpEnabled"
+                          [class.mr-flag--off]="!q.xpEnabled"
+                        >
+                          XP {{ q.xpEnabled ? "On" : "Off" }}
+                        </span>
+                        <span
+                          class="mr-flag"
+                          [class.mr-flag--on]="q.includeInRanking"
+                          [class.mr-flag--off]="!q.includeInRanking"
+                        >
+                          RP {{ q.includeInRanking ? "On" : "Off" }}
+                        </span>
+                        <span class="mr-flag mr-flag--blue"
+                          >{{ q.questionTimeLimitSeconds ?? 15 }}s</span
+                        >
+                      </span>
+
+                      <span class="mr-meta-row mr-meta-row--bottom">
+                        <span class="mr-meta-sep" aria-hidden="true"
+                          >&middot;</span
+                        >
+                        <span class="mr-meta--mode">{{
+                          q.gameMode === "RANKED" ? "Ranked" : "Casual"
+                        }}</span>
+                        <span class="mr-meta-sep" aria-hidden="true"
+                          >&middot;</span
+                        >
+                        <span class="mr-meta--questions"
+                          >{{ q.questionCount }} questions</span
+                        >
+                      </span>
+                    </div>
                   </div>
                 </div>
 
                 <div class="cell category col-category" role="cell">
-                  <span class="cat-pill" *ngIf="q.categoryName; else noCat">{{ q.categoryName }}</span>
-                  <ng-template #noCat><span class="muted">&mdash;</span></ng-template>
-                </div>
-
-                <div class="cell right col-questions" role="cell">
-                  <span class="count">{{ q.questionCount }}</span>
+                  <span class="cat-pill" *ngIf="q.categoryName; else noCat">{{
+                    q.categoryName
+                  }}</span>
+                  <ng-template #noCat
+                    ><span class="muted">&mdash;</span></ng-template
+                  >
                 </div>
 
                 <div class="cell right actions col-action" role="cell">
-                  <button class="icon-btn" type="button" (click)="selectQuiz(q.id, 'details')" aria-label="Edit quiz">
-                    <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
-                  </button>
                   <button
-                    class="icon-btn danger"
+                    class="icon-btn"
                     type="button"
-                    (click)="deleteQuizFromList(q.id)"
-                    [disabled]="deletingQuiz"
-                    aria-label="Delete quiz"
+                    (click)="selectQuiz(q.id, 'details')"
+                    aria-label="Edit quiz"
                   >
-                    <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
+                    <i
+                      class="fa-regular fa-pen-to-square"
+                      aria-hidden="true"
+                    ></i>
                   </button>
+
+                  <div
+                    class="mr-select-wrap"
+                    style="width: 34px"
+                    [class.menu-open]="openQuizActionsId === q.id"
+                    (click)="$event.stopPropagation()"
+                  >
+                    <button
+                      class="icon-btn"
+                      type="button"
+                      (click)="toggleQuizActions(q.id, $event)"
+                      aria-label="Quiz actions"
+                    >
+                      <i
+                        class="fa-solid fa-ellipsis-vertical"
+                        aria-hidden="true"
+                      ></i>
+                    </button>
+
+                    <div
+                      class="mr-select__menu"
+                      role="menu"
+                      *ngIf="openQuizActionsId === q.id"
+                      [ngStyle]="quizActionsMenuStyle"
+                      (click)="$event.stopPropagation()"
+                    >
+                      <button
+                        class="mr-select__item"
+                        type="button"
+                        role="menuitem"
+                        (click)="
+                          selectQuiz(q.id, 'details'); closeQuizActions()
+                        "
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        class="mr-select__item"
+                        type="button"
+                        role="menuitem"
+                        *ngIf="q.status === 'DRAFT'"
+                        [disabled]="q.questionCount === 0"
+                        (click)="
+                          setQuizStatus(q.id, 'ACTIVE'); closeQuizActions()
+                        "
+                      >
+                        Publish
+                      </button>
+                      <button
+                        class="mr-select__item"
+                        type="button"
+                        role="menuitem"
+                        *ngIf="q.status === 'ACTIVE'"
+                        (click)="
+                          setQuizStatus(q.id, 'DRAFT'); closeQuizActions()
+                        "
+                      >
+                        Disable
+                      </button>
+                      <button
+                        class="mr-select__item"
+                        type="button"
+                        role="menuitem"
+                        *ngIf="q.status !== 'TRASHED'"
+                        (click)="
+                          setQuizStatus(q.id, 'TRASHED'); closeQuizActions()
+                        "
+                      >
+                        Move to trash
+                      </button>
+                      <button
+                        class="mr-select__item"
+                        type="button"
+                        role="menuitem"
+                        *ngIf="q.status === 'TRASHED'"
+                        (click)="
+                          setQuizStatus(q.id, 'DRAFT'); closeQuizActions()
+                        "
+                      >
+                        Restore
+                      </button>
+                      <button
+                        class="mr-select__item"
+                        type="button"
+                        role="menuitem"
+                        *ngIf="q.status === 'TRASHED'"
+                        (click)="purgeQuiz(q.id); closeQuizActions()"
+                      >
+                        Delete permanently
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -172,10 +373,18 @@
 
           <div class="table-footer" *ngIf="filteredQuizzes.length">
             <div class="pager">
-              <button class="icon-btn" type="button" (click)="prevQuizPage()" [disabled]="quizPageIndex === 0" aria-label="Previous page">
+              <button
+                class="icon-btn"
+                type="button"
+                (click)="prevQuizPage()"
+                [disabled]="quizPageIndex === 0"
+                aria-label="Previous page"
+              >
                 <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
               </button>
-              <div class="pager__text">Page {{ quizPageIndex + 1 }} / {{ quizTotalPages }}</div>
+              <div class="pager__text">
+                Page {{ quizPageIndex + 1 }} / {{ quizTotalPages }}
+              </div>
               <button
                 class="icon-btn"
                 type="button"
@@ -188,8 +397,14 @@
             </div>
 
             <div class="footer-right">
-              <div class="muted">Showing {{ quizPageFrom }} to {{ quizPageTo }} of {{ filteredQuizzes.length }} entries</div>
-              <div class="mr-select-wrap mr-select-wrap--sm mr-select-wrap--up" [class.menu-open]="openMenu === 'pageSize'">
+              <div class="muted">
+                Showing {{ quizPageFrom }} to {{ quizPageTo }} of
+                {{ filteredQuizzes.length }} entries
+              </div>
+              <div
+                class="mr-select-wrap mr-select-wrap--sm mr-select-wrap--up"
+                [class.menu-open]="openMenu === 'pageSize'"
+              >
                 <button
                   class="mr-select"
                   type="button"
@@ -201,17 +416,46 @@
                   <span class="mr-select__label">{{ pageSizeLabel }}</span>
                   <span class="mr-select__caret" aria-hidden="true"></span>
                 </button>
-                <div class="mr-select__menu" role="listbox" *ngIf="openMenu === 'pageSize'" (click)="$event.stopPropagation()">
-                  <button class="mr-select__item" type="button" role="option" [class.active]="pageSize.value === 8" (click)="setPageSize(8, $event)">
+                <div
+                  class="mr-select__menu"
+                  role="listbox"
+                  *ngIf="openMenu === 'pageSize'"
+                  (click)="$event.stopPropagation()"
+                >
+                  <button
+                    class="mr-select__item"
+                    type="button"
+                    role="option"
+                    [class.active]="pageSize.value === 8"
+                    (click)="setPageSize(8, $event)"
+                  >
                     Show 8
                   </button>
-                  <button class="mr-select__item" type="button" role="option" [class.active]="pageSize.value === 12" (click)="setPageSize(12, $event)">
+                  <button
+                    class="mr-select__item"
+                    type="button"
+                    role="option"
+                    [class.active]="pageSize.value === 12"
+                    (click)="setPageSize(12, $event)"
+                  >
                     Show 12
                   </button>
-                  <button class="mr-select__item" type="button" role="option" [class.active]="pageSize.value === 20" (click)="setPageSize(20, $event)">
+                  <button
+                    class="mr-select__item"
+                    type="button"
+                    role="option"
+                    [class.active]="pageSize.value === 20"
+                    (click)="setPageSize(20, $event)"
+                  >
                     Show 20
                   </button>
-                  <button class="mr-select__item" type="button" role="option" [class.active]="pageSize.value === 50" (click)="setPageSize(50, $event)">
+                  <button
+                    class="mr-select__item"
+                    type="button"
+                    role="option"
+                    [class.active]="pageSize.value === 50"
+                    (click)="setPageSize(50, $event)"
+                  >
                     Show 50
                   </button>
                 </div>
@@ -226,18 +470,86 @@
       </div>
     </div>
 
-    <div class="panel panel--editor" *ngIf="tab === 'manage' && selectedQuiz as quiz">
+    <div
+      class="panel panel--editor"
+      *ngIf="tab === 'manage' && selectedQuiz as quiz"
+    >
       <div class="editor-top">
-        <div class="editor-top__title">Editing: <span>{{ quiz.title }}</span></div>
+        <div class="editor-top__title">
+          Editing: <span>{{ quiz.title }}</span>
+          <span
+            class="mr-status-badge"
+            [class.mr-status-badge--active]="quiz.status === 'ACTIVE'"
+            [class.mr-status-badge--draft]="quiz.status === 'DRAFT'"
+            [class.mr-status-badge--trash]="quiz.status === 'TRASHED'"
+          >
+            {{ quiz.status === 'ACTIVE' ? 'Active' : quiz.status === 'DRAFT' ? 'Draft' : 'Trash' }}
+          </span>
+        </div>
       </div>
 
       <div class="editor-details" *ngIf="editorTab === 'details'">
         <div class="panel__title">
           <h2>Quiz details</h2>
-          <button class="btn danger" type="button" (click)="deleteSelectedQuiz()" [disabled]="deletingQuiz">Delete quiz</button>
+          <div class="panel__actions">
+            <button
+              class="btn success"
+              type="button"
+              *ngIf="quiz.status === 'DRAFT'"
+              [disabled]="deletingQuiz || quiz.questions.length === 0"
+              (click)="setQuizStatus(quiz.id, 'ACTIVE')"
+              title="Requires at least 1 question"
+            >
+              Publish
+            </button>
+            <button
+              class="btn"
+              type="button"
+              *ngIf="quiz.status === 'ACTIVE'"
+              [disabled]="deletingQuiz"
+              (click)="setQuizStatus(quiz.id, 'DRAFT')"
+            >
+              Disable
+            </button>
+            <button
+              class="btn success"
+              type="button"
+              *ngIf="quiz.status === 'TRASHED'"
+              [disabled]="deletingQuiz"
+              (click)="setQuizStatus(quiz.id, 'DRAFT')"
+            >
+              Restore
+            </button>
+
+            <button
+              class="btn danger btn--icon"
+              type="button"
+              *ngIf="quiz.status !== 'TRASHED'"
+              [disabled]="deletingQuiz"
+              (click)="setQuizStatus(quiz.id, 'TRASHED')"
+              title="Move to trash"
+              aria-label="Move to trash"
+            >
+              <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
+              <span class="sr-only">Move to trash</span>
+            </button>
+            <button
+              class="btn danger"
+              type="button"
+              *ngIf="quiz.status === 'TRASHED'"
+              [disabled]="deletingQuiz"
+              (click)="purgeQuiz(quiz.id)"
+            >
+              Delete permanently
+            </button>
+          </div>
         </div>
 
-        <form class="form form--quiz" [formGroup]="editQuizForm" (ngSubmit)="saveQuiz()">
+        <form
+          class="form form--quiz"
+          [formGroup]="editQuizForm"
+          (ngSubmit)="saveQuiz()"
+        >
           <div class="quiz-details__left">
             <label class="field">
               <span class="field__label">Title</span>
@@ -251,14 +563,113 @@
               <span class="field__label">Description</span>
               <input formControlName="description" />
             </label>
+
+            <div class="block block--sub">
+              <h2>Game rules</h2>
+
+              <div class="rules-stack">
+                <div class="field field--inline">
+                  <span class="field__label">Game mode</span>
+                  <div
+                    class="mr-select-wrap mr-select-wrap--full"
+                    [class.menu-open]="openMenu === 'gameModeEdit'"
+                  >
+                    <button
+                      class="mr-select"
+                      type="button"
+                      (click)="toggleMenu('gameModeEdit', $event)"
+                      [attr.aria-expanded]="openMenu === 'gameModeEdit'"
+                      aria-haspopup="listbox"
+                      aria-label="Game mode"
+                    >
+                      <span class="mr-select__label">{{
+                        editQuizForm.controls.gameMode.value === "RANKED"
+                          ? "Ranked"
+                          : "Casual"
+                      }}</span>
+                      <span class="mr-select__caret" aria-hidden="true"></span>
+                    </button>
+                    <div
+                      class="mr-select__menu"
+                      role="listbox"
+                      *ngIf="openMenu === 'gameModeEdit'"
+                      (click)="$event.stopPropagation()"
+                    >
+                      <button
+                        class="mr-select__item"
+                        type="button"
+                        role="option"
+                        [class.active]="
+                          editQuizForm.controls.gameMode.value === 'CASUAL'
+                        "
+                        (click)="setGameMode('edit', 'CASUAL', $event)"
+                      >
+                        Casual
+                      </button>
+                      <button
+                        class="mr-select__item"
+                        type="button"
+                        role="option"
+                        [class.active]="
+                          editQuizForm.controls.gameMode.value === 'RANKED'
+                        "
+                        (click)="setGameMode('edit', 'RANKED', $event)"
+                      >
+                        Ranked
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <label class="toggle" title="Include results in global ranking">
+                  <input type="checkbox" formControlName="includeInRanking" />
+                  <span>Include in ranking</span>
+                </label>
+
+                <div
+                  class="muted rules-hint"
+                  *ngIf="editQuizForm.controls.gameMode.value === 'RANKED'"
+                >
+                  Ranked quizzes always count toward ranking.
+                </div>
+
+                <label class="toggle" title="Award XP for playing this quiz">
+                  <input type="checkbox" formControlName="xpEnabled" />
+                  <span>Award XP</span>
+                </label>
+
+                <label class="field field--inline">
+                  <span class="field__label">Time limit per question (s)</span>
+                  <input
+                    type="number"
+                    min="5"
+                    max="600"
+                    step="1"
+                    inputmode="numeric"
+                    formControlName="questionTimeLimitSeconds"
+                    (blur)="onTimeLimitBlur('edit')"
+                  />
+                </label>
+
+                <div class="muted rules-hint">
+                  Allowed range: 5–600 seconds. Default: 15 seconds.
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="quiz-details__right">
             <div class="avatar-panel" aria-label="Quiz avatar settings">
               <div class="avatar-preview" aria-label="Avatar preview">
-                <div class="avatar-preview__circle" [ngStyle]="quizAvatarStyle('edit')">
-                  <span class="avatar-preview__initial" *ngIf="!editQuizForm.controls.avatarImageUrl.value">
-                    {{ titleInitial(editQuizForm.controls.title.value || 'M') }}
+                <div
+                  class="avatar-preview__circle"
+                  [ngStyle]="quizAvatarStyle('edit')"
+                >
+                  <span
+                    class="avatar-preview__initial"
+                    *ngIf="!editQuizForm.controls.avatarImageUrl.value"
+                  >
+                    {{ titleInitial(editQuizForm.controls.title.value || "M") }}
                   </span>
                 </div>
                 <div class="avatar-preview__actions">
@@ -269,7 +680,12 @@
                     hidden
                     (change)="uploadQuizAvatarImage('edit', $event)"
                   />
-                  <button class="icon-btn" type="button" (click)="editQuizAvatarInput.click()" [disabled]="uploadingQuizAvatar">
+                  <button
+                    class="icon-btn"
+                    type="button"
+                    (click)="editQuizAvatarInput.click()"
+                    [disabled]="uploadingQuizAvatar"
+                  >
                     <i class="fa-solid fa-upload" aria-hidden="true"></i>
                     <span class="sr-only">Upload quiz avatar image</span>
                   </button>
@@ -292,7 +708,9 @@
                     <input
                       type="checkbox"
                       [checked]="avatarGradientEnabled('edit')"
-                      (change)="setAvatarGradient('edit', $any($event.target).checked)"
+                      (change)="
+                        setAvatarGradient('edit', $any($event.target).checked)
+                      "
                     />
                     <span>Gradient</span>
                   </label>
@@ -317,13 +735,25 @@
                     <input
                       type="color"
                       formControlName="avatarBgStart"
-                      (input)="onAvatarColorPicker('edit', 'avatarBgStart', $any($event.target).value)"
+                      (input)="
+                        onAvatarColorPicker(
+                          'edit',
+                          'avatarBgStart',
+                          $any($event.target).value
+                        )
+                      "
                     />
                     <input
                       class="color-field__text"
                       type="text"
                       [value]="avatarColorText('edit', 'avatarBgStart')"
-                      (input)="onAvatarColorTextInput('edit', 'avatarBgStart', $any($event.target).value)"
+                      (input)="
+                        onAvatarColorTextInput(
+                          'edit',
+                          'avatarBgStart',
+                          $any($event.target).value
+                        )
+                      "
                       (blur)="onAvatarColorTextBlur('edit', 'avatarBgStart')"
                     />
                   </label>
@@ -334,14 +764,26 @@
                       type="color"
                       formControlName="avatarBgEnd"
                       [disabled]="!avatarGradientEnabled('edit')"
-                      (input)="onAvatarColorPicker('edit', 'avatarBgEnd', $any($event.target).value)"
+                      (input)="
+                        onAvatarColorPicker(
+                          'edit',
+                          'avatarBgEnd',
+                          $any($event.target).value
+                        )
+                      "
                     />
                     <input
                       class="color-field__text"
                       type="text"
                       [value]="avatarColorText('edit', 'avatarBgEnd')"
                       [disabled]="!avatarGradientEnabled('edit')"
-                      (input)="onAvatarColorTextInput('edit', 'avatarBgEnd', $any($event.target).value)"
+                      (input)="
+                        onAvatarColorTextInput(
+                          'edit',
+                          'avatarBgEnd',
+                          $any($event.target).value
+                        )
+                      "
                       (blur)="onAvatarColorTextBlur('edit', 'avatarBgEnd')"
                     />
                   </label>
@@ -351,24 +793,38 @@
                     <input
                       type="color"
                       formControlName="avatarTextColor"
-                      (input)="onAvatarColorPicker('edit', 'avatarTextColor', $any($event.target).value)"
+                      (input)="
+                        onAvatarColorPicker(
+                          'edit',
+                          'avatarTextColor',
+                          $any($event.target).value
+                        )
+                      "
                     />
                     <input
                       class="color-field__text"
                       type="text"
                       [value]="avatarColorText('edit', 'avatarTextColor')"
-                      (input)="onAvatarColorTextInput('edit', 'avatarTextColor', $any($event.target).value)"
+                      (input)="
+                        onAvatarColorTextInput(
+                          'edit',
+                          'avatarTextColor',
+                          $any($event.target).value
+                        )
+                      "
                       (blur)="onAvatarColorTextBlur('edit', 'avatarTextColor')"
                     />
                   </label>
                 </div>
-
-          
               </div>
             </div>
           </div>
 
-          <button class="btn primary quiz-details__save" type="submit" [disabled]="savingQuiz || editQuizForm.invalid">
+          <button
+            class="btn primary quiz-details__save"
+            type="submit"
+            [disabled]="savingQuiz || editQuizForm.invalid"
+          >
             Save quiz
           </button>
         </form>
@@ -384,7 +840,10 @@
           <div class="editor-pane__body">
             <label class="field field--inline">
               <span class="field__label">Search questions</span>
-              <input [formControl]="questionSearch" placeholder="Search by prompt..." />
+              <input
+                [formControl]="questionSearch"
+                placeholder="Search by prompt..."
+              />
             </label>
 
             <div class="question-list">
@@ -398,22 +857,41 @@
                 <div class="qitem__n">#{{ q.orderIndex + 1 }}</div>
                 <div class="qitem__txt">{{ q.prompt }}</div>
               </button>
-              <div class="muted question-list__empty" *ngIf="!filteredQuestions.length">No matching questions.</div>
+              <div
+                class="muted question-list__empty"
+                *ngIf="!filteredQuestions.length"
+              >
+                No matching questions.
+              </div>
             </div>
           </div>
         </div>
 
         <div class="editor-pane editor-pane--questionform">
           <div class="panel__title">
-            <h2>{{ questionPanelMode === 'create' ? 'Add question' : 'Edit question' }}</h2>
+            <h2>
+              {{
+                questionPanelMode === "create"
+                  ? "Add question"
+                  : "Edit question"
+              }}
+            </h2>
             <div class="panel__actions">
-              <button class="btn success" type="button" *ngIf="questionPanelMode !== 'create'" (click)="startAddQuestion()">
+              <button
+                class="btn success"
+                type="button"
+                *ngIf="questionPanelMode !== 'create'"
+                (click)="startAddQuestion()"
+              >
                 Add question
               </button>
               <button
                 class="btn"
                 type="button"
-                *ngIf="questionPanelMode === 'create' && lastEditingQuestionId != null"
+                *ngIf="
+                  questionPanelMode === 'create' &&
+                  lastEditingQuestionId != null
+                "
                 (click)="cancelAddQuestion()"
               >
                 Cancel
@@ -432,9 +910,16 @@
 
           <div class="editor-pane__body">
             <ng-container *ngIf="questionPanelMode !== 'create'">
-              <div class="muted" *ngIf="!selectedQuestionId">Pick a question to edit or click "Add question".</div>
+              <div class="muted" *ngIf="!selectedQuestionId">
+                Pick a question to edit or click "Add question".
+              </div>
 
-              <form class="form" *ngIf="selectedQuestionId" [formGroup]="editQuestionForm" (ngSubmit)="saveQuestion()">
+              <form
+                class="form"
+                *ngIf="selectedQuestionId"
+                [formGroup]="editQuestionForm"
+                (ngSubmit)="saveQuestion()"
+              >
                 <label class="field">
                   <span class="field__label">Prompt</span>
                   <input formControlName="prompt" />
@@ -451,7 +936,12 @@
                         hidden
                         (change)="uploadQuestionImage('edit', $event)"
                       />
-                      <button class="icon-btn" type="button" (click)="editQuestionImageInput.click()" [disabled]="uploadingImage">
+                      <button
+                        class="icon-btn"
+                        type="button"
+                        (click)="editQuestionImageInput.click()"
+                        [disabled]="uploadingImage"
+                      >
                         <i class="fa-solid fa-upload" aria-hidden="true"></i>
                         <span class="sr-only">Upload question image</span>
                       </button>
@@ -476,15 +966,29 @@
                 </div>
 
                 <div class="options">
-                  <div class="opt" *ngFor="let key of ['o1','o2','o3','o4']; let i = index">
+                  <div
+                    class="opt"
+                    *ngFor="let key of ['o1', 'o2', 'o3', 'o4']; let i = index"
+                  >
                     <label class="opt__radio">
-                      <input type="radio" [value]="i" formControlName="correctIndex" />
+                      <input
+                        type="radio"
+                        [value]="i"
+                        formControlName="correctIndex"
+                      />
                       <span>Correct</span>
                     </label>
 
                     <div class="opt__content">
                       <div class="opt__top">
-                        <input [formControlName]="key" [placeholder]="'Option ' + (i + 1) + ' (text optional if image set)'" />
+                        <input
+                          [formControlName]="key"
+                          [placeholder]="
+                            'Option ' +
+                            (i + 1) +
+                            ' (text optional if image set)'
+                          "
+                        />
 
                         <input
                           #editOptImageInput
@@ -493,7 +997,12 @@
                           hidden
                           (change)="uploadOptionImage('edit', i, $event)"
                         />
-                        <button class="icon-btn" type="button" (click)="editOptImageInput.click()" [disabled]="uploadingImage">
+                        <button
+                          class="icon-btn"
+                          type="button"
+                          (click)="editOptImageInput.click()"
+                          [disabled]="uploadingImage"
+                        >
                           <i class="fa-solid fa-image" aria-hidden="true"></i>
                           <span class="sr-only">Upload option image</span>
                         </button>
@@ -519,7 +1028,11 @@
                   </div>
                 </div>
 
-                <button class="btn accent" type="submit" [disabled]="savingQuestion || editQuestionForm.invalid">
+                <button
+                  class="btn accent"
+                  type="submit"
+                  [disabled]="savingQuestion || editQuestionForm.invalid"
+                >
                   Save question
                 </button>
               </form>
@@ -533,7 +1046,10 @@
             >
               <label class="field">
                 <span class="field__label">Prompt</span>
-                <input formControlName="prompt" placeholder="Question text..." />
+                <input
+                  formControlName="prompt"
+                  placeholder="Question text..."
+                />
               </label>
 
               <div class="media-block">
@@ -547,7 +1063,12 @@
                       hidden
                       (change)="uploadQuestionImage('create', $event)"
                     />
-                    <button class="icon-btn" type="button" (click)="createQuestionImageInput.click()" [disabled]="uploadingImage">
+                    <button
+                      class="icon-btn"
+                      type="button"
+                      (click)="createQuestionImageInput.click()"
+                      [disabled]="uploadingImage"
+                    >
                       <i class="fa-solid fa-upload" aria-hidden="true"></i>
                       <span class="sr-only">Upload question image</span>
                     </button>
@@ -572,15 +1093,27 @@
               </div>
 
               <div class="options">
-                <div class="opt" *ngFor="let key of ['o1','o2','o3','o4']; let i = index">
+                <div
+                  class="opt"
+                  *ngFor="let key of ['o1', 'o2', 'o3', 'o4']; let i = index"
+                >
                   <label class="opt__radio">
-                    <input type="radio" [value]="i" formControlName="correctIndex" />
+                    <input
+                      type="radio"
+                      [value]="i"
+                      formControlName="correctIndex"
+                    />
                     <span>Correct</span>
                   </label>
 
                   <div class="opt__content">
                     <div class="opt__top">
-                      <input [formControlName]="key" [placeholder]="'Option ' + (i + 1) + ' (text optional if image set)'" />
+                      <input
+                        [formControlName]="key"
+                        [placeholder]="
+                          'Option ' + (i + 1) + ' (text optional if image set)'
+                        "
+                      />
 
                       <input
                         #createOptImageInput
@@ -589,7 +1122,12 @@
                         hidden
                         (change)="uploadOptionImage('create', i, $event)"
                       />
-                      <button class="icon-btn" type="button" (click)="createOptImageInput.click()" [disabled]="uploadingImage">
+                      <button
+                        class="icon-btn"
+                        type="button"
+                        (click)="createOptImageInput.click()"
+                        [disabled]="uploadingImage"
+                      >
                         <i class="fa-solid fa-image" aria-hidden="true"></i>
                         <span class="sr-only">Upload option image</span>
                       </button>
@@ -615,7 +1153,13 @@
                 </div>
               </div>
 
-              <button class="btn accent" type="submit" [disabled]="addingExistingQuestion || addExistingQuestionForm.invalid">
+              <button
+                class="btn accent"
+                type="submit"
+                [disabled]="
+                  addingExistingQuestion || addExistingQuestionForm.invalid
+                "
+              >
                 Add question
               </button>
             </form>
@@ -627,7 +1171,11 @@
     <!-- CREATE -->
     <div class="block" *ngIf="tab === 'create'">
       <h2>Create quiz</h2>
-      <form class="form form--quiz" [formGroup]="quizForm" (ngSubmit)="createQuiz()">
+      <form
+        class="form form--quiz"
+        [formGroup]="quizForm"
+        (ngSubmit)="createQuiz()"
+      >
         <div class="quiz-details__left">
           <label class="field">
             <span class="field__label">Title</span>
@@ -636,21 +1184,123 @@
 
           <label class="field">
             <span class="field__label">Category</span>
-            <input formControlName="categoryName" placeholder="Optional (e.g. Programming)" />
+            <input
+              formControlName="categoryName"
+              placeholder="Optional (e.g. Programming)"
+            />
           </label>
 
           <label class="field">
             <span class="field__label">Description</span>
             <input formControlName="description" placeholder="Optional" />
           </label>
+
+          <div class="block block--sub">
+            <h2>Game rules</h2>
+
+            <div class="rules-stack">
+              <div class="field field--inline">
+                <span class="field__label">Game mode</span>
+                <div
+                  class="mr-select-wrap mr-select-wrap--full"
+                  [class.menu-open]="openMenu === 'gameModeCreate'"
+                >
+                  <button
+                    class="mr-select"
+                    type="button"
+                    (click)="toggleMenu('gameModeCreate', $event)"
+                    [attr.aria-expanded]="openMenu === 'gameModeCreate'"
+                    aria-haspopup="listbox"
+                    aria-label="Game mode"
+                  >
+                    <span class="mr-select__label">{{
+                      quizForm.controls.gameMode.value === "RANKED"
+                        ? "Ranked"
+                        : "Casual"
+                    }}</span>
+                    <span class="mr-select__caret" aria-hidden="true"></span>
+                  </button>
+                  <div
+                    class="mr-select__menu"
+                    role="listbox"
+                    *ngIf="openMenu === 'gameModeCreate'"
+                    (click)="$event.stopPropagation()"
+                  >
+                    <button
+                      class="mr-select__item"
+                      type="button"
+                      role="option"
+                      [class.active]="
+                        quizForm.controls.gameMode.value === 'CASUAL'
+                      "
+                      (click)="setGameMode('create', 'CASUAL', $event)"
+                    >
+                      Casual
+                    </button>
+                    <button
+                      class="mr-select__item"
+                      type="button"
+                      role="option"
+                      [class.active]="
+                        quizForm.controls.gameMode.value === 'RANKED'
+                      "
+                      (click)="setGameMode('create', 'RANKED', $event)"
+                    >
+                      Ranked
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <label class="toggle" title="Include results in global ranking">
+                <input type="checkbox" formControlName="includeInRanking" />
+                <span>Include in ranking</span>
+              </label>
+
+              <div
+                class="muted rules-hint"
+                *ngIf="quizForm.controls.gameMode.value === 'RANKED'"
+              >
+                Ranked quizzes always count toward ranking.
+              </div>
+
+              <label class="toggle" title="Award XP for playing this quiz">
+                <input type="checkbox" formControlName="xpEnabled" />
+                <span>Award XP</span>
+              </label>
+
+              <label class="field field--inline">
+                <span class="field__label">Time limit per question (s)</span>
+                <input
+                  type="number"
+                  min="5"
+                  max="600"
+                  step="1"
+                  inputmode="numeric"
+                  formControlName="questionTimeLimitSeconds"
+                  (blur)="onTimeLimitBlur('create')"
+                />
+              </label>
+
+              <div class="muted rules-hint">
+                Allowed range: 5–600 seconds. Default: 15 seconds.
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="quiz-details__right">
           <div class="avatar-panel" aria-label="Quiz avatar settings">
             <div class="avatar-preview" aria-label="Avatar preview">
-              <div class="avatar-preview__circle" [ngStyle]="quizAvatarStyle('create')">
-                <span class="avatar-preview__initial" *ngIf="!quizForm.controls.avatarImageUrl.value">
-                  {{ titleInitial(quizForm.controls.title.value || 'M') }}
+              <div
+                class="avatar-preview__circle"
+                [ngStyle]="quizAvatarStyle('create')"
+              >
+                <span
+                  class="avatar-preview__initial"
+                  *ngIf="!quizForm.controls.avatarImageUrl.value"
+                >
+                  {{ titleInitial(quizForm.controls.title.value || "M") }}
                 </span>
               </div>
               <div class="avatar-preview__actions">
@@ -661,7 +1311,12 @@
                   hidden
                   (change)="uploadQuizAvatarImage('create', $event)"
                 />
-                <button class="icon-btn" type="button" (click)="createQuizAvatarInput.click()" [disabled]="uploadingQuizAvatar">
+                <button
+                  class="icon-btn"
+                  type="button"
+                  (click)="createQuizAvatarInput.click()"
+                  [disabled]="uploadingQuizAvatar"
+                >
                   <i class="fa-solid fa-upload" aria-hidden="true"></i>
                   <span class="sr-only">Upload quiz avatar image</span>
                 </button>
@@ -684,7 +1339,9 @@
                   <input
                     type="checkbox"
                     [checked]="avatarGradientEnabled('create')"
-                    (change)="setAvatarGradient('create', $any($event.target).checked)"
+                    (change)="
+                      setAvatarGradient('create', $any($event.target).checked)
+                    "
                   />
                   <span>Gradient</span>
                 </label>
@@ -709,13 +1366,25 @@
                   <input
                     type="color"
                     formControlName="avatarBgStart"
-                    (input)="onAvatarColorPicker('create', 'avatarBgStart', $any($event.target).value)"
+                    (input)="
+                      onAvatarColorPicker(
+                        'create',
+                        'avatarBgStart',
+                        $any($event.target).value
+                      )
+                    "
                   />
                   <input
                     class="color-field__text"
                     type="text"
                     [value]="avatarColorText('create', 'avatarBgStart')"
-                    (input)="onAvatarColorTextInput('create', 'avatarBgStart', $any($event.target).value)"
+                    (input)="
+                      onAvatarColorTextInput(
+                        'create',
+                        'avatarBgStart',
+                        $any($event.target).value
+                      )
+                    "
                     (blur)="onAvatarColorTextBlur('create', 'avatarBgStart')"
                   />
                 </label>
@@ -726,14 +1395,26 @@
                     type="color"
                     formControlName="avatarBgEnd"
                     [disabled]="!avatarGradientEnabled('create')"
-                    (input)="onAvatarColorPicker('create', 'avatarBgEnd', $any($event.target).value)"
+                    (input)="
+                      onAvatarColorPicker(
+                        'create',
+                        'avatarBgEnd',
+                        $any($event.target).value
+                      )
+                    "
                   />
                   <input
                     class="color-field__text"
                     type="text"
                     [value]="avatarColorText('create', 'avatarBgEnd')"
                     [disabled]="!avatarGradientEnabled('create')"
-                    (input)="onAvatarColorTextInput('create', 'avatarBgEnd', $any($event.target).value)"
+                    (input)="
+                      onAvatarColorTextInput(
+                        'create',
+                        'avatarBgEnd',
+                        $any($event.target).value
+                      )
+                    "
                     (blur)="onAvatarColorTextBlur('create', 'avatarBgEnd')"
                   />
                 </label>
@@ -743,27 +1424,41 @@
                   <input
                     type="color"
                     formControlName="avatarTextColor"
-                    (input)="onAvatarColorPicker('create', 'avatarTextColor', $any($event.target).value)"
+                    (input)="
+                      onAvatarColorPicker(
+                        'create',
+                        'avatarTextColor',
+                        $any($event.target).value
+                      )
+                    "
                   />
                   <input
                     class="color-field__text"
                     type="text"
                     [value]="avatarColorText('create', 'avatarTextColor')"
-                    (input)="onAvatarColorTextInput('create', 'avatarTextColor', $any($event.target).value)"
+                    (input)="
+                      onAvatarColorTextInput(
+                        'create',
+                        'avatarTextColor',
+                        $any($event.target).value
+                      )
+                    "
                     (blur)="onAvatarColorTextBlur('create', 'avatarTextColor')"
                   />
                 </label>
               </div>
-
             </div>
           </div>
         </div>
 
-        <button class="btn primary quiz-details__save" type="submit" [disabled]="creating || quizForm.invalid">
+        <button
+          class="btn primary quiz-details__save"
+          type="submit"
+          [disabled]="creating || quizForm.invalid"
+        >
           Create
         </button>
       </form>
-
     </div>
   </div>
 </section>

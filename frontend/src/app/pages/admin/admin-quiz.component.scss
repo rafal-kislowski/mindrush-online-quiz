@@ -93,6 +93,10 @@
   width: 220px;
 }
 
+.mr-select-wrap--full {
+  width: 100%;
+}
+
 .mr-select-wrap--sm {
   width: 120px;
 }
@@ -941,7 +945,7 @@ h2 {
   width: 100%;
   text-align: left;
   display: grid;
-  grid-template-columns: 1.4fr 1fr 90px 92px;
+  grid-template-columns: 1.6fr 1fr 92px;
   gap: 10px;
   padding: 10px 12px;
   border: 0;
@@ -954,8 +958,8 @@ h2 {
 }
 
 .qrow:hover {
-  filter: brightness(1.06);
-  background: rgba(255, 255, 255, 0.03);
+  /* Avoid `filter` here: it creates a containing block and breaks fixed-position dropdowns. */
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .qrow.active {
@@ -1008,8 +1012,9 @@ h2 {
 }
 
 .title__meta {
-  font-size: 12px;
-  margin-top: 2px;
+  font-size: 11px;
+  margin-top: 5px;
+  line-height: 1.25;
 }
 
 .qtable .right {
@@ -1222,13 +1227,11 @@ h2 {
 
 /* Manage table: on small screens show only "Name" column. */
 @media (max-width: 620px) {
-  .qtable .col-category,
-  .qtable .col-questions,
-  .qtable .col-action {
+  .qtable .col-category {
     display: none !important;
   }
 
   .qrow {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: 1fr 92px !important;
   }
 }
