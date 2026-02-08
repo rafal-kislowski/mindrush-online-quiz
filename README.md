@@ -159,19 +159,25 @@ Public, read-only quiz endpoints (no auth required):
 - `GET /api/quizzes/{id}` -> quiz details
 - `GET /api/quizzes/{id}/questions` -> quiz questions + answer options (does not expose correct answers)
 
+Notes:
+- Only quizzes with status `ACTIVE` are exposed publicly. Non-active quizzes return `404`.
+
 ## Admin (quiz management)
 Admin-only quiz endpoints (requires `ADMIN` role):
 - `GET /api/admin/quizzes` -> list quizzes
 - `GET /api/admin/quizzes/{id}` -> quiz detail including questions and correct answers
 - `POST /api/admin/quizzes` -> create quiz
-- `PUT /api/admin/quizzes/{id}` -> update quiz (title/description/category)
-- `DELETE /api/admin/quizzes/{id}` -> delete quiz (and all its questions)
+- `PUT /api/admin/quizzes/{id}` -> update quiz (title/description/category/avatar/game rules)
+- `PUT /api/admin/quizzes/{id}/status` -> set quiz status (`DRAFT`, `ACTIVE`, `TRASHED`)
+- `DELETE /api/admin/quizzes/{id}` -> move quiz to trash (`TRASHED`)
+- `DELETE /api/admin/quizzes/{id}/purge` -> permanently delete quiz (questions/options + stored media)
 - `POST /api/admin/quizzes/{id}/questions` -> add a question (4 options, exactly 1 correct)
 - `PUT /api/admin/quizzes/{id}/questions/{questionId}` -> update question + options (requires option ids, exactly 1 correct)
 - `DELETE /api/admin/quizzes/{id}/questions/{questionId}` -> delete question
 
 Optional dev seed data:
-- set `app.seed.enabled=true` (e.g. in `application-local.properties`)
+- Seed is enabled by default for local development (`app.seed.enabled=true`) and runs only when there are no quizzes in DB.
+- To disable: set `app.seed.enabled=false`.
 
 ## Game (lobby)
 Minimal game flow on top of lobbies (intended to be used with real-time updates later; for now you can poll `/state`).
@@ -186,7 +192,11 @@ Notes:
 - Both players get the same question; answer options are shuffled per player.
 - The response includes per-player correctness only in `REVEAL` stage (after everyone answers).
 - Scoring uses a base score + a speed bonus for correct answers (faster answers give more points). Ties are broken by total points, then correct answers, then total correct answer time.
-- Guest games are time-boxed: `QUESTION` defaults to 10s and `REVEAL` to 3s (configurable via `game.guest.question-duration` / `game.guest.reveal-duration`). The response exposes `stageEndsAt` for countdowns.
+- Games are time-boxed:
+  - `QUESTION` duration is taken from the quiz settings (`questionTimeLimitSeconds`), default `15s`.
+  - `REVEAL` defaults to `3s` (configurable via `game.guest.reveal-duration`).
+  - The response exposes `stageEndsAt` and `stageTotalMs` for countdowns.
+- Starting a game is blocked if the quiz is not `ACTIVE`.
 - If a player doesn't answer before `stageEndsAt`, the server records it as a wrong answer and the game continues normally.
 - Auto-advance can be driven by polling `GET /state`, or by the built-in scheduler (`game.scheduler.enabled=true`).
 - Lobby status becomes `IN_GAME` while a game is active, then returns to `OPEN` after the game ends.
