@@ -33,7 +33,7 @@ public class QuizService {
     }
 
     public List<QuizListItemDto> listQuizzes() {
-        return quizRepository.findAllWithCategory().stream()
+        return quizRepository.findAllWithCategoryByStatus(QuizStatus.ACTIVE).stream()
                 .map(q -> new QuizListItemDto(
                         q.getId(),
                         q.getTitle(),
@@ -47,6 +47,10 @@ public class QuizService {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
 
+        if (quiz.getStatus() != QuizStatus.ACTIVE) {
+            throw new ResponseStatusException(NOT_FOUND, "Quiz not found");
+        }
+
         return new QuizDetailDto(
                 quiz.getId(),
                 quiz.getTitle(),
@@ -57,7 +61,9 @@ public class QuizService {
     }
 
     public List<QuizQuestionDto> getQuizQuestions(Long quizId) {
-        if (!quizRepository.existsById(quizId)) {
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
+        if (quiz.getStatus() != QuizStatus.ACTIVE) {
             throw new ResponseStatusException(NOT_FOUND, "Quiz not found");
         }
 

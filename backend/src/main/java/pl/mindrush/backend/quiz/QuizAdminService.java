@@ -3,6 +3,7 @@ package pl.mindrush.backend.quiz;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import pl.mindrush.backend.media.MediaStorageService;
 
 import java.util.HashMap;
 import java.util.List;
@@ -21,20 +22,27 @@ public class QuizAdminService {
     private final QuizCategoryRepository categoryRepository;
     private final QuizQuestionRepository questionRepository;
     private final QuizAnswerOptionRepository optionRepository;
+    private final MediaStorageService mediaStorageService;
 
     private static final java.util.regex.Pattern HEX_COLOR =
             java.util.regex.Pattern.compile("^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$");
+
+    private static final int MIN_QUESTION_TIME_LIMIT_SECONDS = 5;
+    private static final int MAX_QUESTION_TIME_LIMIT_SECONDS = 600;
+    private static final int DEFAULT_QUESTION_TIME_LIMIT_SECONDS = Quiz.DEFAULT_QUESTION_TIME_LIMIT_SECONDS;
 
     public QuizAdminService(
             QuizRepository quizRepository,
             QuizCategoryRepository categoryRepository,
             QuizQuestionRepository questionRepository,
-            QuizAnswerOptionRepository optionRepository
+            QuizAnswerOptionRepository optionRepository,
+            MediaStorageService mediaStorageService
     ) {
         this.quizRepository = quizRepository;
         this.categoryRepository = categoryRepository;
         this.questionRepository = questionRepository;
         this.optionRepository = optionRepository;
+        this.mediaStorageService = mediaStorageService;
     }
 
     public Quiz createQuiz(
@@ -44,7 +52,11 @@ public class QuizAdminService {
             String avatarImageUrl,
             String avatarBgStart,
             String avatarBgEnd,
-            String avatarTextColor
+            String avatarTextColor,
+            GameMode gameMode,
+            Boolean includeInRanking,
+            Boolean xpEnabled,
+            Integer questionTimeLimitSeconds
     ) {
         String t = title == null ? "" : title.trim();
         if (t.isBlank()) throw new ResponseStatusException(BAD_REQUEST, "Title is required");
@@ -57,6 +69,7 @@ public class QuizAdminService {
 
         Quiz quiz = new Quiz(t, description == null ? null : description.trim(), category);
         applyAvatar(quiz, avatarImageUrl, avatarBgStart, avatarBgEnd, avatarTextColor);
+        applyGameRules(quiz, gameMode, includeInRanking, xpEnabled, questionTimeLimitSeconds);
         return quizRepository.save(quiz);
     }
 
@@ -72,6 +85,11 @@ public class QuizAdminService {
                         q.getAvatarBgStart(),
                         q.getAvatarBgEnd(),
                         q.getAvatarTextColor(),
+                        q.getGameMode(),
+                        q.isIncludeInRanking(),
+                        q.isXpEnabled(),
+                        q.getQuestionTimeLimitSeconds(),
+                        q.getStatus(),
                         questionRepository.countByQuizId(q.getId())
                 ))
                 .toList();
@@ -112,6 +130,11 @@ public class QuizAdminService {
                 quiz.getAvatarBgStart(),
                 quiz.getAvatarBgEnd(),
                 quiz.getAvatarTextColor(),
+                quiz.getGameMode(),
+                quiz.isIncludeInRanking(),
+                quiz.isXpEnabled(),
+                quiz.getQuestionTimeLimitSeconds(),
+                quiz.getStatus(),
                 qDtos
         );
     }
@@ -124,7 +147,11 @@ public class QuizAdminService {
             String avatarImageUrl,
             String avatarBgStart,
             String avatarBgEnd,
-            String avatarTextColor
+            String avatarTextColor,
+            GameMode gameMode,
+            Boolean includeInRanking,
+            Boolean xpEnabled,
+            Integer questionTimeLimitSeconds
     ) {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
@@ -142,6 +169,7 @@ public class QuizAdminService {
         quiz.setDescription(description == null ? null : description.trim());
         quiz.setCategory(category);
         applyAvatar(quiz, avatarImageUrl, avatarBgStart, avatarBgEnd, avatarTextColor);
+        applyGameRules(quiz, gameMode, includeInRanking, xpEnabled, questionTimeLimitSeconds);
         return quizRepository.save(quiz);
     }
 
@@ -246,11 +274,55 @@ public class QuizAdminService {
     public void deleteQuiz(Long quizId) {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
+        quiz.setStatus(QuizStatus.TRASHED);
+        quizRepository.save(quiz);
+    }
+
+    public Quiz setStatus(Long quizId, QuizStatus status) {
+        if (status == null) throw new ResponseStatusException(BAD_REQUEST, "Status is required");
+
+        Quiz quiz = quizRepository.findByIdWithCategory(quizId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
+
+        if (status == QuizStatus.ACTIVE) {
+            long questionCount = questionRepository.countByQuizId(quizId);
+            if (questionCount <= 0) {
+                throw new ResponseStatusException(BAD_REQUEST, "Quiz must have at least 1 question to publish");
+            }
+        }
+
+        quiz.setStatus(status);
+        return quizRepository.save(quiz);
+    }
+
+    public void purgeQuiz(Long quizId) {
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
+
         List<QuizQuestion> questions = questionRepository.findAllByQuizIdOrderByOrderIndexAsc(quizId);
         List<Long> qIds = questions.stream().map(QuizQuestion::getId).toList();
+
+        Set<String> mediaUrls = new java.util.HashSet<>();
+        if (quiz.getAvatarImageUrl() != null) mediaUrls.add(quiz.getAvatarImageUrl());
+        for (QuizQuestion q : questions) {
+            if (q.getImageUrl() != null) mediaUrls.add(q.getImageUrl());
+        }
+        if (!qIds.isEmpty()) {
+            optionRepository.findAllByQuestionIdInOrderByQuestionIdAscOrderIndexAsc(qIds).forEach(o -> {
+                if (o.getImageUrl() != null) mediaUrls.add(o.getImageUrl());
+            });
+        }
+
         if (!qIds.isEmpty()) optionRepository.deleteAllByQuestionIdIn(qIds);
         questionRepository.deleteAll(questions);
         quizRepository.delete(quiz);
+
+        for (String url : mediaUrls) {
+            try {
+                mediaStorageService.deleteIfStoredUrl(url);
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     public record AnswerOptionInput(String text, String imageUrl, boolean correct) {}
@@ -266,6 +338,11 @@ public class QuizAdminService {
             String avatarBgStart,
             String avatarBgEnd,
             String avatarTextColor,
+            GameMode gameMode,
+            boolean includeInRanking,
+            boolean xpEnabled,
+            Integer questionTimeLimitSeconds,
+            QuizStatus status,
             long questionCount
     ) {}
 
@@ -278,6 +355,11 @@ public class QuizAdminService {
             String avatarBgStart,
             String avatarBgEnd,
             String avatarTextColor,
+            GameMode gameMode,
+            boolean includeInRanking,
+            boolean xpEnabled,
+            Integer questionTimeLimitSeconds,
+            QuizStatus status,
             List<AdminQuestion> questions
     ) {}
 
@@ -323,5 +405,38 @@ public class QuizAdminService {
         quiz.setAvatarBgStart(trimToNullColor(avatarBgStart));
         quiz.setAvatarBgEnd(trimToNullColor(avatarBgEnd));
         quiz.setAvatarTextColor(trimToNullColor(avatarTextColor));
+    }
+
+    private static void applyGameRules(
+            Quiz quiz,
+            GameMode gameMode,
+            Boolean includeInRanking,
+            Boolean xpEnabled,
+            Integer questionTimeLimitSeconds
+    ) {
+        GameMode mode = gameMode == null ? GameMode.CASUAL : gameMode;
+        boolean ranking = Boolean.TRUE.equals(includeInRanking);
+        if (mode == GameMode.RANKED) ranking = true;
+
+        boolean xp = xpEnabled == null || xpEnabled;
+
+        int normalizedLimit = questionTimeLimitSeconds == null || questionTimeLimitSeconds <= 0
+                ? DEFAULT_QUESTION_TIME_LIMIT_SECONDS
+                : questionTimeLimitSeconds;
+        if (normalizedLimit < MIN_QUESTION_TIME_LIMIT_SECONDS || normalizedLimit > MAX_QUESTION_TIME_LIMIT_SECONDS) {
+            throw new ResponseStatusException(
+                    BAD_REQUEST,
+                    "Question time limit must be between "
+                            + MIN_QUESTION_TIME_LIMIT_SECONDS
+                            + " and "
+                            + MAX_QUESTION_TIME_LIMIT_SECONDS
+                            + " seconds"
+            );
+        }
+
+        quiz.setGameMode(mode);
+        quiz.setIncludeInRanking(ranking);
+        quiz.setXpEnabled(xp);
+        quiz.setQuestionTimeLimitSeconds(normalizedLimit);
     }
 }

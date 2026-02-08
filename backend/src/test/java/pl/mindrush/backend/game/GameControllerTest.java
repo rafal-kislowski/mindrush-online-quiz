@@ -227,7 +227,7 @@ class GameControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.stage").value("QUESTION"));
 
-        clock.advance(Duration.ofSeconds(11));
+        clock.advance(Duration.ofSeconds(16));
 
         mockMvc.perform(get("/api/lobbies/" + lobbyCode + "/game/state")
                         .cookie(new Cookie("guestSessionId", ownerSessionId)))

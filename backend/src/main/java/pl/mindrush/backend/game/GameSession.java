@@ -36,6 +36,9 @@ public class GameSession {
     @Column(name = "stage_ends_at", nullable = false)
     private Instant stageEndsAt;
 
+    @Column(name = "question_duration_ms")
+    private Integer questionDurationMs;
+
     @Column(name = "current_question_index", nullable = false)
     private int currentQuestionIndex;
 
@@ -57,7 +60,13 @@ public class GameSession {
     protected GameSession() {
     }
 
-    public static GameSession startNew(String lobbyId, Long quizId, Instant now, Duration preCountdownDuration) {
+    public static GameSession startNew(
+            String lobbyId,
+            Long quizId,
+            Instant now,
+            Duration preCountdownDuration,
+            Integer questionDurationMs
+    ) {
         GameSession session = new GameSession();
         session.id = UUID.randomUUID().toString();
         session.lobbyId = lobbyId;
@@ -65,6 +74,7 @@ public class GameSession {
         session.status = GameStatus.IN_PROGRESS;
         session.stage = GameStage.PRE_COUNTDOWN;
         session.stageEndsAt = now.plus(preCountdownDuration);
+        session.questionDurationMs = questionDurationMs;
         session.currentQuestionIndex = 0;
         session.createdAt = now;
         session.startedAt = now;
@@ -108,6 +118,14 @@ public class GameSession {
 
     public void setStageEndsAt(Instant stageEndsAt) {
         this.stageEndsAt = stageEndsAt;
+    }
+
+    public Integer getQuestionDurationMs() {
+        return questionDurationMs;
+    }
+
+    public void setQuestionDurationMs(Integer questionDurationMs) {
+        this.questionDurationMs = questionDurationMs;
     }
 
     public int getCurrentQuestionIndex() {

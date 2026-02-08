@@ -10,6 +10,7 @@ public record GameStateDto(
         int totalQuestions,
         String stage,
         String stageEndsAt,
+        Long stageTotalMs,
         GameQuestionDto question,
         List<GamePlayerDto> players,
         String gameSessionId,

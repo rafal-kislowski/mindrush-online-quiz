@@ -8,6 +8,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -85,5 +86,33 @@ public class MediaStorageService {
     }
 
     public record StoredMedia(String url, String contentType, String originalName) {}
-}
 
+    public boolean deleteIfStoredUrl(String url) {
+        if (url == null) return false;
+        String raw = url.trim();
+        if (raw.isBlank()) return false;
+
+        String path = raw;
+        try {
+            if (raw.startsWith("http://") || raw.startsWith("https://")) {
+                path = URI.create(raw).getPath();
+            }
+        } catch (Exception ignored) {
+            path = raw;
+        }
+
+        if (path == null) return false;
+        if (!path.startsWith("/media/")) return false;
+
+        String name = path.substring("/media/".length());
+        if (name.isBlank() || name.contains("/") || name.contains("\\") || name.contains("..")) return false;
+
+        try {
+            Path target = rootDir.resolve(name).normalize();
+            if (!target.startsWith(rootDir)) return false;
+            return Files.deleteIfExists(target);
+        } catch (IOException ignored) {
+            return false;
+        }
+    }
+}

@@ -40,6 +40,11 @@ public class AdminQuizController {
                                 q.avatarBgStart(),
                                 q.avatarBgEnd(),
                                 q.avatarTextColor(),
+                                q.gameMode(),
+                                q.includeInRanking(),
+                                q.xpEnabled(),
+                                q.questionTimeLimitSeconds(),
+                                q.status(),
                                 q.questionCount()
                         ))
                         .toList()
@@ -61,7 +66,11 @@ public class AdminQuizController {
                 req.avatarImageUrl(),
                 req.avatarBgStart(),
                 req.avatarBgEnd(),
-                req.avatarTextColor()
+                req.avatarTextColor(),
+                req.gameMode(),
+                req.includeInRanking(),
+                req.xpEnabled(),
+                req.questionTimeLimitSeconds()
         );
         return ResponseEntity.status(CREATED).body(new QuizAdminDto(
                 quiz.getId(),
@@ -71,7 +80,12 @@ public class AdminQuizController {
                 quiz.getAvatarImageUrl(),
                 quiz.getAvatarBgStart(),
                 quiz.getAvatarBgEnd(),
-                quiz.getAvatarTextColor()
+                quiz.getAvatarTextColor(),
+                quiz.getGameMode(),
+                quiz.isIncludeInRanking(),
+                quiz.isXpEnabled(),
+                quiz.getQuestionTimeLimitSeconds(),
+                quiz.getStatus()
         ));
     }
 
@@ -85,7 +99,11 @@ public class AdminQuizController {
                 req.avatarImageUrl(),
                 req.avatarBgStart(),
                 req.avatarBgEnd(),
-                req.avatarTextColor()
+                req.avatarTextColor(),
+                req.gameMode(),
+                req.includeInRanking(),
+                req.xpEnabled(),
+                req.questionTimeLimitSeconds()
         );
         return ResponseEntity.ok(new QuizAdminDto(
                 quiz.getId(),
@@ -95,7 +113,32 @@ public class AdminQuizController {
                 quiz.getAvatarImageUrl(),
                 quiz.getAvatarBgStart(),
                 quiz.getAvatarBgEnd(),
-                quiz.getAvatarTextColor()
+                quiz.getAvatarTextColor(),
+                quiz.getGameMode(),
+                quiz.isIncludeInRanking(),
+                quiz.isXpEnabled(),
+                quiz.getQuestionTimeLimitSeconds(),
+                quiz.getStatus()
+        ));
+    }
+
+    @PutMapping("/{id}/status")
+    public ResponseEntity<QuizAdminDto> setStatus(@PathVariable("id") Long quizId, @RequestBody StatusRequest req) {
+        Quiz quiz = adminService.setStatus(quizId, req == null ? null : req.status());
+        return ResponseEntity.ok(new QuizAdminDto(
+                quiz.getId(),
+                quiz.getTitle(),
+                quiz.getDescription(),
+                quiz.getCategory() == null ? null : quiz.getCategory().getName(),
+                quiz.getAvatarImageUrl(),
+                quiz.getAvatarBgStart(),
+                quiz.getAvatarBgEnd(),
+                quiz.getAvatarTextColor(),
+                quiz.getGameMode(),
+                quiz.isIncludeInRanking(),
+                quiz.isXpEnabled(),
+                quiz.getQuestionTimeLimitSeconds(),
+                quiz.getStatus()
         ));
     }
 
@@ -143,6 +186,12 @@ public class AdminQuizController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/{id}/purge")
+    public ResponseEntity<Void> purgeQuiz(@PathVariable("id") Long quizId) {
+        adminService.purgeQuiz(quizId);
+        return ResponseEntity.noContent().build();
+    }
+
     public record CreateQuizRequest(
             @NotBlank @Size(max = 120) String title,
             @Size(max = 500) String description,
@@ -150,7 +199,11 @@ public class AdminQuizController {
             @Size(max = 500) String avatarImageUrl,
             @Size(max = 32) String avatarBgStart,
             @Size(max = 32) String avatarBgEnd,
-            @Size(max = 32) String avatarTextColor
+            @Size(max = 32) String avatarTextColor,
+            GameMode gameMode,
+            Boolean includeInRanking,
+            Boolean xpEnabled,
+            Integer questionTimeLimitSeconds
     ) {}
 
     public record AddQuestionRequest(
@@ -186,8 +239,15 @@ public class AdminQuizController {
             String avatarImageUrl,
             String avatarBgStart,
             String avatarBgEnd,
-            String avatarTextColor
+            String avatarTextColor,
+            GameMode gameMode,
+            boolean includeInRanking,
+            boolean xpEnabled,
+            Integer questionTimeLimitSeconds,
+            QuizStatus status
     ) {}
+
+    public record StatusRequest(QuizStatus status) {}
 
     public record QuizQuestionAdminDto(Long id, int orderIndex, String prompt, String imageUrl) {}
 
@@ -200,6 +260,11 @@ public class AdminQuizController {
             String avatarBgStart,
             String avatarBgEnd,
             String avatarTextColor,
+            GameMode gameMode,
+            boolean includeInRanking,
+            boolean xpEnabled,
+            Integer questionTimeLimitSeconds,
+            QuizStatus status,
             long questionCount
     ) {}
 
@@ -212,6 +277,11 @@ public class AdminQuizController {
             String avatarBgStart,
             String avatarBgEnd,
             String avatarTextColor,
+            GameMode gameMode,
+            boolean includeInRanking,
+            boolean xpEnabled,
+            Integer questionTimeLimitSeconds,
+            QuizStatus status,
             List<AdminQuestionDto> questions
     ) {}
 
@@ -241,6 +311,11 @@ public class AdminQuizController {
                 quiz.avatarBgStart(),
                 quiz.avatarBgEnd(),
                 quiz.avatarTextColor(),
+                quiz.gameMode(),
+                quiz.includeInRanking(),
+                quiz.xpEnabled(),
+                quiz.questionTimeLimitSeconds(),
+                quiz.status(),
                 quiz.questions().stream()
                         .map(q -> new AdminQuestionDto(
                                 q.id(),

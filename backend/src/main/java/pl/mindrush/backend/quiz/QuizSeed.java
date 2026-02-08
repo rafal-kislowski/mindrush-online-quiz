@@ -36,11 +36,13 @@ public class QuizSeed implements CommandLineRunner {
         QuizCategory general = categoryRepository.findByName("General Knowledge")
                 .orElseGet(() -> categoryRepository.save(new QuizCategory("General Knowledge")));
 
-        Quiz quiz = quizRepository.save(new Quiz(
+        Quiz quiz = new Quiz(
                 "MindRush Starter Quiz",
                 "A small starter quiz for local development.",
                 general
-        ));
+        );
+        quiz.setStatus(QuizStatus.ACTIVE);
+        quiz = quizRepository.save(quiz);
 
         QuizQuestion q1 = questionRepository.save(new QuizQuestion(quiz, "Which planet is known as the Red Planet?", 1));
         optionRepository.save(new QuizAnswerOption(q1, "Mars", true, 1));
@@ -55,4 +57,3 @@ public class QuizSeed implements CommandLineRunner {
         optionRepository.save(new QuizAnswerOption(q2, "Host Transfer Tool Package", false, 4));
     }
 }
-
