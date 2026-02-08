@@ -32,6 +32,7 @@ export interface GameStateDto {
   totalQuestions: number;
   stage: string;
   stageEndsAt: string | null;
+  stageTotalMs?: number | null;
   question: GameQuestionDto | null;
   players: GamePlayerDto[];
   gameSessionId: string | null;

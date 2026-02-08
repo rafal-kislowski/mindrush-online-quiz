@@ -18,7 +18,7 @@ import { StompClientService } from '../../core/ws/stomp-client.service';
   styleUrl: './game.component.scss',
 })
 export class GameComponent implements OnInit, OnDestroy {
-  private static readonly GUEST_QUESTION_MS = 10_000;
+  private static readonly GUEST_QUESTION_MS = 15_000;
   private static readonly GUEST_REVEAL_MS = 3_000;
   private static readonly GUEST_PRE_COUNTDOWN_MS = 4_000;
   private static readonly ANSWER_FEEDBACK_MS = 1200;
@@ -399,13 +399,15 @@ export class GameComponent implements OnInit, OnDestroy {
 
     const stage = this.state?.stage;
     const totalMs =
-      stage === 'PRE_COUNTDOWN'
+      this.state?.stageTotalMs ??
+      (stage === 'PRE_COUNTDOWN'
         ? GameComponent.GUEST_PRE_COUNTDOWN_MS
         : stage === 'REVEAL'
-        ? GameComponent.GUEST_REVEAL_MS
-        : GameComponent.GUEST_QUESTION_MS;
+          ? GameComponent.GUEST_REVEAL_MS
+          : GameComponent.GUEST_QUESTION_MS);
 
-    const nextPct = Math.max(0, Math.min(100, (msLeft / totalMs) * 100));
+    const safeTotal = Math.max(1, totalMs);
+    const nextPct = Math.max(0, Math.min(100, (msLeft / safeTotal) * 100));
     const shouldNoAnim =
       nextPct > this.progressPct &&
       (stage === 'QUESTION' || stage === 'REVEAL' || stage === 'PRE_COUNTDOWN');
