@@ -1,281 +1,1198 @@
-<div class="lobby-page" *ngIf="lobby as l; else loading">
-  <header class="lobby-header">
-    <div class="lobby-header__top">
-    <div class="lobby-title">
-      <h1>
-        Lobby <span class="code">{{ l.code }}</span>
-      </h1>
-    </div>
-
-    <div class="lobby-actions">
-      <button
-        class="btn danger leave-btn"
-        type="button"
-        (click)="leave()"
-        *ngIf="joinState === 'joined'"
-        aria-label="Leave lobby"
-      >
-        <span class="leave-btn__text">Leave lobby</span>
-        <span class="leave-btn__icon" aria-hidden="true">×</span>
-      </button>
-    </div>
-    </div>
-
-    <div class="lobby-meta" *ngIf="l.status && l.players && l.maxPlayers">
-      <span class="pill" [attr.data-status]="l.status">{{ l.status }}</span>
-      <span class="muted">Players: {{ l.players.length }}/{{ l.maxPlayers }}</span>
-    </div>
-  </header>
-
-  <div class="lobby-grid">
-    <section
-      class="card panel players-panel"
-      *ngIf="joinState === 'joined' && l.players"
-    >
-      <h2 class="section-title">Players</h2>
-      <ng-container *ngIf="session$ | async as session">
-        <div class="roster">
-          <div class="roster__head">
-            <span>User</span>
-            <span class="right">Status</span>
-          </div>
-
-          <div class="roster__item" *ngFor="let p of l.players; let i = index">
-            <div class="left">
-              <span class="rank">{{ i + 1 }}</span>
-              <span
-                class="badge"
-                [attr.data-badge]="
-                  i === 0
-                    ? 'gold'
-                    : i === 1
-                    ? 'silver'
-                    : i === 2
-                    ? 'bronze'
-                    : 'none'
-                "
-                aria-hidden="true"
-              ></span>
-              <span class="name">{{ p.displayName }}</span>
-            </div>
-            <div class="right">
-              <span class="tag" *ngIf="p.displayName === session.displayName"
-                >You</span
-              >
-            </div>
-          </div>
-        </div>
-      </ng-container>
-    </section>
-
-    <section class="card panel" *ngIf="joinState !== 'joined'">
-      <h2 class="section-title">Join</h2>
-      <p class="muted" *ngIf="l.hasPassword && !l.isOwner">This lobby requires a password.</p>
-      <p class="muted" *ngIf="!l.hasPassword">
-        No password: opening this view auto-joins your guest.
-      </p>
-      <p class="muted" *ngIf="joinState === 'viewOnly'">
-        Lobby is full or not joinable.
-      </p>
-
-      <div class="form">
-        <div class="row" *ngIf="l.hasPassword && !l.isOwner">
-          <label class="label">Password</label>
-          <input [(ngModel)]="password" placeholder="Enter lobby password" />
-        </div>
-
-        <button
-          class="btn primary"
-          type="button"
-          (click)="join()"
-          [disabled]="
-            joinState === 'viewOnly' || (l.hasPassword && !l.isOwner && !password.trim())
-          "
+﻿<div class="lobby-page" [class.is-join]="joinState !== 'joined'" *ngIf="lobby as l; else loading">
+  <section class="card panel lobby-shell">
+    <svg class="svg-defs" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient
+          id="mrTitleGrad"
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="20"
+          gradientUnits="userSpaceOnUse"
         >
-          Join lobby
+          <stop offset="0" style="stop-color: var(--lobby-accent-gold)" />
+          <stop offset="1" style="stop-color: var(--lobby-accent-cyan)" />
+        </linearGradient>
+        <symbol id="mrTitleMark" viewBox="0 0 10 20">
+          <path
+            d="M5 1c2.1 0 3.2 1.6 3.2 3.5v11C8.2 17.4 7.1 19 5 19S1.8 17.4 1.8 15.5v-11C1.8 2.6 2.9 1 5 1Z"
+            fill="url(#mrTitleGrad)"
+          />
+        </symbol>
+      </defs>
+    </svg>
+    <div class="lobby-shell__header">
+      <div class="lobby-title">
+        <h1>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="lucide lucide-users-icon lucide-users"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <path d="M16 3.128a4 4 0 0 1 0 7.744" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+            <circle cx="9" cy="7" r="4" />
+          </svg>
+          <ng-container *ngIf="joinState === 'joined'; else joinTitle">
+            Lobby
+          </ng-container>
+          <ng-template #joinTitle>
+            Join room <span class="code">{{ code }}</span>
+          </ng-template>
+        </h1>
+      </div>
+
+      <div
+        class="lobby-actions"
+        [class.lobby-actions--picker]="view === 'picker'"
+      >
+        <button
+          class="btn secondary"
+          type="button"
+          (click)="closeQuizSelection()"
+          *ngIf="view === 'picker'"
+          aria-label="Back to lobby"
+        >
+          Back
+        </button>
+        <button
+          class="btn danger leave-btn"
+          type="button"
+          (click)="leave()"
+          *ngIf="joinState === 'joined' && view !== 'picker'"
+          aria-label="Leave lobby"
+        >
+          <span class="leave-btn__text">Leave lobby</span>
+          <span class="leave-btn__icon" aria-hidden="true">&times;</span>
         </button>
       </div>
-    </section>
+    </div>
 
-    <section
-      class="card panel owner"
-      *ngIf="joinState === 'joined' && l.isOwner && l.players && l.maxPlayers"
-    >
-      <h2 class="section-title">Owner controls</h2>
-      <div class="form">
-        <div class="row">
-          <label class="label">Privacy</label>
-          <div class="segmented" role="group" aria-label="Lobby privacy">
-            <button
-              class="segmented__btn"
-              type="button"
-              [class.active]="privacyMode === 'public'"
-              (click)="setPrivacyMode('public')"
-              [disabled]="privacySaving"
-            >
-              Public
-            </button>
-            <button
-              class="segmented__btn"
-              type="button"
-              [class.active]="privacyMode === 'private'"
-              (click)="setPrivacyMode('private')"
-              [disabled]="privacySaving"
-            >
-              Private
-            </button>
-          </div>
-      
-        </div>
-
-        <div class="row" *ngIf="privacyMode === 'private'">
-          <label class="label">Password</label>
-          <div class="password-row">
-            <div class="password-input">
-              <input
-                class="password-input__field"
-                [type]="privacyShowPassword ? 'text' : 'password'"
-                [(ngModel)]="privacyPassword"
-                (keydown.enter)="setPrivatePassword()"
-                [placeholder]="l.hasPassword ? 'enter new to change' : 'Set a password'"
-              />
-              <button
-                class="password-input__toggle"
-                type="button"
-                (click)="togglePrivacyPassword()"
-                [disabled]="privacySaving"
-                [attr.aria-label]="privacyShowPassword ? 'Hide password' : 'Show password'"
-                [attr.aria-pressed]="privacyShowPassword"
-                title="{{ privacyShowPassword ? 'Hide password' : 'Show password' }}"
-              >
-                <i
-                  class="fa-solid"
-                  [class.fa-eye]="!privacyShowPassword"
-                  [class.fa-eye-slash]="privacyShowPassword"
-                  aria-hidden="true"
-                ></i>
-              </button>
-            </div>
-            <button
-              class="btn primary"
-              type="button"
-              (click)="setPrivatePassword()"
-              [disabled]="privacySaving || !privacyPassword.trim()"
-            >
-              {{ privacySaving ? "Saving..." : "Set password" }}
-            </button>
-          </div>
-        </div>
-
-        <button
-          class="btn primary"
-          type="button"
-          *ngIf="false"
-          (click)="setPrivatePassword()"
-          [disabled]="privacySaving"
+    <section class="tab-panel">
+      <div class="lobby-layout">
+        <section
+          class="lobby-shell__body"
+          [class.is-picker]="view === 'picker'"
+          *ngIf="joinState === 'joined' && l.players; else joinCard"
         >
-          {{ privacySaving ? "Saving…" : "Save privacy" }}
-        </button>
+          <ng-container *ngIf="view === 'lobby'; else pickerView">
+            <div class="lobby-shell__top">
+              <h2 class="section-title">
+                <svg
+                  class="section-title__mark"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <use href="#mrTitleMark"></use>
+                </svg>
+                <ng-container *ngIf="l.isOwner; else settingsManagedTitle">
+                  Current settings
+                </ng-container>
+                <ng-template #settingsManagedTitle>
+                  Settings (owner managed)
+                </ng-template>
+              </h2>
+              <div class="muted picker-head__hint">
+                <ng-container *ngIf="l.isOwner; else settingsManagedHint">
+                  Configure game settings and select a quiz to begin.
+                </ng-container>
+                <ng-template #settingsManagedHint>
+                  The lobby owner manages these settings.
+                </ng-template>
+              </div>
 
-        <ng-container *ngIf="(authUser$ | async) as user">
-          <div class="row">
-            <label class="label">Max players</label>
-            <div class="mr-select-wrap" [class.menu-open]="maxPlayersMenuOpen">
-              <button
-                class="mr-select"
-                type="button"
-                (click)="toggleMaxPlayersMenu()"
-                [attr.aria-expanded]="maxPlayersMenuOpen"
-                [disabled]="maxPlayersSaving"
-                aria-label="Max players"
-              >
-                <span class="mr-select__label">{{ maxPlayersDraft }} players</span>
-                <span class="mr-select__caret" aria-hidden="true"></span>
-              </button>
+              <div class="settings-grid">
+                <div class="current-quizWrap">
+                  <div
+                    class="match-type-grid"
+                    role="tablist"
+                    aria-label="Game type"
+                  >
+                    <button
+                      class="stat-tile match-tile match-tile--casual"
+                      type="button"
+                      role="tab"
+                      [class.active]="matchType === 'CASUAL'"
+                      [attr.aria-selected]="matchType === 'CASUAL'"
+                      [disabled]="!l.isOwner"
+                      (click)="setMatchType('CASUAL')"
+                    >
+                      <div class="stat-tile__icon" aria-hidden="true">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <polygon
+                            points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+                          />
+                        </svg>
+                      </div>
+                      <div class="stat-tile__label">Mode</div>
+                      <div class="stat-tile__value">Casual</div>
+                    </button>
+                    <button
+                      class="stat-tile match-tile match-tile--ranked"
+                      type="button"
+                      role="tab"
+                      [class.active]="matchType === 'RANKED'"
+                      [attr.aria-selected]="matchType === 'RANKED'"
+                      [disabled]="!l.isOwner"
+                      (click)="setMatchType('RANKED')"
+                    >
+                      <div class="stat-tile__icon" aria-hidden="true">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <path d="M8 21h8" />
+                          <path d="M12 17v4" />
+                          <path d="M7 4h10v3a5 5 0 0 1-10 0V4z" />
+                          <path d="M17 4h3v3a4 4 0 0 1-3 4" />
+                          <path d="M7 4H4v3a4 4 0 0 0 3 4" />
+                        </svg>
+                      </div>
+                      <div class="stat-tile__label">Mode</div>
+                      <div class="stat-tile__value">Ranked</div>
+                    </button>
+                  </div>
+
+                  <button
+                    class="current-quiz quiz-card"
+                    type="button"
+                    [class.is-empty]="!selectedQuiz"
+                    [class.current-quiz--clickable]="l.isOwner"
+                    [class.is-muted]="!l.isOwner"
+                    (click)="openQuizSelection()"
+                    [attr.aria-disabled]="!l.isOwner"
+                    [attr.aria-label]="
+                      l.isOwner ? 'Open quiz selection' : 'Selected quiz'
+                    "
+                  >
+                    <div
+                      class="quiz-card__avatar"
+                      [ngStyle]="quizAvatarStyle(selectedQuiz)"
+                    >
+                      <span
+                        class="quiz-card__txt"
+                        aria-hidden="true"
+                        *ngIf="selectedQuiz && !selectedQuiz.avatarImageUrl"
+                        >{{ quizInitials(selectedQuiz.title) }}</span
+                      >
+                      <span
+                        class="quiz-card__txt"
+                        aria-hidden="true"
+                        *ngIf="!selectedQuiz"
+                      >
+                        <svg
+                          class="quiz-card__emptyIcon"
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <circle cx="12" cy="12" r="10" />
+                          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                          <path d="M12 17h.01" />
+                        </svg>
+                      </span>
+                    </div>
+
+                    <div class="quiz-card__body">
+                      <div
+                        class="quiz-card__title"
+                        [attr.title]="selectedQuiz?.title ?? 'No quiz selected'"
+                        #quizTitle
+                      >
+                        <span class="quiz-card__titleMarquee">
+                          <span class="quiz-card__titleOnce">{{
+                            selectedQuiz?.title ?? "No quiz selected"
+                          }}</span>
+                          <span
+                            class="quiz-card__titleGap"
+                            aria-hidden="true"
+                          ></span>
+                          <span
+                            class="quiz-card__titleOnce"
+                            aria-hidden="true"
+                            >{{
+                              selectedQuiz?.title ?? "No quiz selected"
+                            }}</span
+                          >
+                        </span>
+                      </div>
+
+                      <div class="quiz-card__meta muted">
+                        <ng-container
+                          *ngIf="selectedQuiz as q; else noQuizMeta"
+                        >
+                          {{ q.categoryName ?? "Uncategorized" }}
+                        </ng-container>
+                        <ng-template #noQuizMeta>
+                          <ng-container *ngIf="l.isOwner; else ownerPicking">
+                            Click to select a quiz.
+                          </ng-container>
+                          <ng-template #ownerPicking>
+                            Owner is choosing a quiz...
+                          </ng-template>
+                        </ng-template>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                <div class="current-lobby">
+                  <div class="stat-stack" *ngIf="l.players && l.maxPlayers">
+                    <div
+                      class="stat-tile stat-tile--privacy stat-tile--privacyWide"
+                      [class.is-editable]="l.isOwner"
+                      [class.is-muted]="!l.isOwner"
+                    >
+                      <div class="stat-tile__icon" aria-hidden="true">
+                        <svg
+                          *ngIf="
+                            l.hasPassword || privacyMode === 'private';
+                            else unlockedIcon
+                          "
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          class="lucide lucide-lock-icon lucide-lock"
+                        >
+                          <rect
+                            width="18"
+                            height="11"
+                            x="3"
+                            y="11"
+                            rx="2"
+                            ry="2"
+                          />
+                          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+
+                        <ng-template #unlockedIcon>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            class="lucide lucide-lock-open-icon lucide-lock-open"
+                          >
+                            <rect
+                              width="18"
+                              height="11"
+                              x="3"
+                              y="11"
+                              rx="2"
+                              ry="2"
+                            />
+                            <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                          </svg>
+                        </ng-template>
+                      </div>
+
+                      <div class="stat-tile__label">Privacy</div>
+                      <div class="stat-tile__value">
+                        {{
+                          l.hasPassword || privacyMode === "private"
+                            ? "Private"
+                            : "Public"
+                        }}
+                      </div>
+
+                      <div class="privacy-right">
+                        <div
+                          class="privacy-pin privacy-pin--inline"
+                          [class.is-muted]="!privacyPinEditing || !l.isOwner"
+                          aria-label="Lobby PIN"
+                          (click)="
+                            $event.stopPropagation(); onPrivacyPinAreaClick()
+                          "
+                        >
+                          <input
+                            #privacyPinHidden
+                            class="privacy-pin__hidden"
+                            type="tel"
+                            inputmode="numeric"
+                            pattern="[0-9]*"
+                            autocomplete="one-time-code"
+                            maxlength="4"
+                            tabindex="-1"
+                            [disabled]="
+                              !l.isOwner || privacySaving || !privacyPinEditing
+                            "
+                            aria-label="Lobby PIN input"
+                            (input)="onPrivacyPinHiddenInput($event)"
+                            (keydown)="onPrivacyPinHiddenKeydown($event)"
+                          />
+
+                          <div
+                            *ngFor="let d of privacyPinDigits; let i = index"
+                            class="privacy-pin__box"
+                            [class.is-filled]="
+                              (l.isOwner && !!privacyPinDigits[i]) ||
+                              (!l.isOwner && l.hasPassword)
+                            "
+                            [class.is-active]="
+                              l.isOwner &&
+                              privacyPinEditing &&
+                              privacyPinActiveIndex === i
+                            "
+                            [attr.aria-label]="'PIN digit ' + (i + 1)"
+                          >
+                            {{
+                              l.isOwner
+                                ? privacyPinDigits[i] || ""
+                                : l.hasPassword
+                                  ? "*"
+                                  : ""
+                            }}
+                          </div>
+                        </div>
+                        <div class="privacy-actions" *ngIf="l.isOwner">
+                          <button
+                            class="privacy-action privacy-action--primary"
+                            type="button"
+                            (click)="
+                              $event.stopPropagation(); onPrivacyApplyClick()
+                            "
+                            [class.is-hidden]="
+                              (l.hasPassword || privacyMode === 'private') &&
+                              !privacyPinEditing
+                            "
+                            [disabled]="
+                              !l.isOwner ||
+                              privacySaving ||
+                              (privacyPinEditing && !isPrivacyPinComplete)
+                            "
+                            [attr.aria-label]="
+                              privacyPinEditing ? 'Apply PIN' : 'Set PIN'
+                            "
+                          >
+                            {{ privacyPinEditing ? "Apply" : "Set" }}
+                          </button>
+                          <button
+                            class="privacy-action privacy-action--danger"
+                            type="button"
+                            (click)="
+                              $event.stopPropagation(); onPrivacyClearClick()
+                            "
+                            [disabled]="!l.isOwner || privacySaving"
+                            [class.is-hidden]="
+                              !(l.hasPassword || privacyMode === 'private') ||
+                              privacyPinEditing
+                            "
+                            aria-label="Clear PIN"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="stat-grid stat-grid--4">
+                      <div
+                        class="stat-tile stat-tile--players"
+                        [class.stat-tile--hintable]="l.isOwner && isLoggedIn"
+                        [class.stat-tile--hintableCover]="l.isOwner && isLoggedIn"
+                        [class.is-open]="l.isOwner && isLoggedIn && maxPlayersMenuOpen"
+                        [class.is-muted]="!l.isOwner"
+                        [attr.role]="l.isOwner && isLoggedIn ? 'button' : null"
+                        [attr.tabindex]="l.isOwner && isLoggedIn ? '0' : null"
+                        (click)="onMaxPlayersTileClick($event)"
+                        (keydown)="onMaxPlayersTileKeydown($event)"
+                        [attr.aria-label]="
+                          l.isOwner && isLoggedIn
+                            ? 'Change max players'
+                            : 'Max players ' + l.maxPlayers
+                        "
+                      >
+                        <div class="stat-tile__icon" aria-hidden="true">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            class="lucide lucide-user-icon lucide-user"
+                          >
+                            <path
+                              d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"
+                            />
+                            <circle cx="12" cy="7" r="4" />
+                          </svg>
+                        </div>
+                        <div class="stat-tile__label">
+                          {{ l.isOwner && isLoggedIn ? "Max players" : "Players" }}
+                        </div>
+
+                        <div
+                          class="stat-tile__value"
+                          *ngIf="!l.isOwner || !isLoggedIn"
+                        >
+                          {{ l.maxPlayers }} players
+                        </div>
+
+                        <div
+                          class="stat-tile__value"
+                          *ngIf="l.isOwner && isLoggedIn"
+                        >
+                          <div class="mr-select-wrap">
+                            <span class="max-players-trigger">{{
+                              maxPlayersDraft
+                            }} players</span>
+
+                            <div
+                              class="mr-select__menu"
+                              *ngIf="maxPlayersMenuOpen"
+                              (click)="$event.stopPropagation()"
+                            >
+                              <button
+                                class="mr-select__item"
+                                type="button"
+                                *ngFor="let mp of maxPlayersOptions"
+                                (click)="setMaxPlayersFromMenu(mp)"
+                                [class.active]="maxPlayersDraft === mp"
+                                [class.disabled]="l.players.length > mp"
+                                [disabled]="l.players.length > mp"
+                              >
+                                {{ mp }} players
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div
+                          class="stat-tile__hint"
+                          *ngIf="l.isOwner && isLoggedIn"
+                          aria-hidden="true"
+                        >
+                          <div class="stat-tile__hintTitle">Max players</div>
+                          <div class="stat-tile__hintSub">
+                            Click to change lobby size.
+                          </div>
+                        </div>
+                      </div>
+
+                      <div
+                        class="stat-tile stat-tile--code stat-tile--hintable stat-tile--hintableCover"
+                        role="button"
+                        tabindex="0"
+                        (click)="copyLobbyCode(l.code, $event)"
+                        (keydown)="onCodeTileKeydown($event, l.code)"
+                        aria-label="Copy lobby code"
+                      >
+                        <div class="stat-tile__icon" aria-hidden="true">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            class="lucide lucide-code-xml-icon lucide-code-xml"
+                          >
+                            <path d="m18 16 4-4-4-4" />
+                            <path d="m6 8-4 4 4 4" />
+                            <path d="m14.5 4-5 16" />
+                          </svg>
+                        </div>
+                        <div class="stat-tile__label">Code</div>
+                        <div class="stat-tile__value">{{ l.code }}</div>
+
+                        <div class="stat-tile__hint" aria-hidden="true">
+                          <div class="stat-tile__hintTitle">
+                            {{ codeCopied ? "Copied" : "Copy code" }}
+                          </div>
+                          <div class="stat-tile__hintSub">
+                            {{
+                              codeCopied
+                                ? "Copied to clipboard."
+                                : "Click to copy to clipboard."
+                            }}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="lobby-shell__bottom">
+              <div class="lobby-main">
+                <section class="subpanel players-panel">
+                  <h2 class="section-title">
+                    <svg
+                      class="section-title__mark"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <use href="#mrTitleMark"></use>
+                    </svg>
+                    Players
+                    <span
+                      class="players-count"
+                      *ngIf="l.maxPlayers"
+                      [attr.aria-label]="
+                        'Players ' + l.players.length + ' of ' + l.maxPlayers
+                      "
+                      >
+                      ({{ l.players.length }}/{{ l.maxPlayers }})</span
+                    >
+                  </h2>
+                  <ng-container *ngIf="session$ | async as session">
+                    <div class="players-list" role="list">
+                      <div
+                        class="row-item"
+                        role="listitem"
+                        *ngFor="let p of l.players; let i = index"
+                        [class.is-me]="p.displayName === session.displayName"
+                      >
+                        <div class="left">
+                          <span class="pos"
+                            ><span class="pos__n">{{ i + 1 }}</span></span
+                          >
+                          <span
+                            class="avatar"
+                            [ngStyle]="playerAvatarStyle(p.displayName)"
+                            >{{ playerInitials(p.displayName) }}</span
+                          >
+                          <span class="name">{{ p.displayName }}</span>
+                        </div>
+                        <div class="right">
+                          <span
+                            class="rank-pill"
+                            *ngIf="p.displayName === session.displayName"
+                            >YOU</span
+                          >
+                          <span
+                            class="rank-pill rank-pill--owner"
+                            *ngIf="i === 0"
+                            >OWNER</span
+                          >
+                        </div>
+                      </div>
+
+                      <div
+                        class="row-item row-item--placeholder"
+                        role="listitem"
+                        *ngFor="let _ of waitingSlots; let j = index"
+                      >
+                        <div class="left">
+                          <span class="pos"
+                            ><span class="pos__n">{{
+                              l.players.length + j + 1
+                            }}</span></span
+                          >
+                          <span
+                            class="avatar avatar--ghost"
+                            aria-hidden="true"
+                          ></span>
+                          <span class="name name--ghost">
+                            Waiting for player
+                            <span class="waiting-dots" aria-hidden="true">
+                              <span></span><span></span><span></span>
+                            </span>
+                          </span>
+                        </div>
+                        <div class="right"></div>
+                      </div>
+                    </div>
+                  </ng-container>
+                </section>
+
+                <section class="subpanel chat-panel">
+                  <h2 class="section-title">
+                    <svg
+                      class="section-title__mark"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <use href="#mrTitleMark"></use>
+                    </svg>
+                    Chat
+                  </h2>
+
+                  <div
+                    class="chat-box"
+                    #chatLog
+                    role="log"
+                    aria-label="Chat messages"
+                  >
+                    <div class="chat-empty muted" *ngIf="!chatMessages.length">
+                      No messages yet.
+                    </div>
+
+                    <div
+                      class="chat-line"
+                      *ngFor="let m of chatMessages; trackBy: trackChatMessage"
+                    >
+                      <span class="time"
+                        >[{{ m.serverTime | date: "HH:mm" }}]</span
+                      >
+                      <span
+                        class="nick"
+                        [class.me]="m.displayName === meDisplayName"
+                        >{{ m.displayName }}:</span
+                      >
+                      <span class="text">{{ m.text }}</span>
+                    </div>
+                  </div>
+
+                  <div class="chat-input">
+                    <input
+                      class="input"
+                      [(ngModel)]="chatText"
+                      [disabled]="joinState !== 'joined'"
+                      [maxlength]="maxChatMessageLength"
+                      (keydown.enter)="sendChat()"
+                      placeholder="Type a message..."
+                    />
+                  </div>
+                </section>
+              </div>
 
               <div
-                class="mr-select__menu"
-                *ngIf="maxPlayersMenuOpen"
-                role="listbox"
-                aria-label="Select max players"
+                class="lobby-startbar"
+                *ngIf="l.isOwner && l.players && l.maxPlayers"
               >
                 <button
+                  class="btn success owner-startwide"
                   type="button"
-                  class="mr-select__item"
-                  *ngFor="let n of maxPlayersOptions"
-                  [class.active]="maxPlayersDraft === n"
-                  [class.disabled]="n < l.players.length"
-                  [disabled]="n < l.players.length"
-                  (click)="setMaxPlayersFromMenu(n)"
-                  role="option"
-                  [attr.aria-selected]="maxPlayersDraft === n"
+                  (click)="startGame()"
+                  [disabled]="
+                    !selectedQuizId || l.players.length !== l.maxPlayers
+                  "
                 >
-                  {{ n }} players
+                  <span class="owner-startwide__content">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      class="lucide lucide-gamepad2-icon lucide-gamepad-2"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <line x1="6" x2="10" y1="11" y2="11" />
+                      <line x1="8" x2="8" y1="9" y2="13" />
+                      <line x1="15" x2="15.01" y1="12" y2="12" />
+                      <line x1="18" x2="18.01" y1="10" y2="10" />
+                      <path
+                        d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"
+                      />
+                    </svg>
+                    Start game
+                  </span>
                 </button>
               </div>
             </div>
-            <p class="muted hint" *ngIf="maxPlayersSaving">Saving...</p>
-          </div>
+          </ng-container>
 
-          <button
-            class="btn primary"
-            type="button"
-            *ngIf="false"
-            (click)="saveMaxPlayers()"
-            [disabled]="maxPlayersSaving"
-          >
-            {{ maxPlayersSaving ? "Saving…" : "Save max players" }}
-          </button>
-        </ng-container>
+          <ng-template #pickerView>
+            <div class="lobby-shell__top">
+              <div class="picker-shell" #quizPicker>
+                <section class="picker-panel">
+                  <div class="picker-head">
+                    <div class="picker-head__title">
+                      <h2 class="section-title">
+                        <svg
+                          class="section-title__mark"
+                          aria-hidden="true"
+                          focusable="false"
+                        >
+                          <use href="#mrTitleMark"></use>
+                        </svg>
+                        Quiz selection
+                      </h2>
+                      <div class="muted picker-head__hint">
+                        Choose a quiz for the lobby. Use filters to narrow
+                        results.
+                      </div>
+                    </div>
 
-        <div class="row">
-          <label class="label">Quiz</label>
-          <div class="mr-select-wrap" [class.menu-open]="quizMenuOpen">
-            <button
-              class="mr-select"
-              type="button"
-              (click)="toggleQuizMenu()"
-              [attr.aria-expanded]="quizMenuOpen"
-              [disabled]="!quizzes.length"
-              aria-label="Quiz"
-            >
-              <span class="mr-select__label">{{ selectedQuizLabel }}</span>
-              <span class="mr-select__caret" aria-hidden="true"></span>
-            </button>
+                    <div class="picker-head__controls">
+                      <div
+                        class="segmented picker-modes"
+                        role="tablist"
+                        aria-label="Game mode"
+                      >
+                        <button
+                          class="segmented__btn"
+                          type="button"
+                          role="tab"
+                          [class.active]="matchType === 'CASUAL'"
+                          [attr.aria-selected]="matchType === 'CASUAL'"
+                          (click)="setMatchType('CASUAL')"
+                        >
+                          <span class="segmented__icon" aria-hidden="true">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                            >
+                              <polygon
+                                points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+                              />
+                            </svg>
+                          </span>
+                          Casual
+                        </button>
+                        <button
+                          class="segmented__btn"
+                          type="button"
+                          role="tab"
+                          [class.active]="matchType === 'RANKED'"
+                          [attr.aria-selected]="matchType === 'RANKED'"
+                          (click)="setMatchType('RANKED')"
+                        >
+                          <span class="segmented__icon" aria-hidden="true">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                            >
+                              <path d="M8 21h8" />
+                              <path d="M12 17v4" />
+                              <path d="M7 4h10v4a5 5 0 0 1-10 0V4z" />
+                              <path d="M17 6h2a2 2 0 0 1 0 4h-2" />
+                              <path d="M7 6H5a2 2 0 0 0 0 4h2" />
+                            </svg>
+                          </span>
+                          Ranked
+                        </button>
+                      </div>
 
-            <div
-              class="mr-select__menu"
-              *ngIf="quizMenuOpen"
-              role="listbox"
-              aria-label="Select quiz"
-            >
-              <button
-                type="button"
-                class="mr-select__item"
-                *ngFor="let q of quizzes"
-                [class.active]="selectedQuizId === q.id"
-                (click)="selectQuizFromMenu(q.id)"
-                role="option"
-                [attr.aria-selected]="selectedQuizId === q.id"
-              >
-                {{ q.title }}
-              </button>
+                      <div
+                        class="segmented segmented--3 picker-sources"
+                        role="tablist"
+                        aria-label="Quiz sources"
+                      >
+                        <button
+                          class="segmented__btn"
+                          type="button"
+                          role="tab"
+                          [class.active]="pickerScope === 'official'"
+                          [attr.aria-selected]="pickerScope === 'official'"
+                          (click)="setPickerScope('official')"
+                        >
+                          <span class="segmented__icon" aria-hidden="true">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                            >
+                              <path
+                                d="M12 2l7 4v6c0 5-3 9-7 10-4-1-7-5-7-10V6l7-4z"
+                              />
+                              <path d="m9 12 2 2 4-5" />
+                            </svg>
+                          </span>
+                          Official
+                        </button>
+                        <button
+                          class="segmented__btn"
+                          type="button"
+                          role="tab"
+                          [disabled]="matchType === 'RANKED'"
+                          [class.active]="pickerScope === 'custom'"
+                          [attr.aria-selected]="pickerScope === 'custom'"
+                          (click)="setPickerScope('custom')"
+                        >
+                          <span class="segmented__icon" aria-hidden="true">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                            >
+                              <path
+                                d="M12 3l1.2 3.8L17 8l-3.8 1.2L12 13l-1.2-3.8L7 8l3.8-1.2L12 3z"
+                              />
+                              <path
+                                d="M5 12l.8 2.4L8 15l-2.2.6L5 18l-.8-2.4L2 15l2.2-.6L5 12z"
+                              />
+                              <path
+                                d="M19 12l.8 2.4L22 15l-2.2.6L19 18l-.8-2.4L16 15l2.2-.6L19 12z"
+                              />
+                            </svg>
+                          </span>
+                          Custom
+                        </button>
+                        <button
+                          class="segmented__btn"
+                          type="button"
+                          role="tab"
+                          [disabled]="matchType === 'RANKED'"
+                          [class.active]="pickerScope === 'library'"
+                          [attr.aria-selected]="pickerScope === 'library'"
+                          (click)="setPickerScope('library')"
+                        >
+                          <span class="segmented__icon" aria-hidden="true">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                            >
+                              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                              <path
+                                d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"
+                              />
+                            </svg>
+                          </span>
+                          Library
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="picker-filters" aria-label="Quiz filters">
+                    <input
+                      class="picker-filters__search"
+                      [(ngModel)]="quizSearch"
+                      placeholder="Search quizzes..."
+                      aria-label="Search quizzes"
+                    />
+
+                    <div class="mr-select-wrap mr-multi">
+                      <button
+                        class="mr-select"
+                        type="button"
+                        (click)="toggleCategoryMenu()"
+                        [attr.aria-expanded]="categoryMenuOpen"
+                        aria-label="Category filter"
+                      >
+                        <span class="mr-select__left">
+                          <span class="mr-select__icon" aria-hidden="true">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                            >
+                              <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z" />
+                            </svg>
+                          </span>
+                          <span class="mr-select__value">{{
+                            categorySelectedLabel
+                          }}</span>
+                        </span>
+                        <span
+                          class="mr-select__caret"
+                          aria-hidden="true"
+                        ></span>
+                      </button>
+
+                      <div class="mr-select__menu" *ngIf="categoryMenuOpen">
+                        <div class="mr-select__search">
+                          <input
+                            [(ngModel)]="categoryMenuSearch"
+                            placeholder="Search categories..."
+                            aria-label="Search categories"
+                          />
+                        </div>
+
+                        <button
+                          class="mr-select__item"
+                          type="button"
+                          (click)="clearCategories()"
+                          [class.active]="!categorySelected.length"
+                        >
+                          All categories
+                        </button>
+
+                        <button
+                          class="mr-multi__item"
+                          type="button"
+                          *ngFor="let c of categoryMenuItemsFiltered"
+                          (click)="toggleCategory(c)"
+                          [class.active]="isCategorySelected(c)"
+                        >
+                          <span class="mr-multi__label">{{ c }}</span>
+                          <span class="mr-multi__mark" aria-hidden="true">{{
+                            isCategorySelected(c) ? "✓" : ""
+                          }}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="mr-select-wrap picker-sort" aria-label="Sort">
+                      <button
+                        type="button"
+                        class="mr-select mr-select--purple"
+                        (click)="toggleSortMenu()"
+                        [attr.aria-expanded]="sortMenuOpen"
+                        aria-label="Sort"
+                      >
+                        <span class="mr-select__left">
+                          <span class="mr-select__icon" aria-hidden="true">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                            >
+                              <path d="M3 6h12" />
+                              <path d="M3 12h9" />
+                              <path d="M3 18h6" />
+                              <path d="M18 6v14" />
+                              <path d="m21 17-3 3-3-3" />
+                            </svg>
+                          </span>
+                          <span class="mr-select__value">{{
+                            pickerSortLabel
+                          }}</span>
+                        </span>
+                        <span class="mr-select__caret" aria-hidden="true"></span>
+                      </button>
+
+                      <div class="mr-select__menu" *ngIf="sortMenuOpen">
+                        <button
+                          class="mr-select__item"
+                          type="button"
+                          (click)="selectSort('az')"
+                          [class.active]="pickerSort === 'az'"
+                        >
+                          Name A–Z
+                        </button>
+                        <button
+                          class="mr-select__item"
+                          type="button"
+                          (click)="selectSort('za')"
+                          [class.active]="pickerSort === 'za'"
+                        >
+                          Name Z–A
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="picker-list" role="region" aria-label="Quiz list">
+                    <div class="quiz-grid quiz-grid--picker">
+                      <button
+                        class="quiz-card"
+                        *ngFor="let q of filteredQuizzes"
+                        type="button"
+                        [class.active]="selectedQuizId === q.id"
+                        (click)="selectQuiz(q.id)"
+                        [disabled]="selectedQuizSaving"
+                      >
+                        <div
+                          class="quiz-card__avatar"
+                          [ngStyle]="quizAvatarStyle(q)"
+                        >
+                          <span
+                            class="quiz-card__txt"
+                            aria-hidden="true"
+                            *ngIf="!q.avatarImageUrl"
+                            >{{ quizInitials(q.title) }}</span
+                          >
+                        </div>
+                        <div class="quiz-card__body">
+                          <div
+                            class="quiz-card__title"
+                            [attr.title]="q.title"
+                            #quizTitle
+                          >
+                            <span class="quiz-card__titleMarquee">
+                              <span class="quiz-card__titleOnce">{{
+                                q.title
+                              }}</span>
+                              <span
+                                class="quiz-card__titleGap"
+                                aria-hidden="true"
+                              ></span>
+                              <span
+                                class="quiz-card__titleOnce"
+                                aria-hidden="true"
+                                >{{ q.title }}</span
+                              >
+                            </span>
+                          </div>
+                          <div class="quiz-card__meta muted">
+                            {{ q.categoryName ?? "Uncategorized" }}
+                          </div>
+                        </div>
+                      </button>
+                    </div>
+
+                    <div
+                      class="muted picker-empty"
+                      *ngIf="!filteredQuizzes.length"
+                    >
+                      No quizzes match your filters.
+                    </div>
+                  </div>
+                </section>
+              </div>
             </div>
-          </div>
-        </div>
+          </ng-template>
+        </section>
 
-        <button
-          class="btn primary"
-          type="button"
-          (click)="startGame()"
-          [disabled]="l.players.length !== l.maxPlayers"
-        >
-          Start game
-        </button>
-  
+        <ng-template #joinCard>
+          <div class="join-shell">
+            <section class="join-modal" aria-label="Join lobby">
+              <div class="join-banner" *ngIf="l.hasPassword && !l.isOwner">
+                <div class="join-banner__icon" aria-hidden="true">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </div>
+                <div class="join-banner__text">
+                  <div class="join-banner__title">Private lobby</div>
+                  <div class="join-banner__sub">
+                    This lobby is protected. Enter the 4-digit PIN to join.
+                  </div>
+                </div>
+              </div>
+
+              <div class="muted join-viewonly" *ngIf="joinState === 'viewOnly'">
+                Lobby is full or not joinable.
+              </div>
+
+              <div class="join-pinWrap" *ngIf="l.hasPassword && !l.isOwner">
+                <div
+                  class="privacy-pin privacy-pin--join"
+                  aria-label="Lobby PIN"
+                  (click)="onJoinPinAreaClick()"
+                >
+                  <input
+                    #joinPinHidden
+                    class="privacy-pin__hidden"
+                    type="tel"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    autocomplete="one-time-code"
+                    maxlength="4"
+                    [disabled]="joinState === 'viewOnly'"
+                    aria-label="Lobby PIN input"
+                    (input)="onJoinPinHiddenInput($event)"
+                    (keydown)="onJoinPinHiddenKeydown($event)"
+                    (keydown.enter)="join()"
+                  />
+
+                  <div
+                    *ngFor="let d of joinPinDigits; let i = index"
+                    class="privacy-pin__box"
+                    [class.is-filled]="!!joinPinDigits[i]"
+                    [class.is-active]="joinPinActiveIndex === i"
+                    [attr.aria-label]="'PIN digit ' + (i + 1)"
+                  >
+                    {{ joinPinDigits[i] || "" }}
+                  </div>
+                </div>
+              </div>
+
+              <div class="join-actions">
+                <button class="btn secondary" type="button" (click)="cancelJoin()">
+                  Cancel
+                </button>
+                <button
+                  class="btn join-primary"
+                  type="button"
+                  (click)="join()"
+                  [disabled]="
+                    joinState === 'viewOnly' ||
+                    (l.hasPassword && !l.isOwner && !isJoinPinComplete)
+                  "
+                >
+                  Join room
+                </button>
+              </div>
+            </section>
+          </div>
+        </ng-template>
       </div>
     </section>
-  </div>
+  </section>
 
   <p class="error" *ngIf="error">{{ error }}</p>
 </div>

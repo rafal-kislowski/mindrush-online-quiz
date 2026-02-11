@@ -9,7 +9,9 @@ export interface LobbyDto {
   maxPlayers?: number;
   players?: LobbyPlayerDto[];
   hasPassword: boolean;
+  pin?: string | null;
   createdAt?: string;
   isOwner?: boolean;
   isParticipant?: boolean;
+  selectedQuizId?: number | null;
 }

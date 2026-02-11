@@ -50,6 +50,28 @@ export class StompClientService {
     });
   }
 
+  publish(destination: string, body: unknown): void {
+    const isString = typeof body === 'string';
+    const payload = isString ? (body as string) : JSON.stringify(body ?? {});
+    const headers = isString ? undefined : { 'content-type': 'application/json' };
+    const doPublish = () => {
+      if (!this.client || !this.connected) return;
+      try {
+        this.client.publish({ destination, body: payload, headers });
+      } catch {
+        // ignore
+      }
+    };
+
+    if (this.connected) {
+      doPublish();
+      return;
+    }
+    void this.connect().then(doPublish).catch(() => {
+      // ignore
+    });
+  }
+
   private async connectInternal(): Promise<void> {
     await firstValueFrom(this.sessionService.ensure());
 

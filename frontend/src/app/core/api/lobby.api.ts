@@ -39,4 +39,12 @@ export class LobbyApi {
       { withCredentials: true }
     );
   }
+
+  setSelectedQuiz(code: string, quizId: number | null): Observable<LobbyDto> {
+    return this.http.post<LobbyDto>(
+      `/api/lobbies/${encodeURIComponent(code)}/selected-quiz`,
+      { quizId },
+      { withCredentials: true }
+    );
+  }
 }
