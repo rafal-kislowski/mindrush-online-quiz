@@ -37,7 +37,16 @@ public class QuizService {
                 .map(q -> new QuizListItemDto(
                         q.getId(),
                         q.getTitle(),
+                        q.getDescription(),
                         q.getCategory() == null ? null : q.getCategory().getName(),
+                        q.getAvatarImageUrl(),
+                        q.getAvatarBgStart(),
+                        q.getAvatarBgEnd(),
+                        q.getAvatarTextColor(),
+                        q.getGameMode(),
+                        q.isIncludeInRanking(),
+                        q.isXpEnabled(),
+                        q.getQuestionTimeLimitSeconds(),
                         questionRepository.countByQuizId(q.getId())
                 ))
                 .toList();
@@ -56,6 +65,14 @@ public class QuizService {
                 quiz.getTitle(),
                 quiz.getDescription(),
                 quiz.getCategory() == null ? null : quiz.getCategory().getName(),
+                quiz.getAvatarImageUrl(),
+                quiz.getAvatarBgStart(),
+                quiz.getAvatarBgEnd(),
+                quiz.getAvatarTextColor(),
+                quiz.getGameMode(),
+                quiz.isIncludeInRanking(),
+                quiz.isXpEnabled(),
+                quiz.getQuestionTimeLimitSeconds(),
                 questionRepository.countByQuizId(quizId)
         );
     }
