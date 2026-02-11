@@ -16,7 +16,7 @@ import java.util.regex.Pattern;
 @Component
 public class WebSocketLobbyPresenceListener {
 
-    private static final Pattern DESTINATION_PATTERN = Pattern.compile("^/topic/lobbies/([A-Za-z0-9]{6})/(lobby|game)$");
+    private static final Pattern DESTINATION_PATTERN = Pattern.compile("^/topic/lobbies/([A-Za-z0-9]{6})/(lobby|game|chat)$");
 
     private final LobbyService lobbyService;
     private final ConcurrentHashMap<String, Presence> presenceBySessionId = new ConcurrentHashMap<>();
