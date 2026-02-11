@@ -68,6 +68,16 @@ public class LobbyController {
         return ResponseEntity.ok(lobbyService.setLobbyMaxPlayers(request, code, maxPlayers, isAuthenticated(authentication)));
     }
 
+    @PostMapping("/{code}/selected-quiz")
+    public ResponseEntity<Map<String, Object>> setSelectedQuiz(
+            HttpServletRequest request,
+            @PathVariable String code,
+            @RequestBody(required = false) Map<String, Object> body
+    ) {
+        Long quizId = body == null ? null : asNullableLong(body.get("quizId"));
+        return ResponseEntity.ok(lobbyService.setSelectedQuiz(request, code, quizId));
+    }
+
     @PostMapping("/{code}/leave")
     public ResponseEntity<?> leave(HttpServletRequest request, @PathVariable String code) {
         LobbyService.LeaveResult result = lobbyService.leaveLobby(request, code);
@@ -98,6 +108,18 @@ public class LobbyController {
             return Integer.parseInt(s);
         } catch (NumberFormatException e) {
             throw new ResponseStatusException(BAD_REQUEST, "Invalid maxPlayers value");
+        }
+    }
+
+    private static Long asNullableLong(Object value) {
+        if (value == null) return null;
+        if (value instanceof Number n) return n.longValue();
+        String s = value.toString().trim();
+        if (s.isBlank()) return null;
+        try {
+            return Long.parseLong(s);
+        } catch (NumberFormatException e) {
+            throw new ResponseStatusException(BAD_REQUEST, "Invalid quizId value");
         }
     }
 

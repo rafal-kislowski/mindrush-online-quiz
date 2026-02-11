@@ -540,17 +540,37 @@ class LobbyControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.players.length()").value(2));
 
+        // Owner sets a numeric PIN (stored as lobby password) - should be visible to the owner.
+        mockMvc.perform(post("/api/lobbies/" + code + "/password")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"1234\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasPassword").value(true))
+                .andExpect(jsonPath("$.pin").value("1234"));
+
         mockMvc.perform(post("/api/lobbies/" + code + "/leave")
                         .cookie(new Cookie("guestSessionId", ownerSessionId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("OPEN"))
-                .andExpect(jsonPath("$.players.length()").value(1));
+                .andExpect(jsonPath("$.hasPassword").value(true))
+                .andExpect(jsonPath("$.isOwner").value(false))
+                .andExpect(jsonPath("$.isParticipant").value(false))
+                .andExpect(jsonPath("$.players").doesNotExist())
+                .andExpect(jsonPath("$.status").doesNotExist());
+
+        // The remaining participant becomes the new owner and should see the currently set PIN.
+        mockMvc.perform(get("/api/lobbies/" + code)
+                        .cookie(new Cookie("guestSessionId", secondSessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isOwner").value(true))
+                .andExpect(jsonPath("$.hasPassword").value(true))
+                .andExpect(jsonPath("$.pin").value("1234"));
 
         String thirdSessionId = createGuestSession();
         mockMvc.perform(post("/api/lobbies/" + code + "/join")
                         .cookie(new Cookie("guestSessionId", thirdSessionId))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
+                        .content("{\"password\":\"1234\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.players.length()").value(2));
 

@@ -27,11 +27,17 @@ public class Lobby {
     @Column(name = "password_hash")
     private String passwordHash;
 
+    @Column(name = "pin_code", length = 8)
+    private String pinCode;
+
     @Column(name = "max_players", nullable = false)
     private int maxPlayers;
 
     @Column(name = "empty_since")
     private Instant emptySince;
+
+    @Column(name = "selected_quiz_id")
+    private Long selectedQuizId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 16, nullable = false)
@@ -40,13 +46,14 @@ public class Lobby {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    public static Lobby createNew(String code, String ownerGuestSessionId, int maxPlayers, String passwordHash, Instant now) {
+    public static Lobby createNew(String code, String ownerGuestSessionId, int maxPlayers, String passwordHash, String pinCode, Instant now) {
         Lobby lobby = new Lobby();
         lobby.id = UUID.randomUUID().toString();
         lobby.code = code;
         lobby.ownerGuestSessionId = ownerGuestSessionId;
         lobby.maxPlayers = maxPlayers;
         lobby.passwordHash = passwordHash;
+        lobby.pinCode = pinCode;
         lobby.emptySince = null;
         lobby.status = LobbyStatus.OPEN;
         lobby.createdAt = now;
@@ -77,6 +84,14 @@ public class Lobby {
         this.passwordHash = passwordHash;
     }
 
+    public String getPinCode() {
+        return pinCode;
+    }
+
+    public void setPinCode(String pinCode) {
+        this.pinCode = pinCode;
+    }
+
     public int getMaxPlayers() {
         return maxPlayers;
     }
@@ -91,6 +106,14 @@ public class Lobby {
 
     public void setEmptySince(Instant emptySince) {
         this.emptySince = emptySince;
+    }
+
+    public Long getSelectedQuizId() {
+        return selectedQuizId;
+    }
+
+    public void setSelectedQuizId(Long selectedQuizId) {
+        this.selectedQuizId = selectedQuizId;
     }
 
     public LobbyStatus getStatus() {

@@ -8,9 +8,13 @@ import org.springframework.web.server.ResponseStatusException;
 import pl.mindrush.backend.guest.GuestSession;
 import pl.mindrush.backend.guest.GuestSessionService;
 import pl.mindrush.backend.lobby.events.LobbyEventPublisher;
+import pl.mindrush.backend.quiz.Quiz;
+import pl.mindrush.backend.quiz.QuizRepository;
+import pl.mindrush.backend.quiz.QuizStatus;
 
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -37,17 +41,20 @@ public class LobbyService {
     private final LobbyRepository lobbyRepository;
     private final LobbyParticipantRepository participantRepository;
     private final LobbyEventPublisher lobbyEventPublisher;
+    private final QuizRepository quizRepository;
 
     public LobbyService(
             GuestSessionService guestSessionService,
             LobbyRepository lobbyRepository,
             LobbyParticipantRepository participantRepository,
-            LobbyEventPublisher lobbyEventPublisher
+            LobbyEventPublisher lobbyEventPublisher,
+            QuizRepository quizRepository
     ) {
         this.guestSessionService = guestSessionService;
         this.lobbyRepository = lobbyRepository;
         this.participantRepository = participantRepository;
         this.lobbyEventPublisher = lobbyEventPublisher;
+        this.quizRepository = quizRepository;
     }
 
     public Map<String, Object> createLobby(
@@ -61,9 +68,10 @@ public class LobbyService {
 
         String code = generateUniqueCode();
         String passwordHash = (rawPassword == null || rawPassword.isBlank()) ? null : passwordEncoder.encode(rawPassword);
+        String pinCode = normalizePin(rawPassword);
 
         int maxPlayers = resolveMaxPlayers(requestedMaxPlayers, authenticatedUser);
-        Lobby lobby = Lobby.createNew(code, guestSession.getId(), maxPlayers, passwordHash, now);
+        Lobby lobby = Lobby.createNew(code, guestSession.getId(), maxPlayers, passwordHash, pinCode, now);
         lobbyRepository.save(lobby);
 
         String displayName = uniqueDisplayNameForLobby(lobby.getId(), guestSession.getDisplayName());
@@ -130,8 +138,18 @@ public class LobbyService {
         }
 
         if (lobby.hasPassword()) {
-            if (!isOwner && (rawPassword == null || rawPassword.isBlank() || !passwordEncoder.matches(rawPassword, lobby.getPasswordHash()))) {
+            boolean passwordOk = isOwner || (rawPassword != null && !rawPassword.isBlank() && passwordEncoder.matches(rawPassword, lobby.getPasswordHash()));
+            if (!passwordOk) {
                 throw new ResponseStatusException(FORBIDDEN, "Invalid lobby password");
+            }
+
+            // Backfill PIN for older lobbies (or in case pinCode was missing) once a valid PIN is provided.
+            if (lobby.getPinCode() == null && rawPassword != null) {
+                String normalizedPin = normalizePin(rawPassword);
+                if (normalizedPin != null) {
+                    lobby.setPinCode(normalizedPin);
+                    lobbyRepository.save(lobby);
+                }
             }
         }
 
@@ -155,6 +173,39 @@ public class LobbyService {
         return lobbySummary(lobby, guestSession.getId());
     }
 
+    public Map<String, Object> setSelectedQuiz(HttpServletRequest request, String code, Long quizId) {
+        GuestSession guestSession = guestSessionService.requireValidSession(request);
+        Lobby lobby = lobbyRepository.findByCode(code).orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Lobby not found"));
+
+        if (!guestSession.getId().equals(lobby.getOwnerGuestSessionId())) {
+            throw new ResponseStatusException(FORBIDDEN, "Only the lobby owner can change lobby settings");
+        }
+        if (lobby.getStatus() != LobbyStatus.OPEN) {
+            throw new ResponseStatusException(CONFLICT, "Lobby is not open");
+        }
+
+        Long normalizedQuizId = quizId;
+        if (normalizedQuizId != null) {
+            Quiz quiz = quizRepository.findById(normalizedQuizId)
+                    .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
+            if (quiz.getStatus() != QuizStatus.ACTIVE) {
+                throw new ResponseStatusException(NOT_FOUND, "Quiz not found");
+            }
+        }
+
+        if (normalizedQuizId == null && lobby.getSelectedQuizId() == null) {
+            return lobbySummary(lobby, guestSession.getId());
+        }
+        if (normalizedQuizId != null && normalizedQuizId.equals(lobby.getSelectedQuizId())) {
+            return lobbySummary(lobby, guestSession.getId());
+        }
+
+        lobby.setSelectedQuizId(normalizedQuizId);
+        lobbyRepository.save(lobby);
+        lobbyEventPublisher.lobbyUpdated(lobby.getCode());
+        return lobbySummary(lobby, guestSession.getId());
+    }
+
     public Map<String, Object> setLobbyPassword(HttpServletRequest request, String code, String rawPassword) {
         GuestSession guestSession = guestSessionService.requireValidSession(request);
         Lobby lobby = lobbyRepository.findByCode(code).orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Lobby not found"));
@@ -168,6 +219,7 @@ public class LobbyService {
 
         String passwordHash = (rawPassword == null || rawPassword.isBlank()) ? null : passwordEncoder.encode(rawPassword);
         lobby.setPasswordHash(passwordHash);
+        lobby.setPinCode(normalizePin(rawPassword));
         lobbyRepository.save(lobby);
 
         lobbyEventPublisher.lobbyUpdated(lobby.getCode());
@@ -263,27 +315,39 @@ public class LobbyService {
         boolean isParticipant = viewerGuestSessionId != null && participantRepository.existsByLobbyIdAndGuestSessionId(lobby.getId(), viewerGuestSessionId);
 
         if (lobby.hasPassword() && !isParticipant && !isOwner) {
-            return Map.of(
-                    "code", lobby.getCode(),
-                    "hasPassword", true,
-                    "isOwner", false,
-                    "isParticipant", false
-            );
+            Map<String, Object> locked = new HashMap<>();
+            locked.put("code", lobby.getCode());
+            locked.put("hasPassword", true);
+            locked.put("isOwner", false);
+            locked.put("isParticipant", false);
+            locked.put("selectedQuizId", lobby.getSelectedQuizId());
+            return locked;
         }
 
-        return Map.of(
-                "code", lobby.getCode(),
-                "status", lobby.getStatus().name(),
-                "maxPlayers", lobby.getMaxPlayers(),
-                "players", participants.stream().map(p -> Map.of(
-                        "displayName", p.getDisplayName(),
-                        "joinedAt", p.getJoinedAt().toString()
-                )).toList(),
-                "hasPassword", lobby.hasPassword(),
-                "createdAt", lobby.getCreatedAt().toString(),
-                "isOwner", isOwner,
-                "isParticipant", isParticipant
-        );
+        Map<String, Object> res = new HashMap<>();
+        res.put("code", lobby.getCode());
+        res.put("status", lobby.getStatus().name());
+        res.put("maxPlayers", lobby.getMaxPlayers());
+        res.put("players", participants.stream().map(p -> Map.of(
+                "displayName", p.getDisplayName(),
+                "joinedAt", p.getJoinedAt().toString()
+        )).toList());
+        res.put("hasPassword", lobby.hasPassword());
+        if (isOwner) {
+            res.put("pin", lobby.getPinCode());
+        }
+        res.put("createdAt", lobby.getCreatedAt().toString());
+        res.put("isOwner", isOwner);
+        res.put("isParticipant", isParticipant);
+        res.put("selectedQuizId", lobby.getSelectedQuizId());
+        return res;
+    }
+
+    private static String normalizePin(String rawPassword) {
+        if (rawPassword == null) return null;
+        String s = rawPassword.trim();
+        if (!s.matches("^\\d{4}$")) return null;
+        return s;
     }
 
     private String generateUniqueCode() {
