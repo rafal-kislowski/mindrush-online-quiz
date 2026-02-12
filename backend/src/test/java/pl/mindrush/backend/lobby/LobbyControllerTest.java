@@ -221,7 +221,7 @@ class LobbyControllerTest {
         MvcResult created = mockMvc.perform(post("/api/lobbies")
                         .cookie(new Cookie("guestSessionId", ownerSessionId))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"password\":\"secret123\"}"))
+                        .content("{\"password\":\"1234\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.hasPassword").value(true))
                 .andReturn();
@@ -239,7 +239,7 @@ class LobbyControllerTest {
         mockMvc.perform(post("/api/lobbies/" + code + "/join")
                         .cookie(new Cookie("guestSessionId", otherSessionId))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"password\":\"secret123\"}"))
+                        .content("{\"password\":\"1234\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.players.length()").value(2));
     }
@@ -251,7 +251,7 @@ class LobbyControllerTest {
         MvcResult created = mockMvc.perform(post("/api/lobbies")
                         .cookie(new Cookie("guestSessionId", ownerSessionId))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"password\":\"secret123\"}"))
+                        .content("{\"password\":\"1234\"}"))
                 .andExpect(status().isCreated())
                 .andReturn();
 
@@ -288,7 +288,7 @@ class LobbyControllerTest {
         mockMvc.perform(post("/api/lobbies/" + code + "/password")
                         .cookie(new Cookie("guestSessionId", ownerSessionId))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"password\":\"secret123\"}"))
+                        .content("{\"password\":\"1234\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.hasPassword").value(true));
 
@@ -337,7 +337,7 @@ class LobbyControllerTest {
         mockMvc.perform(post("/api/lobbies/" + code + "/password")
                         .cookie(new Cookie("guestSessionId", otherSessionId))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"password\":\"secret123\"}"))
+                        .content("{\"password\":\"1234\"}"))
                 .andExpect(status().isForbidden());
     }
 
@@ -362,7 +362,7 @@ class LobbyControllerTest {
         mockMvc.perform(post("/api/lobbies/" + code + "/password")
                         .cookie(new Cookie("guestSessionId", ownerSessionId))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"password\":\"secret123\"}"))
+                        .content("{\"password\":\"1234\"}"))
                 .andExpect(status().isConflict());
     }
 
@@ -382,7 +382,7 @@ class LobbyControllerTest {
         mockMvc.perform(post("/api/lobbies/" + code + "/password")
                         .cookie(new Cookie("guestSessionId", ownerSessionId))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"password\":\"secret123\"}"))
+                        .content("{\"password\":\"1234\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.hasPassword").value(true));
 

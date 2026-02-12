@@ -67,8 +67,12 @@ public class LobbyService {
         Instant now = Instant.now();
 
         String code = generateUniqueCode();
-        String passwordHash = (rawPassword == null || rawPassword.isBlank()) ? null : passwordEncoder.encode(rawPassword);
-        String pinCode = normalizePin(rawPassword);
+        String trimmedPassword = rawPassword == null ? null : rawPassword.trim();
+        String pinCode = normalizePin(trimmedPassword);
+        if (trimmedPassword != null && !trimmedPassword.isBlank() && pinCode == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "PIN must be exactly 4 digits");
+        }
+        String passwordHash = pinCode == null ? null : passwordEncoder.encode(pinCode);
 
         int maxPlayers = resolveMaxPlayers(requestedMaxPlayers, authenticatedUser);
         Lobby lobby = Lobby.createNew(code, guestSession.getId(), maxPlayers, passwordHash, pinCode, now);
@@ -138,14 +142,15 @@ public class LobbyService {
         }
 
         if (lobby.hasPassword()) {
-            boolean passwordOk = isOwner || (rawPassword != null && !rawPassword.isBlank() && passwordEncoder.matches(rawPassword, lobby.getPasswordHash()));
+            String trimmedPassword = rawPassword == null ? null : rawPassword.trim();
+            boolean passwordOk = isOwner || (trimmedPassword != null && !trimmedPassword.isBlank() && passwordEncoder.matches(trimmedPassword, lobby.getPasswordHash()));
             if (!passwordOk) {
                 throw new ResponseStatusException(FORBIDDEN, "Invalid lobby password");
             }
 
             // Backfill PIN for older lobbies (or in case pinCode was missing) once a valid PIN is provided.
-            if (lobby.getPinCode() == null && rawPassword != null) {
-                String normalizedPin = normalizePin(rawPassword);
+            if (lobby.getPinCode() == null && trimmedPassword != null) {
+                String normalizedPin = normalizePin(trimmedPassword);
                 if (normalizedPin != null) {
                     lobby.setPinCode(normalizedPin);
                     lobbyRepository.save(lobby);
@@ -217,9 +222,15 @@ public class LobbyService {
             throw new ResponseStatusException(CONFLICT, "Lobby is not open");
         }
 
-        String passwordHash = (rawPassword == null || rawPassword.isBlank()) ? null : passwordEncoder.encode(rawPassword);
+        String trimmedPassword = rawPassword == null ? null : rawPassword.trim();
+        String pinCode = normalizePin(trimmedPassword);
+        if (trimmedPassword != null && !trimmedPassword.isBlank() && pinCode == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "PIN must be exactly 4 digits");
+        }
+
+        String passwordHash = pinCode == null ? null : passwordEncoder.encode(pinCode);
         lobby.setPasswordHash(passwordHash);
-        lobby.setPinCode(normalizePin(rawPassword));
+        lobby.setPinCode(pinCode);
         lobbyRepository.save(lobby);
 
         lobbyEventPublisher.lobbyUpdated(lobby.getCode());

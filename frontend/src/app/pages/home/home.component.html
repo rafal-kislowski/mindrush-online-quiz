@@ -143,7 +143,11 @@
           <input
             class="tile__input"
             [(ngModel)]="createPassword"
-            placeholder="Password (optional)"
+            type="tel"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            maxlength="4"
+            placeholder="4-digit PIN (optional)"
           />
           <button
             class="btn primary"

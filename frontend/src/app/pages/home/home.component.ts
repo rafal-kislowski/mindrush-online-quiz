@@ -137,7 +137,14 @@ export class HomeComponent implements OnInit, OnDestroy {
   createLobby(): void {
     this.error = null;
     this.creating = true;
-    const password = this.createPassword.trim();
+    const raw = this.createPassword.trim();
+    const pin = raw.replace(/\D/g, '');
+    if (raw && pin.length !== 4) {
+      this.error = 'PIN must be exactly 4 digits';
+      this.creating = false;
+      return;
+    }
+    const password = pin.length === 4 ? pin : '';
     const isLoggedIn = !!this.auth.snapshot;
     const maxPlayers = isLoggedIn ? this.createMaxPlayers : undefined;
 

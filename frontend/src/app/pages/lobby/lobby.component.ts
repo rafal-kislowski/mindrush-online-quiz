@@ -66,7 +66,6 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   quizSearch = '';
   categoryOptions: ReadonlyArray<{ name: string | null; label: string; count: number }> = [];
 
-  password = '';
   error: string | null = null;
   joinState: 'unknown' | 'joined' | 'viewOnly' = 'unknown';
   get session$() {
@@ -74,8 +73,6 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   privacyMode: 'public' | 'private' = 'public';
-  privacyPassword = '';
-  privacyShowPassword = false;
   privacySaving = false;
   private privacyDirty = false;
 
@@ -1062,7 +1059,6 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   private resetTransientState(): void {
     this.view = 'lobby';
     this.error = null;
-    this.password = '';
     this.joinState = 'unknown';
     this.joinPinDigits = ['', '', '', ''];
     this.joinPinActiveIndex = 0;
@@ -1106,8 +1102,6 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.privacyMode = mode;
 
     if (mode === 'public') {
-      this.privacyPassword = '';
-      this.privacyShowPassword = false;
       if (!this.lobby?.hasPassword) {
         this.privacyDirty = false;
         return;
@@ -1129,39 +1123,6 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       });
       return;
     }
-  }
-
-  togglePrivacyPassword(): void {
-    this.privacyShowPassword = !this.privacyShowPassword;
-  }
-
-  setPrivatePassword(): void {
-    if (!this.lobby?.isOwner) return;
-    if (this.privacySaving) return;
-    this.error = null;
-
-    const password = this.privacyPassword.trim();
-    if (!password) {
-      this.error = 'Password is required to make this lobby private';
-      return;
-    }
-
-    this.privacySaving = true;
-    this.lobbyApi
-      .setPassword(this.code, password)
-      .subscribe({
-        next: (updated) => {
-          this.privacySaving = false;
-          this.privacyDirty = false;
-          this.privacyPassword = '';
-          this.privacyShowPassword = false;
-          this.onLobbyUpdate(updated);
-        },
-        error: (err) => {
-          this.privacySaving = false;
-          this.error = err?.error?.message ?? 'Failed to update lobby privacy';
-        },
-      });
   }
 
   onPrivacyApplyClick(): void {
