@@ -1,5 +1,6 @@
 ﻿<div class="lobby-page" [class.is-join]="joinState !== 'joined'" *ngIf="lobby as l; else loading">
-  <section class="card panel lobby-shell">
+  <div class="lobby-frame">
+    <section class="card panel lobby-shell">
     <svg class="svg-defs" aria-hidden="true" focusable="false">
       <defs>
         <linearGradient
@@ -1192,7 +1193,8 @@
         </ng-template>
       </div>
     </section>
-  </section>
+    </section>
+  </div>
 
   <p class="error" *ngIf="error">{{ error }}</p>
 </div>

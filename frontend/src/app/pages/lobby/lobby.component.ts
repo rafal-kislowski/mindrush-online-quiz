@@ -376,41 +376,52 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     const root = this.document?.documentElement;
     if (!body || !root) return;
 
+    const win = this.document.defaultView;
     const alreadyLocked = body.classList.contains('mr-no-scroll');
 
-    if (locked && !alreadyLocked) {
-      const win = this.document.defaultView;
-      const y = win?.scrollY ?? 0;
-      this.scrollLockY = y;
+    if (locked) {
+      if (!alreadyLocked) {
+        const y = win?.scrollY ?? 0;
+        this.scrollLockY = y;
 
-      body.style.position = 'fixed';
-      body.style.top = `-${y}px`;
-      body.style.left = '0';
-      body.style.right = '0';
-      body.style.width = '100%';
+        body.style.position = 'fixed';
+        body.style.top = `-${y}px`;
+        body.style.left = '0';
+        body.style.right = '0';
+        body.style.width = '100%';
+      }
+
+      body.classList.add('mr-no-scroll');
+      root.classList.add('mr-no-scroll');
+      return;
     }
 
-    if (!locked && alreadyLocked) {
-      const win = this.document.defaultView;
-      const y = this.scrollLockY ?? 0;
+    // Always clear scroll-lock styles (even if the class was removed elsewhere).
+    let y = this.scrollLockY;
+    if (y == null) {
+      const top = body.style.top ?? '';
+      const m = top.match(/^-(\d+)(?:\.\d+)?px$/);
+      y = m ? Number(m[1]) : 0;
+    }
 
-      body.style.position = '';
-      body.style.top = '';
-      body.style.left = '';
-      body.style.right = '';
-      body.style.width = '';
-      this.scrollLockY = null;
+    body.style.position = '';
+    body.style.top = '';
+    body.style.left = '';
+    body.style.right = '';
+    body.style.width = '';
+    this.scrollLockY = null;
 
-      // Restore the previous scroll position (no visual jump on unlock).
+    body.classList.remove('mr-no-scroll');
+    root.classList.remove('mr-no-scroll');
+
+    // Restore the previous scroll position (no visual jump on unlock).
+    if (y && y > 0) {
       try {
         win?.scrollTo?.({ top: y, left: 0, behavior: 'auto' });
       } catch {
         win?.scrollTo?.(0, y);
       }
     }
-
-    body.classList.toggle('mr-no-scroll', locked);
-    root.classList.toggle('mr-no-scroll', locked);
   }
 
   private attemptAutoJoinIfPossible(lobby: LobbyDto | null): void {

@@ -67,6 +67,7 @@ export class AppComponent implements OnInit {
 
   sidebarOpen = false;
   contentWide = false;
+  contentFull = false;
 
   readonly menuItems: Array<{
     label: string;
@@ -91,10 +92,17 @@ export class AppComponent implements OnInit {
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
       .subscribe(() => {
         this.sidebarOpen = false;
-        this.contentWide = this.router.url.startsWith('/create-quiz');
+        this.updateContentFlags(this.router.url);
       });
 
-    this.contentWide = this.router.url.startsWith('/create-quiz');
+    this.updateContentFlags(this.router.url);
+  }
+
+  private updateContentFlags(url: string): void {
+    const path = (url ?? '').split('?')[0]?.split('#')[0] ?? '';
+    this.contentWide = path.startsWith('/create-quiz');
+    this.contentFull =
+      path === '/' || path.startsWith('/leaderboards') || path.startsWith('/lobby');
   }
 
   toggleSidebar(): void {

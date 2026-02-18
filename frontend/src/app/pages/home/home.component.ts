@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, HostListener, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Subject, catchError, map, of, takeUntil } from 'rxjs';
@@ -15,6 +15,7 @@ import { rankForPoints } from '../../core/progression/progression';
 type LeaderboardRowVm = LeaderboardEntryDto & {
   rankName: string;
   rankColor: string;
+  rankAccent: string;
   initials: string;
 };
 
@@ -27,23 +28,18 @@ type LeaderboardRowVm = LeaderboardEntryDto & {
 })
 export class HomeComponent implements OnInit, OnDestroy {
   readonly joinCodeLength = 6;
-  readonly joinCodeIndices = Array.from(
-    { length: this.joinCodeLength },
-    (_, i) => i
-  );
+  readonly joinCodeSlots = Array.from({ length: this.joinCodeLength });
+  readonly leaderboardSkeleton = Array.from({ length: 5 });
 
   get authUser$() {
     return this.auth.user$;
   }
 
   joinCode = '';
-  joinCodeChars = Array.from({ length: this.joinCodeLength }, () => '');
+  joinCodeFocused = false;
+  joinCodeActiveIndex = 0;
   creating = false;
   error: string | null = null;
-  createPassword = '';
-  createMaxPlayers: 2 | 3 | 4 | 5 = 2;
-  maxPlayersMenuOpen = false;
-  maxPlayersMenuDirection: 'down' | 'up' = 'down';
 
   leaderboardLoading = true;
   leaderboardError: string | null = null;
@@ -57,8 +53,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     private readonly lobbyApi: LobbyApi,
     private readonly leaderboardApi: LeaderboardApi,
     private readonly auth: AuthService,
-    private readonly router: Router,
-    private readonly el: ElementRef<HTMLElement>
+    private readonly router: Router
   ) {}
 
   ngOnInit(): void {
@@ -68,7 +63,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     });
 
     this.leaderboardApi
-      .list(6)
+      .list(5)
       .pipe(
         map((list) =>
           list.map((p) => {
@@ -77,6 +72,7 @@ export class HomeComponent implements OnInit, OnDestroy {
               ...p,
               rankName: rank.name,
               rankColor: rank.color,
+              rankAccent: this.hexToRgba(rank.color, 0.26),
               initials: this.initialsFrom(p.displayName),
             };
           })
@@ -92,9 +88,12 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.leaderboardLoading = false;
       });
 
-    this.leaderboardApi.stats().subscribe({
-      next: (s) => (this.leaderboardStats = s),
-      error: () => {},
+    this.leaderboardApi
+      .stats()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (s) => (this.leaderboardStats = s),
+        error: () => {},
       });
   }
 
@@ -102,12 +101,6 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.destroy$.next();
     this.destroy$.complete();
   }
-
-  readonly steps: Array<{ n: number; label: string }> = [
-    { n: 1, label: 'Enter as guest' },
-    { n: 2, label: 'Create or join lobby' },
-    { n: 3, label: 'Play in real time' },
-  ];
 
   initialsFrom(name: string): string {
     const trimmed = (name ?? '').trim();
@@ -120,6 +113,18 @@ export class HomeComponent implements OnInit, OnDestroy {
     return letters || trimmed.slice(0, 1).toUpperCase();
   }
 
+  private hexToRgba(hex: string, a: number): string {
+    const alpha = Math.max(0, Math.min(1, a));
+    const h = String(hex ?? '').replace('#', '').trim();
+    if (h.length !== 6) return `rgba(56,189,248,${alpha})`;
+    const n = Number.parseInt(h, 16);
+    if (!Number.isFinite(n)) return `rgba(56,189,248,${alpha})`;
+    const r = (n >> 16) & 255;
+    const g = (n >> 8) & 255;
+    const b = n & 255;
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
   avatarGradient(userId: number): string {
     const n = Math.abs(Math.floor(userId || 0));
     const hue1 = n % 360;
@@ -127,32 +132,12 @@ export class HomeComponent implements OnInit, OnDestroy {
     return `linear-gradient(135deg, hsla(${hue1}, 90%, 60%, 0.95), hsla(${hue2}, 90%, 55%, 0.85))`;
   }
 
-  trophyClass(i: number): string | null {
-    if (i === 0) return 'trophy trophy--gold';
-    if (i === 1) return 'trophy trophy--silver';
-    if (i === 2) return 'trophy trophy--bronze';
-    return null;
-  }
 
   createLobby(): void {
     this.error = null;
     this.creating = true;
-    const raw = this.createPassword.trim();
-    const pin = raw.replace(/\D/g, '');
-    if (raw && pin.length !== 4) {
-      this.error = 'PIN must be exactly 4 digits';
-      this.creating = false;
-      return;
-    }
-    const password = pin.length === 4 ? pin : '';
-    const isLoggedIn = !!this.auth.snapshot;
-    const maxPlayers = isLoggedIn ? this.createMaxPlayers : undefined;
-
     this.lobbyApi
-      .create({
-        password: password ? password : undefined,
-        maxPlayers,
-      })
+      .create({})
       .subscribe({
         next: (res) => this.router.navigate(['/lobby', res.code]),
         error: (err) => {
@@ -162,46 +147,6 @@ export class HomeComponent implements OnInit, OnDestroy {
       });
   }
 
-  toggleMaxPlayersMenu(ev?: MouseEvent): void {
-    const next = !this.maxPlayersMenuOpen;
-    this.maxPlayersMenuOpen = next;
-
-    if (!next) return;
-
-    const target = ev?.currentTarget;
-    if (!(target instanceof HTMLElement)) return;
-
-    const rect = target.getBoundingClientRect();
-    const menuWantedHeight = 220;
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
-    this.maxPlayersMenuDirection =
-      spaceBelow < menuWantedHeight && spaceAbove > spaceBelow ? 'up' : 'down';
-  }
-
-  setCreateMaxPlayers(n: 2 | 3 | 4 | 5): void {
-    this.createMaxPlayers = n;
-    this.maxPlayersMenuOpen = false;
-  }
-
-  @HostListener('document:click', ['$event'])
-  onDocumentClick(ev: MouseEvent): void {
-    if (!this.maxPlayersMenuOpen) return;
-    const target = ev.target as Node | null;
-    if (!target) return;
-    if (!this.el.nativeElement.contains(target)) {
-      this.maxPlayersMenuOpen = false;
-    }
-  }
-
-  @HostListener('document:keydown', ['$event'])
-  onDocumentKeydown(ev: KeyboardEvent): void {
-    if (!this.maxPlayersMenuOpen) return;
-    if (ev.key === 'Escape') {
-      this.maxPlayersMenuOpen = false;
-    }
-  }
-
   joinLobby(): void {
     const code = this.joinCode.trim().toUpperCase();
     if (!code) return;
@@ -209,17 +154,29 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   isJoinCodeComplete(): boolean {
-    return this.joinCode.trim().length === 6;
+    return this.joinCode.trim().length === this.joinCodeLength;
+  }
+
+  onJoinCodeFocus(): void {
+    this.joinCodeFocused = true;
+    this.joinCodeActiveIndex = Math.min(
+      this.joinCode.length,
+      this.joinCodeLength - 1
+    );
+  }
+
+  onJoinCodeBlur(): void {
+    this.joinCodeFocused = false;
   }
 
   onJoinCodeChange(value: string): void {
     this.joinCode = value
       .toUpperCase()
       .replace(/[^A-Z0-9]/g, '')
-      .slice(0, 6);
-    this.joinCodeChars = Array.from(
-      { length: this.joinCodeLength },
-      (_, i) => this.joinCode[i] ?? ''
+      .slice(0, this.joinCodeLength);
+    this.joinCodeActiveIndex = Math.min(
+      this.joinCode.length,
+      this.joinCodeLength - 1
     );
   }
 }

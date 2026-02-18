@@ -1,288 +1,550 @@
-<section class="hero">
-  <h1>Play quizzes. Earn bragging rights.</h1>
-  <p class="sub">
-    Real-time guest lobbies for friends.
-    <span class="accent">No paywalls, no account required.</span>
-  </p>
-
-  <div class="steps">
-    <div class="step" *ngFor="let s of steps">
-      <span class="step__n">{{ s.n }}</span>
-      <span class="step__label">{{ s.label }}</span>
-    </div>
-  </div>
-</section>
-
-<section class="grid">
-  <!-- PLAY SOLO -->
-  <a
-    class="tile tile3d tile--solo"
-    routerLink="/play-solo"
-    aria-label="Play Solo"
-  >
-    <div class="tile__layout">
-      <div class="tile__copy">
-        <div class="tile__title">Play Solo</div>
-        <div class="tile__desc">Warm up with a quick solo quiz.</div>
-      </div>
-
-      <div class="tile__media" aria-hidden="true">
-        <img class="tile__img" src="/dashboard/play_solo.png" alt="" />
-      </div>
-    </div>
-  </a>
-
-  <!-- SHOP -->
-  <a class="tile tile3d tile--ppc" routerLink="/shop" aria-label="Shop">
-    <div class="tile__layout">
-      <div class="tile__copy">
-        <div class="tile__title">Shop</div>
-        <div class="tile__desc">Cosmetics and profile items.</div>
-      </div>
-
-      <div class="tile__media" aria-hidden="true">
-        <img class="tile__img" src="/dashboard/shop.png" alt="" />
-      </div>
-    </div>
-  </a>
-
-  <!-- NEWS -->
-  <a class="tile tile3d tile--oneclick" routerLink="/news" aria-label="News">
-    <div class="tile__layout">
-      <div class="tile__copy">
-        <div class="tile__title">News</div>
-        <div class="tile__desc">Latest updates and patch notes.</div>
-      </div>
-
-      <div class="tile__media" aria-hidden="true">
-        <img class="tile__img" src="/dashboard/news.png" alt="" />
-      </div>
-    </div>
-  </a>
-
-  <!-- CREATE LOBBY -->
-  <article
-    class="tile tile3d tile3d--static tile--install"
-    [class.tile--menu-open]="maxPlayersMenuOpen"
-    aria-label="Create Lobby"
-  >
-      <div class="tile__layout tile__layout--with-actions">
-        <div class="tile__left">
-          <div class="tile__copy">
-            <div class="tile__title">Create Lobby</div>
-            <div class="tile__desc" *ngIf="(authUser$ | async) as user; else guestCreateDesc">
-              Create a room (2–5 players).
+<main class="dashboard">
+  <svg class="svg-defs" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="mrTitleGradHome" x1="0" y1="0" x2="0" y2="20" gradientUnits="userSpaceOnUse">
+        <stop offset="0" style="stop-color: var(--lobby-accent-gold)" />
+        <stop offset="1" style="stop-color: var(--lobby-accent-cyan)" />
+      </linearGradient>
+      <symbol id="mrTitleMarkHome" viewBox="0 0 10 20">
+        <path
+          d="M5 1c2.1 0 3.2 1.6 3.2 3.5v11C8.2 17.4 7.1 19 5 19S1.8 17.4 1.8 15.5v-11C1.8 2.6 2.9 1 5 1Z"
+          fill="url(#mrTitleGradHome)"
+        />
+      </symbol>
+    </defs>
+  </svg>
+  <section class="grid" aria-label="Dashboard">
+    <header class="hero tile" aria-label="Dashboard">
+      <div class="hero__inner">
+        <div class="hero__topGrid" aria-label="Hero content">
+          <div class="hero__left">
+            <div class="hero__top">
+              <div class="hero__title">
+                <div class="hero__brand">Quiz Online</div>
+                <h1 class="hero__h1">
+                  Welcome to
+                  <span class="hero__mindrush" aria-label="MindRush">
+                    <span class="sr-only">MindRush</span>
+                    <span class="hero__mindrushLetters" aria-hidden="true">
+                      <span class="hero__letter" style="--i: 0">M</span>
+                      <span class="hero__letter" style="--i: 1">i</span>
+                      <span class="hero__letter" style="--i: 2">n</span>
+                      <span class="hero__letter" style="--i: 3">d</span>
+                      <span class="hero__letter" style="--i: 4">R</span>
+                      <span class="hero__letter" style="--i: 5">u</span>
+                      <span class="hero__letter" style="--i: 6">s</span>
+                      <span class="hero__letter" style="--i: 7">h</span>
+                    </span>
+                  </span>
+                </h1>
+                <p class="hero__sub muted">
+                  <ng-container *ngIf="(authUser$ | async) as user; else guestSub">
+                    Ready for a match, {{ user.displayName }}? Create a lobby, invite friends, and play in real time.
+                  </ng-container>
+                  <ng-template #guestSub>Create a lobby, invite friends, and play in real time.</ng-template>
+                </p>
+              </div>
             </div>
-            <ng-template #guestCreateDesc>
-              <div class="tile__desc">Create a guest room (max 2 players).</div>
-            </ng-template>
+
+            <div class="hero__inlineMeta" aria-label="Stats">
+              <div class="hero__meta" role="status" aria-label="Live stats">
+                <div class="hero-stat">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M20 21a8 8 0 1 0-16 0"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  <span class="hero-stat__n">{{ leaderboardStats ? (leaderboardStats.players | number) : '—' }}</span>
+                  <span class="hero-stat__l">Players</span>
+                </div>
+
+                <div class="hero-stat">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M8 2v4M16 2v4M3 10h18"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M5 6h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  <span class="hero-stat__n">{{ leaderboardStats ? (leaderboardStats.matches | number) : '—' }}</span>
+                  <span class="hero-stat__l">Matches</span>
+                </div>
+
+                <div class="hero-stat">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M21 15a4 4 0 0 1-4 4H7l-4 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v8Z"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  <span class="hero-stat__n">{{ leaderboardStats ? (leaderboardStats.answers | number) : '—' }}</span>
+                  <span class="hero-stat__l">Answers</span>
+                </div>
+              </div>
+            </div>
+
           </div>
 
-        <div class="tile__actions">
-          <div class="tile__select-wrap" *ngIf="(authUser$ | async) as user">
+          <aside class="hero__right" aria-label="Game modes">
+            <header class="hero__modesHeader">
+              <svg class="hero__modesMark" aria-hidden="true" focusable="false" viewBox="0 0 10 20">
+                <use href="#mrTitleMarkHome"></use>
+              </svg>
+              <div class="hero__modesTitleWrap">
+                <h2 class="hero__modesTitle">Game modes</h2>
+                <p class="hero__modesSub muted">Choose a mode and start playing.</p>
+              </div>
+
+              <nav class="hero__social" aria-label="Social links">
+                <a class="social-btn" href="https://discord.com" target="_blank" rel="noopener noreferrer" aria-label="Discord">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path
+                      d="M19.73 4.64a16.91 16.91 0 0 0-4.07-1.26.07.07 0 0 0-.08.04c-.18.32-.38.74-.52 1.07a15.7 15.7 0 0 0-4.7 0c-.14-.33-.35-.75-.53-1.07a.07.07 0 0 0-.08-.04c-1.4.24-2.78.67-4.07 1.26a.06.06 0 0 0-.03.03C.53 9.32-.32 13.86.1 18.35a.07.07 0 0 0 .03.05 17 17 0 0 0 5.1 2.58.07.07 0 0 0 .08-.02c.39-.53.73-1.1 1.03-1.7a.07.07 0 0 0-.04-.1 11.2 11.2 0 0 1-1.6-.76.07.07 0 0 1-.01-.12c.11-.08.22-.17.32-.25a.07.07 0 0 1 .07-.01c3.35 1.53 6.98 1.53 10.3 0a.07.07 0 0 1 .07.01c.1.08.21.17.32.25a.07.07 0 0 1-.01.12c-.51.3-1.05.56-1.6.76a.07.07 0 0 0-.04.1c.3.6.64 1.17 1.03 1.7a.07.07 0 0 0 .08.02 17 17 0 0 0 5.1-2.58.07.07 0 0 0 .03-.05c.5-5.2-.83-9.7-4.52-13.68a.06.06 0 0 0-.03-.03ZM8.02 15.33c-1 0-1.82-.92-1.82-2.05 0-1.13.81-2.05 1.82-2.05s1.83.92 1.82 2.05c0 1.13-.81 2.05-1.82 2.05Zm7.96 0c-1 0-1.82-.92-1.82-2.05 0-1.13.81-2.05 1.82-2.05s1.83.92 1.82 2.05c0 1.13-.81 2.05-1.82 2.05Z"
+                    />
+                  </svg>
+                </a>
+
+                <a class="social-btn" href="https://github.com" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path
+                      d="M12 2a10 10 0 0 0-3.16 19.48c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.19-3.37-1.19-.46-1.17-1.12-1.48-1.12-1.48-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.36 1.09 2.94.83.09-.65.35-1.09.64-1.34-2.22-.25-4.56-1.11-4.56-4.95 0-1.09.39-1.98 1.03-2.68-.1-.26-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.52 9.52 0 0 1 5 0c1.9-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.38.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.85-2.34 4.7-4.57 4.95.36.31.69.92.69 1.86V21c0 .26.18.57.69.48A10 10 0 0 0 12 2Z"
+                    />
+                  </svg>
+                </a>
+
+                <a class="social-btn" href="https://x.com" target="_blank" rel="noopener noreferrer" aria-label="X">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path
+                      d="M18.9 2H22l-6.8 7.78L23.2 22h-6.7l-5.2-6.58L5.7 22H2.6l7.3-8.36L1.2 2h6.9l4.7 6.07L18.9 2Zm-1.2 18h1.8L7.3 3.9H5.4L17.7 20Z"
+                    />
+                  </svg>
+                </a>
+              </nav>
+            </header>
+
+            <div class="hero__modesList" aria-label="Game mode links">
+              <a class="mode-btn mode-btn--cp wm--gamepad accent--cyan" routerLink="/play-solo" aria-label="Casual play">
+                <div class="mini__icon" aria-hidden="true">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <line x1="6" x2="10" y1="11" y2="11" />
+                    <line x1="8" x2="8" y1="9" y2="13" />
+                    <line x1="15" x2="15.01" y1="12" y2="12" />
+                    <line x1="18" x2="18.01" y1="10" y2="10" />
+                    <path
+                      d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"
+                    />
+                  </svg>
+                </div>
+                <div class="mini__text">
+                  <div class="mini__kicker">Mode</div>
+                  <div class="mini__t">Casual</div>
+                  <div class="mini__d muted">Relaxed game with no pressure.</div>
+                </div>
+              </a>
+
+              <a class="mode-btn mode-btn--cp wm--trophy accent--orange" routerLink="/play-ranked" aria-label="Ranked play">
+                <div class="mini__icon" aria-hidden="true">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M10 14.66v1.626a2 2 0 0 1-.976 1.696A5 5 0 0 0 7 21.978" />
+                    <path d="M14 14.66v1.626a2 2 0 0 0 .976 1.696A5 5 0 0 1 17 21.978" />
+                    <path d="M18 9h1.5a1 1 0 0 0 0-5H18" />
+                    <path d="M4 22h16" />
+                    <path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z" />
+                    <path d="M6 9H4.5a1 1 0 0 1 0-5H6" />
+                  </svg>
+                </div>
+                <div class="mini__text">
+                  <div class="mini__kicker">Mode</div>
+                  <div class="mini__t">Ranked</div>
+                  <div class="mini__d muted">Earn rating points and climb.</div>
+                </div>
+              </a>
+
+              <a class="mode-btn mode-btn--cp wm--dice accent--purple" routerLink="/play-random" aria-label="Random game">
+                <div class="mini__icon" aria-hidden="true">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                    <path d="M16 8h.01" />
+                    <path d="M8 8h.01" />
+                    <path d="M8 16h.01" />
+                    <path d="M16 16h.01" />
+                    <path d="M12 12h.01" />
+                  </svg>
+                </div>
+                <div class="mini__text">
+                  <div class="mini__kicker">Mode</div>
+                  <div class="mini__t">Random</div>
+                  <div class="mini__d muted">Jump straight into a match.</div>
+                </div>
+              </a>
+            </div>
+          </aside>
+        </div>
+
+        <div class="hero__divider" aria-hidden="true"></div>
+
+        <section class="hero__lower" aria-label="Quick menu">
+          <section class="lower-menu" aria-label="Quick menu">
+            <header class="lower-menu__header" aria-label="Quick menu header">
+              <svg class="lower-menu__mark" aria-hidden="true" focusable="false" viewBox="0 0 10 20">
+                <use href="#mrTitleMarkHome"></use>
+              </svg>
+              <div class="lower-menu__titleWrap">
+                <div class="lower-menu__title">Quick menu</div>
+                <div class="lower-menu__sub muted">Create, join, and explore in one place.</div>
+              </div>
+            </header>
+
+            <nav class="lower-menu__topnav" aria-label="Quick links">
+              <a class="mode-btn mode-btn--cp mode-btn--nav wm--news accent--cyan" routerLink="/news" aria-label="News">
+                <div class="mini__icon" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M8 7h8M8 11h8M8 15h5"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M4 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4Z"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </div>
+                <div class="mini__text">
+                  <div class="mini__t">News</div>
+                  <div class="mini__d muted">Updates and announcements.</div>
+                </div>
+              </a>
+
+              <a class="mode-btn mode-btn--cp mode-btn--nav wm--cart accent--orange" routerLink="/shop" aria-label="Shop">
+                <div class="mini__icon" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M6 6h15l-1.5 9h-12L6 6Z"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M6 6 5 3H2"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M9 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM18 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </div>
+                <div class="mini__text">
+                  <div class="mini__t">Shop</div>
+                  <div class="mini__d muted">Skins and cosmetics.</div>
+                </div>
+              </a>
+            </nav>
+
             <button
-              class="tile__select"
+              class="mode-btn mode-btn--cp mode-btn--home create wm--gamepad accent--cyan"
               type="button"
-              (click)="toggleMaxPlayersMenu($event)"
-              [attr.aria-expanded]="maxPlayersMenuOpen"
-              aria-label="Max players"
-            >
-              <span class="tile__select-label">{{ createMaxPlayers }} players</span>
-              <span class="tile__select-caret" aria-hidden="true"></span>
-            </button>
-
-            <div
-              class="tile__select-menu"
-              [class.is-up]="maxPlayersMenuDirection === 'up'"
-              *ngIf="maxPlayersMenuOpen"
-              role="listbox"
-              aria-label="Select max players"
-            >
-              <button
-                type="button"
-                class="tile__select-item"
-                [class.active]="createMaxPlayers === 2"
-                (click)="setCreateMaxPlayers(2)"
-                role="option"
-                [attr.aria-selected]="createMaxPlayers === 2"
-              >
-                2 players
-              </button>
-              <button
-                type="button"
-                class="tile__select-item"
-                [class.active]="createMaxPlayers === 3"
-                (click)="setCreateMaxPlayers(3)"
-                role="option"
-                [attr.aria-selected]="createMaxPlayers === 3"
-              >
-                3 players
-              </button>
-              <button
-                type="button"
-                class="tile__select-item"
-                [class.active]="createMaxPlayers === 4"
-                (click)="setCreateMaxPlayers(4)"
-                role="option"
-                [attr.aria-selected]="createMaxPlayers === 4"
-              >
-                4 players
-              </button>
-              <button
-                type="button"
-                class="tile__select-item"
-                [class.active]="createMaxPlayers === 5"
-                (click)="setCreateMaxPlayers(5)"
-                role="option"
-                [attr.aria-selected]="createMaxPlayers === 5"
-              >
-                5 players
-              </button>
-            </div>
-          </div>
-          <input
-            class="tile__input"
-            [(ngModel)]="createPassword"
-            type="tel"
-            inputmode="numeric"
-            pattern="[0-9]*"
-            maxlength="4"
-            placeholder="4-digit PIN (optional)"
-          />
-          <button
-            class="btn primary"
-            type="button"
-            (click)="createLobby()"
+              aria-label="Create lobby"
+              [attr.aria-busy]="creating"
+              (click)="createLobby()"
               [disabled]="creating"
-          >
-            Create
-          </button>
-        </div>
+            >
+              <div class="mini__icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M12 5v14M5 12h14"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </div>
+                <div class="mini__text">
+                  <div class="mini__t">Create lobby</div>
+                  <div class="mini__d muted" *ngIf="(authUser$ | async) as user; else guestCreateDesc">
+                  Start a lobby in seconds.
+                  </div>
+                  <ng-template #guestCreateDesc>
+                  <div class="mini__d muted">Start a guest lobby in seconds.</div>
+                  </ng-template>
+                </div>
+              </button>
+
+            <a class="mode-btn mode-btn--cp mode-btn--home active wm--dice accent--purple" routerLink="/lobbies" aria-label="Active lobbies">
+              <div class="mini__icon" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M16 11c1.66 0 3-1.34 3-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3Z"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M8 11c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3Z"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M2 19c0-2.76 2.24-5 5-5"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M17 14c2.76 0 5 2.24 5 5"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M12 12c2.76 0 5 2.24 5 5"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M12 12c-2.76 0-5 2.24-5 5"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </div>
+              <div class="mini__text">
+                <div class="mini__t">Active lobbies</div>
+                <div class="mini__d muted">Browse open rooms.</div>
+              </div>
+            </a>
+
+            <section class="mode-btn mode-btn--cp join mode-btn--join wm--trophy accent--orange" aria-label="Join lobby">
+              <div class="mini__icon" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M15 3h6v6"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M10 14 21 3"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M21 14v7h-7"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M21 21 3 3"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+              </div>
+
+              <div class="mini__text">
+                <div class="mini__kicker">Join</div>
+                <div class="mini__t">Join with code</div>
+                <div class="mini__d muted">Enter your 6-character code.</div>
+              </div>
+
+              <div class="join-controls" aria-label="Join controls">
+                <div class="join-pin" aria-label="Lobby code">
+                  <input
+                    id="join-code"
+                    class="join-pin__hidden"
+                    type="text"
+                    inputmode="text"
+                    autocapitalize="characters"
+                    autocomplete="one-time-code"
+                    spellcheck="false"
+                    placeholder="AB1234"
+                    maxlength="6"
+                    [ngModel]="joinCode"
+                    (ngModelChange)="onJoinCodeChange($event)"
+                    (keydown.enter)="joinLobby()"
+                    (focus)="onJoinCodeFocus()"
+                    (blur)="onJoinCodeBlur()"
+                    aria-label="Lobby code input"
+                  />
+
+                  <div class="join-pin__boxes" aria-hidden="true">
+                    <div
+                      *ngFor="let _ of joinCodeSlots; let i = index"
+                      class="join-pin__box"
+                      [class.is-filled]="!!joinCode[i]"
+                      [class.is-active]="joinCodeFocused && joinCodeActiveIndex === i"
+                    >
+                      {{ joinCode[i] || "" }}
+                    </div>
+                  </div>
+                </div>
+
+                <button class="join-cta" type="button" (click)="joinLobby()" [disabled]="!isJoinCodeComplete()">
+                  Join
+                </button>
+              </div>
+            </section>
+
+          </section>
+
+          <section class="panel leader leader--list" aria-label="Leaderboards">
+            <header class="leader__header">
+              <svg class="leader__mark" aria-hidden="true" focusable="false" viewBox="0 0 10 20">
+                <use href="#mrTitleMarkHome"></use>
+              </svg>
+              <div class="leader__titleWrap">
+                <div class="leader__title">Leaderboards</div>
+                <div class="leader__sub muted">Top 5 players</div>
+              </div>
+              <a class="leader__more muted" routerLink="/leaderboards" aria-label="See more leaderboards">See more</a>
+            </header>
+
+            <div class="leader__body" aria-label="Top 5 players list">
+              <div class="error" *ngIf="leaderboardError">{{ leaderboardError }}</div>
+
+              <div class="leader__rows leader__rows--skel" *ngIf="leaderboardLoading" aria-hidden="true">
+                <div class="leader-row" *ngFor="let _ of leaderboardSkeleton">
+                  <div class="leader-row__place skel"></div>
+                  <div class="leader-row__avatar leader-row__avatar--skel"></div>
+                  <div class="leader-row__main">
+                    <div class="leader-row__nameWrap">
+                      <div class="leader-row__name skel"></div>
+                      <span class="rank-pill skel"></span>
+                    </div>
+                    <div class="leader-row__meta">
+                      <span class="leader-row__rp skel"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="leader__empty muted" *ngIf="!leaderboardError && !leaderboardLoading && leaderboardRows.length === 0">
+                No players yet.
+              </div>
+
+              <div class="leader__rows" *ngIf="!leaderboardError && !leaderboardLoading && leaderboardRows.length > 0">
+                <div
+                  class="leader-row"
+                  *ngFor="let p of leaderboardRows; let i = index"
+                  [style.--accent]="p.rankAccent"
+                  [class.is-me]="currentUserId === p.userId"
+                >
+                  <div class="leader-row__place" aria-hidden="true">
+                    <i
+                      *ngIf="i < 3"
+                      class="fa-solid fa-trophy"
+                      [class.leader-row__trophy--gold]="i === 0"
+                      [class.leader-row__trophy--silver]="i === 1"
+                      [class.leader-row__trophy--bronze]="i === 2"
+                      aria-hidden="true"
+                    ></i>
+                    <span *ngIf="i >= 3">{{ i + 1 }}</span>
+                  </div>
+
+                  <div class="leader-row__avatar" [style.background]="avatarGradient(p.userId)" aria-hidden="true">
+                    {{ p.initials }}
+                  </div>
+
+                  <div class="leader-row__main">
+                    <div class="leader-row__nameWrap">
+                      <div class="leader-row__name">{{ p.displayName }}</div>
+                      <span class="rank-pill" [style.--rank-color]="p.rankColor">{{ p.rankName }}</span>
+                    </div>
+                    <div class="leader-row__meta">
+                      <span class="leader-row__rp">
+                        {{ p.rankPoints | number }} <span class="rp muted">RP</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+
       </div>
-
-      <div class="tile__media" aria-hidden="true">
-        <img class="tile__img" src="/dashboard/create_lobby.png" alt="" />
-      </div>
-    </div>
-  </article>
-
-  <!-- LEADERBOARD -->
-  <article class="tile tile--leaderboard" aria-label="Leaderboards">
-    <div class="leader__header">
-      <div class="leader__title">Leaderboards</div>
-      <div class="leader__meta">
-        <div class="meta-box">
-          <div class="meta__big">
-            {{ leaderboardStats ? (leaderboardStats.players | number) : '—' }}
-          </div>
-          <div class="meta__small">Players</div>
-        </div>
-        <div class="meta-box">
-          <div class="meta__big">
-            {{ leaderboardStats ? (leaderboardStats.matches | number) : '—' }}
-          </div>
-          <div class="meta__small">Matches</div>
-        </div>
-        <div class="meta-box">
-          <div class="meta__big">
-            {{ leaderboardStats ? (leaderboardStats.answers | number) : '—' }}
-          </div>
-          <div class="meta__small">Answers</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="leader__table">
-      <div class="row-head">
-        <span>User</span>
-        <span class="right">RP</span>
-      </div>
-
-      <div class="error" *ngIf="leaderboardError">{{ leaderboardError }}</div>
-      <div class="row-item" *ngFor="let p of leaderboardRows; let i = index" [class.is-me]="currentUserId === p.userId">
-        <div class="left">
-          <span class="pos" aria-hidden="true">
-            <i
-              *ngIf="trophyClass(i) as tc; else numberPos"
-              [class]="'fa-solid fa-trophy ' + tc"
-            ></i>
-            <ng-template #numberPos>
-              <span class="pos__n">{{ i + 1 }}</span>
-            </ng-template>
-          </span>
-
-          <span
-            class="avatar"
-            [style.background]="avatarGradient(p.userId)"
-            aria-hidden="true"
-            >{{ p.initials }}</span
-          >
-
-          <span class="name">{{ p.displayName }}</span>
-          <span class="rank-pill" [style.--rank-color]="p.rankColor">
-            {{ p.rankName }}
-          </span>
-        </div>
-        <div class="right">
-          <span class="points">{{ p.rankPoints | number }}</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="leader__footer">
-      <a routerLink="/leaderboards">Show more</a>
-    </div>
-  </article>
-
-  <!-- JOIN -->
-  <article
-    class="tile tile3d tile3d--static tile--videos"
-    aria-label="Join your friends"
-  >
-    <div class="tile__layout tile__layout--with-actions">
-      <div class="tile__left">
-        <div class="tile__copy">
-          <div class="tile__title">Join your friends</div>
-          <div class="tile__desc">Enter the 6-character lobby code.</div>
-        </div>
-
-        <div class="tile__actions">
-          <label class="code-input" aria-label="Lobby code">
-            <input
-              class="tile__input code-input__native"
-              [ngModel]="joinCode"
-              (ngModelChange)="onJoinCodeChange($event)"
-              placeholder="AB1234"
-              maxlength="6"
-              inputmode="text"
-              autocapitalize="characters"
-              autocomplete="one-time-code"
-              aria-label="Lobby code"
-            />
-            <span class="code-input__slots" aria-hidden="true">
-              <span
-                class="code-input__slot"
-                *ngFor="let i of joinCodeIndices"
-                >{{ joinCodeChars[i] }}</span
-              >
-            </span>
-          </label>
-          <button
-            class="btn accent"
-            type="button"
-            (click)="joinLobby()"
-            [disabled]="!isJoinCodeComplete()"
-          >
-            Join
-          </button>
-        </div>
-      </div>
-
-      <div class="tile__media" aria-hidden="true">
-        <img class="tile__img" src="/dashboard/join_lobby.png" alt="" />
-      </div>
-    </div>
-  </article>
-</section>
+    </header>
+  </section>
+</main>
 
 <p class="error" *ngIf="error">{{ error }}</p>

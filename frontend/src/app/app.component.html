@@ -271,7 +271,11 @@
       </div>
     </header>
 
-    <main class="content" [class.content--wide]="contentWide">
+    <main
+      class="content"
+      [class.content--wide]="contentWide"
+      [class.content--full]="contentFull"
+    >
       <router-outlet />
     </main>
   </div>
