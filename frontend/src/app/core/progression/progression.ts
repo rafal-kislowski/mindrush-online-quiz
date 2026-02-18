@@ -76,7 +76,9 @@ export function computeLevelProgress(xpRaw: number): LevelProgress {
 
   const levelXpStart = xpToReachLevel(level);
   const levelXpEnd = maxLevel ? levelXpStart : xpToReachLevel(level + 1);
-  const xpInLevel = maxLevel ? 0 : clamp(xp - levelXpStart, 0, levelXpEnd - levelXpStart);
+  const xpInLevel = maxLevel
+    ? 0
+    : clamp(xp - levelXpStart, 0, levelXpEnd - levelXpStart);
   const xpToNext = maxLevel ? 0 : Math.max(0, levelXpEnd - xp);
   const denom = Math.max(1, levelXpEnd - levelXpStart);
   const progress = maxLevel ? 1 : clamp(xpInLevel / denom, 0, 1);
@@ -121,15 +123,45 @@ export function rankForPoints(rpRaw: number): RankInfo {
   const rp = Math.max(0, Math.floor(rpRaw || 0));
 
   const tiers: Array<{ min: number; name: string; color: string }> = [
-    { min: 0, name: 'Rookie', color: '#aab3c2' },
-    { min: 100, name: 'Bronze Brain', color: '#ff9a35' },
-    { min: 250, name: 'Silver Scholar', color: '#cfd8e6' },
-    { min: 500, name: 'Gold Genius', color: '#ffd24a' },
-    { min: 800, name: 'Platinum Pro', color: '#31d1a0' },
-    { min: 1200, name: 'Diamond Mind', color: '#4aa8ff' },
-    { min: 1600, name: 'Master', color: '#b96bff' },
-    { min: 2200, name: 'Legend', color: '#ff6bd6' },
-    { min: 3000, name: 'Mythic', color: '#ff6b6b' },
+    { min: 0, name: 'Rookie', color: '#9AA4B2' },
+
+    // Bronze
+    { min: 100, name: 'Bronze III', color: '#CD7F32' },
+    { min: 200, name: 'Bronze II', color: '#CD7F32' },
+    { min: 300, name: 'Bronze I', color: '#CD7F32' },
+
+    // Silver
+    { min: 450, name: 'Silver III', color: '#C0C0C0' },
+    { min: 600, name: 'Silver II', color: '#C0C0C0' },
+    { min: 750, name: 'Silver I', color: '#C0C0C0' },
+
+    // Gold
+    { min: 950, name: 'Gold III', color: '#E6B800' },
+    { min: 1150, name: 'Gold II', color: '#E6B800' },
+    { min: 1350, name: 'Gold I', color: '#E6B800' },
+
+    // Platinum
+    { min: 1600, name: 'Platinum III', color: '#00C2A8' },
+    { min: 1850, name: 'Platinum II', color: '#00C2A8' },
+    { min: 2100, name: 'Platinum I', color: '#00C2A8' },
+
+    // Diamond
+    { min: 2400, name: 'Diamond III', color: '#3AA0FF' },
+    { min: 2700, name: 'Diamond II', color: '#3AA0FF' },
+    { min: 3000, name: 'Diamond I', color: '#3AA0FF' },
+
+    // Master (deep purple)
+    { min: 3400, name: 'Master III', color: '#7B3FE4' },
+    { min: 3800, name: 'Master II', color: '#7B3FE4' },
+    { min: 4200, name: 'Master I', color: '#7B3FE4' },
+
+    // Legend (royal indigo / premium, zamiast różu)
+    { min: 4700, name: 'Legend III', color: '#4B2EFF' },
+    { min: 5200, name: 'Legend II', color: '#4B2EFF' },
+    { min: 5800, name: 'Legend I', color: '#4B2EFF' },
+
+    // Mythic (top)
+    { min: 6500, name: 'Mythic', color: '#E10600' },
   ];
 
   let current = tiers[0];
@@ -142,4 +174,3 @@ export function rankForPoints(rpRaw: number): RankInfo {
 export const progressionConstants = {
   MAX_LEVEL,
 };
-

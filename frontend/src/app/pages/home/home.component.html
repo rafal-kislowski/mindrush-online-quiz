@@ -38,10 +38,7 @@
                   </span>
                 </h1>
                 <p class="hero__sub muted">
-                  <ng-container *ngIf="(authUser$ | async) as user; else guestSub">
-                    Ready for a match, {{ user.displayName }}? Create a lobby, invite friends, and play in real time.
-                  </ng-container>
-                  <ng-template #guestSub>Create a lobby, invite friends, and play in real time.</ng-template>
+                  Create a lobby, invite friends, and play in real time.
                 </p>
               </div>
             </div>
@@ -424,7 +421,7 @@
               <div class="mini__text">
                 <div class="mini__kicker">Join</div>
                 <div class="mini__t">Join with code</div>
-                <div class="mini__d muted">Enter your 6-character code.</div>
+                <div class="mini__d muted">Enter code.</div>
               </div>
 
               <div class="join-controls" aria-label="Join controls">

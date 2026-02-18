@@ -12,6 +12,43 @@ import { AuthService } from './core/auth/auth.service';
 import { SessionService } from './core/session/session.service';
 import { computeLevelProgress, levelTheme, rankForPoints } from './core/progression/progression';
 
+function clamp01(n: number): number {
+  return Math.max(0, Math.min(1, n));
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const h = (hex || '').replace('#', '').trim();
+  if (h.length !== 6) return null;
+  const n = Number.parseInt(h, 16);
+  if (!Number.isFinite(n)) return null;
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function withAlpha(hex: string, alpha: number, fallback = '255,255,255'): string {
+  const a = clamp01(alpha);
+  const rgb = hexToRgb(hex);
+  if (!rgb) return `rgba(${fallback},${a})`;
+  return `rgba(${rgb.r},${rgb.g},${rgb.b},${a})`;
+}
+
+function clamp255(n: number): number {
+  return Math.max(0, Math.min(255, Math.round(n)));
+}
+
+function toHex(v: number): string {
+  return clamp255(v).toString(16).padStart(2, '0');
+}
+
+function tintHex(hex: string, amount: number): string {
+  const rgb = hexToRgb(hex);
+  const a = clamp01(amount);
+  if (!rgb) return '#c7d0df';
+  const r = rgb.r + (255 - rgb.r) * a;
+  const g = rgb.g + (255 - rgb.g) * a;
+  const b = rgb.b + (255 - rgb.b) * a;
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -50,6 +87,10 @@ export class AppComponent implements OnInit {
         rankPoints,
         rankName: rank.name,
         rankColor: rank.color,
+        rankColor2: tintHex(rank.color, 0.28),
+        rankSoft: withAlpha(rank.color, 0.16, '170,179,194'),
+        rankGlow: withAlpha(rank.color, 0.34, '170,179,194'),
+        isHighRank: rankPoints >= 1200,
         xp,
         coins,
         level: lvl.level,

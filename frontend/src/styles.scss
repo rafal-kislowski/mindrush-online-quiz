@@ -1094,14 +1094,13 @@ input[type="color"]::-moz-color-swatch {
 /* Lobby: moved to global to avoid anyComponentStyle budget warnings. */
 .lobby-page {
   width: 100%;
-  min-height: calc(100svh - 64px);
+  min-height: 100%;
   --lobby-inset: calc(clamp(12px, 1.6vw, 20px) + 6px);
-  --lobby-page-gutter: 20px;
-  --lobby-page-bottom: clamp(10px, 1.8vw, 20px);
-  padding: 0 var(--lobby-page-gutter) var(--lobby-page-bottom);
+  padding: var(--lobby-inset);
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   overflow-x: hidden;
 
   /* Keep lobby readable (less “black overlay”), while staying consistent with the app theme. */
@@ -1121,7 +1120,7 @@ input[type="color"]::-moz-color-swatch {
   width: 100%;
   max-width: 1280px;
   min-height: 0;
-  margin: 0 auto;
+  margin: auto auto;
   padding: clamp(22px, 2.8vw, 44px);
   border-radius: clamp(16px, 2.2vw, 30px);
   border: 1px solid rgba(255, 255, 255, 0.10);
@@ -3957,7 +3956,8 @@ input[type="color"]::-moz-color-swatch {
 
 @media (max-width: 920px) {
   .lobby-page {
-    --lobby-page-gutter: 12px;
+    padding: 0 12px 12px;
+    justify-content: flex-start;
   }
 
   .lobby-page .lobby-shell {
@@ -4157,7 +4157,7 @@ input[type="color"]::-moz-color-swatch {
 
 @media (max-width: 420px) {
   .lobby-page {
-    --lobby-page-gutter: 10px;
+    padding: 0 10px 10px;
   }
 
   .lobby-page .stat-tile--privacyWide .privacy-right .privacy-pin {

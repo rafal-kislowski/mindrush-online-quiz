@@ -24,12 +24,14 @@
 
 .dashboard {
   width: 100%;
-  min-height: calc(100svh - var(--topbar-h));
+  min-height: 100%;
   padding: calc(var(--gap) + 6px);
   overflow: visible;
   overflow-x: hidden;
   position: relative;
   isolation: isolate;
+  display: grid;
+  align-content: center;
 }
 
 /* =================== LAYOUT =================== */
@@ -37,7 +39,7 @@
 .grid {
   max-width: var(--dash-max);
   margin: 0 auto;
-  height: 100%;
+  height: auto;
   min-height: 0;
   position: relative;
   z-index: 1;
@@ -179,6 +181,7 @@
 .lower-menu {
   /* Match the top "Game modes" card height on desktop. */
   --quick-card-h: 78px;
+  --quick-icon-size: 48px;
   min-height: 0;
   display: grid;
   gap: calc(var(--gap) * 0.85);
@@ -257,8 +260,8 @@
 }
 
 .lower-menu .mode-btn--home .mini__icon {
-  width: 52px;
-  height: 52px;
+  width: var(--quick-icon-size);
+  height: var(--quick-icon-size);
 }
 
 .lower-menu .mode-btn--home .mini__t {
@@ -300,8 +303,8 @@
 }
 
 .lower-menu__topnav .mini__icon {
-  width: 44px;
-  height: 44px;
+  width: var(--quick-icon-size);
+  height: var(--quick-icon-size);
 }
 
 .lower-menu__topnav .mini__t {
@@ -315,6 +318,15 @@
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.lower-menu .mode-btn--join {
+  grid-template-columns: var(--quick-icon-size) minmax(0, 1fr) minmax(0, 420px);
+}
+
+.lower-menu .mode-btn--join .mini__icon {
+  width: var(--quick-icon-size);
+  height: var(--quick-icon-size);
 }
 
 
@@ -926,6 +938,7 @@
 @media (max-width: 1180px) {
   .dashboard {
     overflow-y: auto;
+    display: block;
   }
 
   .grid,
@@ -1026,6 +1039,10 @@
   .hero-stat__l {
     grid-area: label;
     line-height: 1.2;
+  }
+
+  .lower-menu .mode-btn--join {
+    grid-template-columns: var(--quick-icon-size) 1fr;
   }
 }
 
@@ -1141,6 +1158,7 @@
     overflow-y: auto;
     height: auto;
     max-height: none;
+    display: block;
   }
 
   .grid,
