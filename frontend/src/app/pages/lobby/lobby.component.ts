@@ -134,9 +134,34 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly minJoinTransitionMs = 2000;
   private readonly joinDelayTimers = new Set<number>();
   private destroyed = false;
+  private initialLobbyReady = false;
+  private quizzesReady = false;
 
   get joinBusy(): boolean {
     return this.joinRequestInFlight || this.autoJoinInFlight;
+  }
+
+  get roomTransitionBusy(): boolean {
+    return (
+      this.joinBusy ||
+      !this.initialLobbyReady ||
+      !this.quizzesReady ||
+      !this.lobbyViewReady
+    );
+  }
+
+  private get lobbyViewReady(): boolean {
+    const lobby = this.lobby;
+    if (!lobby) return false;
+    if (typeof lobby.isOwner !== 'boolean') return false;
+    if (typeof lobby.hasPassword !== 'boolean') return false;
+
+    if (this.joinState === 'joined') {
+      if (!Array.isArray(lobby.players)) return false;
+      if (typeof lobby.maxPlayers !== 'number') return false;
+    }
+
+    return true;
   }
 
   get joinBusyText(): string {
@@ -145,6 +170,18 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       return 'Verifying PIN and joining';
     }
     return 'Joining lobby';
+  }
+
+  get roomTransitionTitle(): string {
+    if (this.joinBusy) return this.joinBusyText;
+    return 'Preparing lobby';
+  }
+
+  get roomTransitionText(): string {
+    if (this.joinBusy) {
+      return 'Please wait while we connect you to this room.';
+    }
+    return 'Finalizing room setup and syncing player data.';
   }
 
   constructor(
@@ -255,6 +292,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private initLobby(lobby: LobbyDto): void {
+    this.initialLobbyReady = true;
     this.onLobbyUpdate(lobby);
     this.ensureChatUpdates();
 
@@ -627,6 +665,12 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
         this.quizzes = quizzes;
         this.recomputeCategoryOptions();
         this.syncMatchTypeFromSelectedQuiz();
+        this.quizzesReady = true;
+      },
+      error: () => {
+        this.quizzes = [];
+        this.categoryOptions = [];
+        this.quizzesReady = true;
       },
     });
   }
@@ -1183,6 +1227,8 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.chatEventsSubscription?.unsubscribe();
     this.chatEventsSubscription = null;
     this.quizzesLoaded = false;
+    this.quizzesReady = false;
+    this.initialLobbyReady = false;
     this.quizzes = [];
     this.categorySelected = [];
     this.pickerScope = 'official';

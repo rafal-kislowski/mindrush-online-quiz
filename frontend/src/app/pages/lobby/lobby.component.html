@@ -1,7 +1,7 @@
 ﻿<div
   class="lobby-page"
   [class.is-join]="joinState !== 'joined'"
-  [class.is-joining]="joinBusy"
+  [class.is-joining]="roomTransitionBusy"
   *ngIf="lobby as l; else loading"
 >
   <div class="lobby-frame">
@@ -1215,30 +1215,43 @@
 
   <div
     class="mr-flow-overlay"
-    *ngIf="joinBusy"
+    *ngIf="roomTransitionBusy"
     role="status"
     aria-live="polite"
     aria-atomic="true"
   >
     <div class="mr-flow-overlay__panel">
       <p class="mr-flow-overlay__title">
-        {{ joinBusyText }}
+        {{ roomTransitionTitle }}
         <span class="mr-flow-dots" aria-hidden="true">
           <span></span><span></span><span></span>
         </span>
       </p>
       <p class="mr-flow-overlay__text">
-        Please wait while we connect you to this room.
+        {{ roomTransitionText }}
       </p>
     </div>
   </div>
 </div>
 
 <ng-template #loading>
-  <section class="card panel loading">
-    <div class="skeleton-title"></div>
-    <div class="skeleton-line"></div>
-    <div class="skeleton-line short"></div>
-  </section>
+  <div
+    class="mr-flow-overlay"
+    role="status"
+    aria-live="polite"
+    aria-atomic="true"
+  >
+    <div class="mr-flow-overlay__panel">
+      <p class="mr-flow-overlay__title">
+        Preparing lobby
+        <span class="mr-flow-dots" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </span>
+      </p>
+      <p class="mr-flow-overlay__text">
+        Loading room configuration and player context.
+      </p>
+    </div>
+  </div>
 </ng-template>
 

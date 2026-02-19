@@ -11,6 +11,7 @@ import { combineLatest, filter, map } from 'rxjs';
 import { AuthService } from './core/auth/auth.service';
 import { SessionService } from './core/session/session.service';
 import { computeLevelProgress, levelTheme, rankForPoints } from './core/progression/progression';
+import { ParticlesService } from './core/ui/particles.service';
 import { ToastViewportComponent } from './core/ui/toast-viewport.component';
 
 function clamp01(n: number): number {
@@ -58,6 +59,7 @@ function tintHex(hex: string, amount: number): string {
   styleUrl: './app.component.scss',
 })
 export class AppComponent implements OnInit {
+  private readonly particlesService = inject(ParticlesService);
   private readonly sessionService = inject(SessionService);
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
@@ -108,6 +110,7 @@ export class AppComponent implements OnInit {
   );
 
   sidebarOpen = false;
+  sidebarCollapsed = false;
   contentWide = false;
   contentFull = false;
 
@@ -123,6 +126,8 @@ export class AppComponent implements OnInit {
   ];
 
   ngOnInit(): void {
+    this.particlesService.initParticles();
+
     this.sessionService.ensure().subscribe();
     this.authService.ensureLoaded().subscribe((u) => {
       if (u) {
@@ -157,6 +162,16 @@ export class AppComponent implements OnInit {
 
   closeSidebar(): void {
     this.sidebarOpen = false;
+  }
+
+  onDesktopBurgerChange(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    this.sidebarCollapsed = !input?.checked;
+  }
+
+  onDesktopBurgerKeyToggle(event: Event): void {
+    event.preventDefault();
+    this.sidebarCollapsed = !this.sidebarCollapsed;
   }
 
   logout(): void {

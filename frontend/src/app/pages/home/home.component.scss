@@ -1024,15 +1024,11 @@
 
   .hero-stat {
     min-width: 0;
-    justify-content: start;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
     padding: 10px 8px;
-    grid-template-columns: 14px minmax(0, 1fr);
-    grid-template-rows: auto auto;
-    grid-template-areas:
-      "icon value"
-      "icon label";
-    column-gap: 8px;
-    row-gap: 2px;
     border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     background: rgba(0, 0, 0, 0.14);
@@ -1041,18 +1037,20 @@
   }
 
   .hero-stat svg {
-    grid-area: icon;
-    align-self: center;
+    flex: 0 0 auto;
   }
 
   .hero-stat__n {
-    grid-area: value;
+    display: inline-flex;
+    align-items: center;
     line-height: 1.1;
   }
 
   .hero-stat__l {
-    grid-area: label;
-    line-height: 1.2;
+    display: inline-flex;
+    align-items: center;
+    margin-left: 4px;
+    line-height: 1.1;
   }
 
   .lower-menu .mode-btn--join {
@@ -1141,29 +1139,27 @@
 
   .hero-stat {
     width: 100%;
-    justify-content: start;
-    grid-template-columns: 14px minmax(0, 1fr);
-    grid-template-rows: auto auto;
-    grid-template-areas:
-      "icon value"
-      "icon label";
-    column-gap: 8px;
-    row-gap: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
   }
 
   .hero-stat svg {
-    grid-area: icon;
-    align-self: center;
+    flex: 0 0 auto;
   }
 
   .hero-stat__n {
-    grid-area: value;
+    display: inline-flex;
+    align-items: center;
     line-height: 1.1;
   }
 
   .hero-stat__l {
-    grid-area: label;
-    line-height: 1.2;
+    display: inline-flex;
+    align-items: center;
+    margin-left: 4px;
+    line-height: 1.1;
   }
 }
 

@@ -24,9 +24,9 @@ textarea {
 
 :root {
   /* Base background (dashboard-like) */
-  --bg0: #070c1b;
-  --bg1: #0b1631;
-  --bg2: #0f2a54;
+  --bg0: #050c1d;
+  --bg1: #0b1a3c;
+  --bg2: #143a6f;
 
   /* Sidebar / offcanvas */
   --sidebar-bg: linear-gradient(180deg, rgba(11, 22, 49, 1), rgba(7, 12, 27, 1));
@@ -53,10 +53,11 @@ textarea {
 body {
   /* Global app background (previously scoped to the Home dashboard). */
   background:
-    radial-gradient(900px 420px at 12% 12%, rgba(47, 134, 255, 0.30), transparent 62%),
-    radial-gradient(860px 380px at 92% 22%, rgba(255, 138, 43, 0.18), transparent 64%),
-    radial-gradient(1200px 900px at 50% 120%, rgba(15, 42, 84, 0.85), transparent 60%),
-    linear-gradient(180deg, var(--bg1), var(--bg0));
+    radial-gradient(980px 500px at 14% 14%, rgba(56, 170, 255, 0.24), transparent 64%),
+    radial-gradient(760px 360px at 82% 16%, rgba(141, 110, 255, 0.16), transparent 66%),
+    radial-gradient(860px 420px at 84% 82%, rgba(255, 184, 88, 0.12), transparent 72%),
+    radial-gradient(1220px 880px at 50% 118%, rgba(18, 53, 106, 0.72), transparent 64%),
+    linear-gradient(180deg, #102853 0%, var(--bg1) 42%, var(--bg0) 100%);
   background-color: var(--bg1);
   color: var(--text);
   cursor: default;
@@ -98,10 +99,218 @@ textarea,
   --lobby-accent-purple: rgba(185, 107, 255, 0.80);
 }
 
+/* App shell: desktop sidebar toggle in topbar and collapsible offcanvas layout. */
+app-root .layout {
+  transition: grid-template-columns 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+app-root .layout.is-sidebar-collapsed {
+  grid-template-columns: 0 1fr;
+}
+
+app-root .layout.is-sidebar-collapsed .sidebar {
+  transform: translateX(-104%);
+  opacity: 0;
+  pointer-events: none;
+  border-right-color: transparent;
+  box-shadow: none;
+}
+
+app-root .topbar__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.burger {
+  position: relative;
+  width: 32px;
+  height: 24px;
+  background: transparent;
+  cursor: pointer;
+  display: block;
+}
+
+.burger input {
+  display: none;
+}
+
+.burger span {
+  display: block;
+  position: absolute;
+  height: 3px;
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(236, 244, 255, 0.95),
+    rgba(213, 227, 249, 0.92)
+  );
+  border-radius: 9px;
+  opacity: 1;
+  left: 0;
+  transform: rotate(0deg);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.2);
+  transition: 0.25s ease-in-out;
+  z-index: 1;
+}
+
+.burger span:nth-of-type(1) {
+  top: 0px;
+  transform-origin: left center;
+}
+
+.burger span:nth-of-type(2) {
+  top: 50%;
+  transform: translateY(-50%);
+  transform-origin: left center;
+}
+
+.burger span:nth-of-type(3) {
+  top: 100%;
+  transform-origin: left center;
+  transform: translateY(-100%);
+}
+
+.burger input:checked ~ span:nth-of-type(1) {
+  transform: rotate(45deg);
+  top: 0px;
+  left: 4px;
+}
+
+.burger input:checked ~ span:nth-of-type(2) {
+  width: 0%;
+  opacity: 0;
+}
+
+.burger input:checked ~ span:nth-of-type(3) {
+  transform: rotate(-45deg);
+  top: 22px;
+  left: 4px;
+}
+
+app-root .topbar__left > .burger--desktop {
+  width: 32px;
+  height: 24px;
+  border-radius: 0;
+  isolation: isolate;
+  outline: none;
+}
+
+app-root .topbar__left > .burger--desktop::before {
+  display: none;
+}
+
+app-root .topbar__left > .burger--desktop:focus-visible::before {
+  display: none;
+}
+
+app-root .topbar__left > .burger--desktop:focus-visible {
+  outline: 2px solid rgba(56, 189, 248, 0.36);
+  outline-offset: 4px;
+}
+
+app-root .mobile-burger {
+  position: relative;
+  width: 28px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+}
+
+app-root .mobile-burger span {
+  position: absolute;
+  left: 0;
+  display: block;
+  width: 100%;
+  height: 2.6px;
+  border-radius: 8px;
+  opacity: 1;
+  transform: rotate(0deg);
+  transform-origin: left center;
+  background: linear-gradient(90deg, rgba(236, 244, 255, 0.95), rgba(213, 227, 249, 0.92));
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  transition: 0.25s ease-in-out;
+}
+
+app-root .mobile-burger span:nth-of-type(1) {
+  top: 0;
+}
+
+app-root .mobile-burger span:nth-of-type(2) {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+app-root .mobile-burger span:nth-of-type(3) {
+  top: 100%;
+  transform: translateY(-100%);
+}
+
+app-root .mobile-burger.is-open span:nth-of-type(1) {
+  top: 0;
+  left: 3px;
+  transform: rotate(45deg);
+}
+
+app-root .mobile-burger.is-open span:nth-of-type(2) {
+  width: 0;
+  opacity: 0;
+}
+
+app-root .mobile-burger.is-open span:nth-of-type(3) {
+  top: 18px;
+  left: 3px;
+  transform: rotate(-45deg);
+}
+
+app-root .mobile-burger:focus-visible {
+  outline: 2px solid rgba(56, 189, 248, 0.36);
+  outline-offset: 4px;
+}
+
+@media (max-width: 980px) {
+  app-root .layout.is-sidebar-collapsed {
+    grid-template-columns: 1fr;
+  }
+
+  /* On mobile, drawer state is controlled only by .is-open */
+  app-root .layout.is-sidebar-collapsed .sidebar {
+    transform: translateX(-105%);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  app-root .layout.is-open .sidebar {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  app-root .topbar__left > .burger {
+    display: none;
+  }
+}
+
 .dashboard .tile {
   border: 0;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+}
+
+.dashboard .grid .hero.tile {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    radial-gradient(130% 110% at 0% 0%, rgba(56, 189, 248, 0.12), transparent 58%),
+    radial-gradient(120% 120% at 100% 100%, rgba(255, 183, 72, 0.10), transparent 62%),
+    linear-gradient(170deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.20));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow:
+    0 26px 60px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
 
 .dashboard .mini .mini__icon {
@@ -224,6 +433,16 @@ a {
   font-size: 15px;
   line-height: 1.42;
   color: rgba(255, 255, 255, 0.72);
+}
+
+/* While any full-screen flow overlay is active, hide shell controls behind it. */
+app-root:has(.mr-flow-overlay) .topbar__right,
+app-root:has(.mr-flow-overlay) .topbar__left > .burger--desktop,
+app-root:has(.mr-flow-overlay) .topbar__left > .mobile-burger,
+app-root:has(.mr-flow-overlay) .sidebar__close {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .card {
@@ -1189,12 +1408,19 @@ input[type="color"]::-moz-color-swatch {
   margin: auto auto;
   padding: clamp(22px, 2.8vw, 44px);
   border-radius: clamp(16px, 2.2vw, 30px);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: transparent;
-  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    radial-gradient(130% 110% at 0% 0%, rgba(56, 189, 248, 0.12), transparent 58%),
+    radial-gradient(120% 120% at 100% 100%, rgba(255, 183, 72, 0.10), transparent 62%),
+    linear-gradient(170deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.20));
+  box-shadow:
+    0 26px 60px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 /* Lobby buttons: align with dashboard's neutral + glow style (less saturated). */
@@ -1876,15 +2102,21 @@ input[type="color"]::-moz-color-swatch {
 }
 
 .lobby-page .subpanel {
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    radial-gradient(130% 110% at 0% 0%, rgba(56, 189, 248, 0.12), transparent 58%),
+    radial-gradient(120% 120% at 100% 100%, rgba(255, 183, 72, 0.10), transparent 62%),
+    linear-gradient(170deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.20));
   border-radius: 18px;
   padding: 16px;
   box-shadow:
-    0 16px 40px rgba(0, 0, 0, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    0 26px 60px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
   display: flex;
   flex-direction: column;
   min-height: 0;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .lobby-page .subpanel .section-title {

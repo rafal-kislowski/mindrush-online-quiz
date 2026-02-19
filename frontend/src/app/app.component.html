@@ -1,4 +1,6 @@
-﻿<div class="layout" [class.is-open]="sidebarOpen">
+<div id="particles-js" class="app-particles" aria-hidden="true"></div>
+
+<div class="layout" [class.is-open]="sidebarOpen" [class.is-sidebar-collapsed]="sidebarCollapsed">
   <div class="overlay" (click)="closeSidebar()"></div>
 
   <aside class="sidebar">
@@ -15,7 +17,8 @@
           (click)="closeSidebar()"
           aria-label="Close menu"
         >
-          <span aria-hidden="true">&times;</span>
+          <span class="sidebar__close-line" aria-hidden="true"></span>
+          <span class="sidebar__close-line" aria-hidden="true"></span>
         </button>
       </div>
 
@@ -282,16 +285,42 @@
 
   <div class="main">
     <header class="topbar">
-      <button
-        class="burger"
-        type="button"
-        (click)="toggleSidebar()"
-        [attr.aria-expanded]="sidebarOpen"
-      >
-        <span></span><span></span><span></span>
-      </button>
+      <div class="topbar__left">
+        <label
+          class="burger burger--desktop"
+          for="sidebar-burger-toggle"
+          role="button"
+          tabindex="0"
+          [class.is-collapsed]="sidebarCollapsed"
+          (keydown.enter)="onDesktopBurgerKeyToggle($event)"
+          (keydown.space)="onDesktopBurgerKeyToggle($event)"
+          [attr.aria-expanded]="!sidebarCollapsed"
+          [attr.aria-label]="sidebarCollapsed ? 'Open menu' : 'Close menu'"
+        >
+          <input
+            type="checkbox"
+            id="sidebar-burger-toggle"
+            [checked]="!sidebarCollapsed"
+            (change)="onDesktopBurgerChange($event)"
+            tabindex="-1"
+            aria-hidden="true"
+          >
+          <span></span>
+          <span></span>
+          <span></span>
+        </label>
 
-      <div></div>
+        <button
+          class="mobile-burger"
+          type="button"
+          [class.is-open]="sidebarOpen"
+          (click)="toggleSidebar()"
+          [attr.aria-expanded]="sidebarOpen"
+          [attr.aria-label]="sidebarOpen ? 'Close mobile menu' : 'Open mobile menu'"
+        >
+          <span></span><span></span><span></span>
+        </button>
+      </div>
 
       <div class="topbar__right">
         <ng-container *ngIf="authUser$ | async as user; else guestActions">
@@ -316,4 +345,3 @@
 </div>
 
 <app-toast-viewport></app-toast-viewport>
-
