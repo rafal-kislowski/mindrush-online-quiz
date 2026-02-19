@@ -1,6 +1,7 @@
 package pl.mindrush.backend.game;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,8 +24,12 @@ public class GameController {
     }
 
     @PostMapping("/start")
-    public ResponseEntity<GameStateDto> start(HttpServletRequest request, @PathVariable("code") String code, @RequestBody StartGameRequest body) {
-        return ResponseEntity.status(201).body(gameService.startGame(request, code, body == null ? null : body.quizId()));
+    public ResponseEntity<GameStateDto> start(
+            HttpServletRequest request,
+            @PathVariable("code") String code,
+            @Valid @RequestBody StartGameRequest body
+    ) {
+        return ResponseEntity.status(201).body(gameService.startGame(request, code, body.quizId()));
     }
 
     @GetMapping("/state")
@@ -33,10 +38,12 @@ public class GameController {
     }
 
     @PostMapping("/answer")
-    public ResponseEntity<GameStateDto> answer(HttpServletRequest request, @PathVariable("code") String code, @RequestBody AnswerRequest body) {
-        Long questionId = body == null ? null : body.questionId();
-        Long optionId = body == null ? null : body.optionId();
-        return ResponseEntity.ok(gameService.submitAnswer(request, code, questionId, optionId));
+    public ResponseEntity<GameStateDto> answer(
+            HttpServletRequest request,
+            @PathVariable("code") String code,
+            @Valid @RequestBody AnswerRequest body
+    ) {
+        return ResponseEntity.ok(gameService.submitAnswer(request, code, body.questionId(), body.optionId()));
     }
 
     @PostMapping("/end")

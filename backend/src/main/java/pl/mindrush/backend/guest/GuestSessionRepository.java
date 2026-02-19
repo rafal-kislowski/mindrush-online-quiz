@@ -12,9 +12,10 @@ public interface GuestSessionRepository extends JpaRepository<GuestSession, Stri
     @Query("""
             select s.id
             from GuestSession s
-            where s.revoked = false
-              and s.lastSeenAt < :cutoff
+            where s.revoked = true
+               or s.expiresAt <= :now
+               or s.lastSeenAt < :cutoff
             """)
-    List<String> findIdsLastSeenBefore(@Param("cutoff") Instant cutoff);
+    List<String> findInactiveSessionIds(@Param("cutoff") Instant cutoff, @Param("now") Instant now);
 }
 

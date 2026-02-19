@@ -14,7 +14,6 @@ import pl.mindrush.backend.quiz.QuizStatus;
 
 import java.security.SecureRandom;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -40,6 +39,7 @@ public class LobbyService {
     private final GuestSessionService guestSessionService;
     private final LobbyRepository lobbyRepository;
     private final LobbyParticipantRepository participantRepository;
+    private final LobbySummaryMapper lobbySummaryMapper;
     private final LobbyEventPublisher lobbyEventPublisher;
     private final QuizRepository quizRepository;
 
@@ -47,12 +47,14 @@ public class LobbyService {
             GuestSessionService guestSessionService,
             LobbyRepository lobbyRepository,
             LobbyParticipantRepository participantRepository,
+            LobbySummaryMapper lobbySummaryMapper,
             LobbyEventPublisher lobbyEventPublisher,
             QuizRepository quizRepository
     ) {
         this.guestSessionService = guestSessionService;
         this.lobbyRepository = lobbyRepository;
         this.participantRepository = participantRepository;
+        this.lobbySummaryMapper = lobbySummaryMapper;
         this.lobbyEventPublisher = lobbyEventPublisher;
         this.quizRepository = quizRepository;
     }
@@ -289,6 +291,19 @@ public class LobbyService {
         return lobbySummary(lobby, guestSession.getId());
     }
 
+    public void removeParticipantFromOpenLobbies(String guestSessionId) {
+        if (guestSessionId == null || guestSessionId.isBlank()) return;
+
+        List<LobbyParticipant> participations = participantRepository.findAllByGuestSessionIdIn(List.of(guestSessionId));
+        if (participations.isEmpty()) return;
+
+        for (LobbyParticipant participant : participations) {
+            Lobby lobby = participant.getLobby();
+            if (lobby == null || lobby.getCode() == null) continue;
+            handleGuestDisconnected(guestSessionId, lobby.getCode());
+        }
+    }
+
     public void handleGuestDisconnected(String guestSessionId, String code) {
         if (guestSessionId == null || guestSessionId.isBlank()) return;
 
@@ -321,37 +336,7 @@ public class LobbyService {
     }
 
     private Map<String, Object> lobbySummary(Lobby lobby, String viewerGuestSessionId) {
-        List<LobbyParticipant> participants = participantRepository.findAllByLobbyIdOrderByJoinedAtAsc(lobby.getId());
-        boolean isOwner = viewerGuestSessionId != null && viewerGuestSessionId.equals(lobby.getOwnerGuestSessionId());
-        boolean isParticipant = viewerGuestSessionId != null && participantRepository.existsByLobbyIdAndGuestSessionId(lobby.getId(), viewerGuestSessionId);
-
-        if (lobby.hasPassword() && !isParticipant && !isOwner) {
-            Map<String, Object> locked = new HashMap<>();
-            locked.put("code", lobby.getCode());
-            locked.put("hasPassword", true);
-            locked.put("isOwner", false);
-            locked.put("isParticipant", false);
-            locked.put("selectedQuizId", lobby.getSelectedQuizId());
-            return locked;
-        }
-
-        Map<String, Object> res = new HashMap<>();
-        res.put("code", lobby.getCode());
-        res.put("status", lobby.getStatus().name());
-        res.put("maxPlayers", lobby.getMaxPlayers());
-        res.put("players", participants.stream().map(p -> Map.of(
-                "displayName", p.getDisplayName(),
-                "joinedAt", p.getJoinedAt().toString()
-        )).toList());
-        res.put("hasPassword", lobby.hasPassword());
-        if (isOwner) {
-            res.put("pin", lobby.getPinCode());
-        }
-        res.put("createdAt", lobby.getCreatedAt().toString());
-        res.put("isOwner", isOwner);
-        res.put("isParticipant", isParticipant);
-        res.put("selectedQuizId", lobby.getSelectedQuizId());
-        return res;
+        return lobbySummaryMapper.summary(lobby, viewerGuestSessionId);
     }
 
     private static String normalizePin(String rawPassword) {

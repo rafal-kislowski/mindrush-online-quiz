@@ -17,6 +17,8 @@ import pl.mindrush.backend.AppUserRepository;
 import pl.mindrush.backend.JwtCookieAuthenticationFilter;
 import pl.mindrush.backend.JwtService;
 
+import java.time.Instant;
+
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
@@ -88,7 +90,7 @@ public class SecurityConfig {
         return (request, response, authException) -> {
             response.setStatus(401);
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            response.getWriter().write("{\"message\":\"UNAUTHORIZED\"}");
+            response.getWriter().write(securityErrorJson(401, "Authentication is required", "HTTP_401", request.getRequestURI()));
         };
     }
 
@@ -96,7 +98,25 @@ public class SecurityConfig {
         return (request, response, accessDeniedException) -> {
             response.setStatus(403);
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            response.getWriter().write("{\"message\":\"FORBIDDEN\"}");
+            response.getWriter().write(securityErrorJson(403, "You do not have permission to perform this action", "HTTP_403", request.getRequestURI()));
         };
+    }
+
+    private static String securityErrorJson(int status, String message, String code, String path) {
+        return """
+                {"timestamp":"%s","status":%d,"error":"%s","code":"%s","message":"%s","path":"%s","validationErrors":[]}
+                """.formatted(
+                Instant.now(),
+                status,
+                status == 401 ? "Unauthorized" : "Forbidden",
+                code,
+                message,
+                escapeJson(path)
+        );
+    }
+
+    private static String escapeJson(String value) {
+        if (value == null) return "";
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

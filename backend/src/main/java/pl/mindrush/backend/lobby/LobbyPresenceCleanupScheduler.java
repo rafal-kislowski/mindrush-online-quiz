@@ -39,8 +39,9 @@ public class LobbyPresenceCleanupScheduler {
     @Scheduled(fixedDelayString = "${lobby.presence.cleanup.fixedDelayMs:5000}")
     @Transactional
     public void cleanupStaleParticipants() {
-        Instant cutoff = Instant.now().minus(timeout);
-        List<String> staleSessionIds = guestSessionRepository.findIdsLastSeenBefore(cutoff);
+        Instant now = Instant.now();
+        Instant cutoff = now.minus(timeout);
+        List<String> staleSessionIds = guestSessionRepository.findInactiveSessionIds(cutoff, now);
         if (staleSessionIds.isEmpty()) return;
 
         List<LobbyParticipant> staleParticipants = participantRepository.findAllByGuestSessionIdIn(staleSessionIds);

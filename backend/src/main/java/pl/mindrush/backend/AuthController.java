@@ -1,8 +1,10 @@
 package pl.mindrush.backend;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +15,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import pl.mindrush.backend.guest.GuestSessionService;
+import pl.mindrush.backend.lobby.LobbyService;
 
 import static org.springframework.http.HttpStatus.CREATED;
 
@@ -22,10 +26,19 @@ public class AuthController {
 
     private final AuthService authService;
     private final AppUserRepository userRepository;
+    private final GuestSessionService guestSessionService;
+    private final LobbyService lobbyService;
 
-    public AuthController(AuthService authService, AppUserRepository userRepository) {
+    public AuthController(
+            AuthService authService,
+            AppUserRepository userRepository,
+            GuestSessionService guestSessionService,
+            LobbyService lobbyService
+    ) {
         this.authService = authService;
         this.userRepository = userRepository;
+        this.guestSessionService = guestSessionService;
+        this.lobbyService = lobbyService;
     }
 
     @PostMapping("/register")
@@ -50,11 +63,20 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
+            HttpServletRequest request,
             @CookieValue(name = AuthCookies.REFRESH_COOKIE, required = false) String refreshToken
     ) {
         authService.logout(refreshToken);
+        guestSessionService.revokeSessionIfPresent(request).ifPresent(lobbyService::removeParticipantFromOpenLobbies);
+
         AuthService.ResponseCookies cleared = authService.clearCookies();
-        return withCookies(ResponseEntity.noContent().build(), cleared);
+        return ResponseEntity.noContent()
+                .headers(h -> {
+                    h.add(HttpHeaders.SET_COOKIE, cleared.access().toString());
+                    h.add(HttpHeaders.SET_COOKIE, cleared.refresh().toString());
+                    h.add(HttpHeaders.SET_COOKIE, guestSessionService.clearCookieHeader());
+                })
+                .build();
     }
 
     @GetMapping("/me")
@@ -92,13 +114,26 @@ public class AuthController {
     }
 
     public record RegisterRequest(
-            @Email @NotBlank String email,
-            @NotBlank @Size(min = 3, max = 32) String displayName,
-            @NotBlank @Size(min = 8, max = 72) String password
+            @NotBlank(message = "Email is required")
+            @Email(message = "Email format is invalid")
+            @Size(max = 320, message = "Email is too long")
+            String email,
+            @NotBlank(message = "Nickname is required")
+            @Size(min = 3, max = 32, message = "Nickname must be 3-32 characters")
+            @Pattern(regexp = "^[A-Za-z0-9 _-]{3,32}$", message = "Nickname contains invalid characters")
+            String displayName,
+            @NotBlank(message = "Password is required")
+            @Size(min = 8, max = 72, message = "Password must be 8-72 characters")
+            String password
     ) {}
 
     public record LoginRequest(
-            @Email @NotBlank String email,
-            @NotBlank @Size(min = 8, max = 72) String password
+            @NotBlank(message = "Email is required")
+            @Email(message = "Email format is invalid")
+            @Size(max = 320, message = "Email is too long")
+            String email,
+            @NotBlank(message = "Password is required")
+            @Size(min = 8, max = 72, message = "Password must be 8-72 characters")
+            String password
     ) {}
 }

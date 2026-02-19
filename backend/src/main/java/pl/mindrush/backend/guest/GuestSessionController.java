@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import pl.mindrush.backend.JwtCookieAuthenticationFilter;
+import pl.mindrush.backend.lobby.LobbyService;
 
 import java.time.Instant;
 import java.util.Map;
@@ -18,9 +19,11 @@ import java.util.Map;
 public class GuestSessionController {
 
     private final GuestSessionService service;
+    private final LobbyService lobbyService;
 
-    public GuestSessionController(GuestSessionService service) {
+    public GuestSessionController(GuestSessionService service, LobbyService lobbyService) {
         this.service = service;
+        this.lobbyService = lobbyService;
     }
 
     @PostMapping
@@ -55,7 +58,7 @@ public class GuestSessionController {
 
     @DeleteMapping
     public ResponseEntity<Void> clearSession(HttpServletRequest request) {
-        service.revokeSessionIfPresent(request);
+        service.revokeSessionIfPresent(request).ifPresent(lobbyService::removeParticipantFromOpenLobbies);
         return ResponseEntity
                 .noContent()
                 .header("Set-Cookie", service.clearCookieHeader())

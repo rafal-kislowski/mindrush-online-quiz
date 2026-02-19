@@ -121,15 +121,21 @@ public class GuestSessionService {
         return cookie.toString();
     }
 
-    public void revokeSessionIfPresent(HttpServletRequest request) {
+    public Optional<String> sessionIdFromRequest(HttpServletRequest request) {
+        return readCookie(request, cookieName);
+    }
+
+    public Optional<String> revokeSessionIfPresent(HttpServletRequest request) {
         Instant now = Instant.now();
-        readCookie(request, cookieName)
-                .flatMap(repository::findById)
-                .ifPresent(session -> {
-                    session.setRevoked(true);
-                    session.setLastSeenAt(now);
-                    repository.save(session);
-                });
+        Optional<String> sessionId = sessionIdFromRequest(request);
+        sessionId
+            .flatMap(repository::findById)
+            .ifPresent(session -> {
+                session.setRevoked(true);
+                session.setLastSeenAt(now);
+                repository.save(session);
+            });
+        return sessionId;
     }
 
     public void updateDisplayName(HttpServletRequest request, String displayName) {
