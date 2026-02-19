@@ -1,6 +1,6 @@
 ﻿# MindRush - Quiz Online
 
-Spring Boot backend for the MindRush quiz platform.
+Full-stack quiz platform (Spring Boot backend + Angular frontend).
 
 ## Tech stack
 - Java 17, Spring Boot 3
@@ -108,6 +108,23 @@ Endpoints:
 Notes:
 - The UI shows `displayName` (nickname) in game/lobby instead of email.
 
+## API error format
+Validation and business errors return a consistent JSON body:
+
+```json
+{
+  "timestamp": "2026-02-19T15:00:00Z",
+  "status": 400,
+  "error": "Bad Request",
+  "code": "VALIDATION_ERROR",
+  "message": "Validation failed",
+  "path": "/api/lobbies",
+  "validationErrors": [
+    { "field": "password", "message": "PIN must be exactly 4 digits", "rejectedValue": "12" }
+  ]
+}
+```
+
 ## Progression (XP / RP / coins)
 Both guests and authenticated users accumulate:
 - `xp` (experience, used to calculate level; max level is 99 in UI)
@@ -129,28 +146,33 @@ Recommended for dev:
 app.jwt.secret=change-me-long-random
 ```
 
-## Lobby (guest)
-Simple guest lobbies (no login required), identified by a 6-character code.
+## Lobby
+Lobbies are identified by a 6-character code and work for both guests and logged-in users.
 
 - `POST /api/lobbies` -> creates a lobby (requires a valid `guestSessionId` cookie)
-  - optional JSON body: `{ "password": "secret123" }`
+  - optional JSON body:
+    - `{ "password": "1234" }` (4-digit PIN, private lobby)
+    - `{ "maxPlayers": 2..5 }` (for guests effectively max 2, for authenticated users 2-5)
 - `GET /api/lobbies/{code}` -> fetches lobby state
 - `POST /api/lobbies/{code}/join` -> joins a lobby (requires a valid `guestSessionId` cookie)
-  - optional JSON body (when password is set): `{ "password": "secret123" }`
+  - optional JSON body (when PIN is set): `{ "password": "1234" }`
 - `POST /api/lobbies/{code}/password` -> changes lobby privacy (owner only, lobby must be `OPEN`)
-  - `{ "password": "secret123" }` -> set/update password (private lobby)
-  - `{}` (or blank password) -> clear password (public lobby)
+  - `{ "password": "1234" }` -> set/update PIN (private lobby)
+  - `{}` -> clear PIN (public lobby)
+- `POST /api/lobbies/{code}/max-players` -> updates max players (owner only)
+- `POST /api/lobbies/{code}/selected-quiz` -> updates selected quiz (owner only)
 - `POST /api/lobbies/{code}/leave` -> leaves a lobby (requires a valid `guestSessionId` cookie)
 - `POST /api/lobbies/{code}/close` -> closes a lobby for new joins (owner only)
 
-Guest lobby limits:
-- Max players: `2`
+Max players:
+- Guests: up to `2`
+- Authenticated users: `2..5`
 
 Notes:
 - In Postman, call `POST /api/guest/session` first (cookie jar must be enabled) and keep the returned `guestSessionId` cookie for lobby requests.
 - `close` prevents new players from joining (status becomes `CLOSED`).
 - If the owner leaves and another player remains, ownership is transferred to the remaining player.
-- If the last player leaves, the lobby is deleted.
+- If the last player leaves, lobby is marked empty and removed by cleanup scheduler after TTL (`lobby.empty.ttl`, default `PT45S`).
 - Leaving the lobby is blocked while a game is in progress (`IN_GAME`).
 
 ## Quizzes (read-only)
@@ -180,7 +202,7 @@ Optional dev seed data:
 - To disable: set `app.seed.enabled=false`.
 
 ## Game (lobby)
-Minimal game flow on top of lobbies (intended to be used with real-time updates later; for now you can poll `/state`).
+Real-time game flow on top of lobbies with REST commands and WebSocket notifications.
 
 Endpoints (requires a valid `guestSessionId` cookie and being in the lobby):
 - `POST /api/lobbies/{code}/game/start` -> starts a game (owner only), body: `{ "quizId": 1 }`
@@ -202,12 +224,24 @@ Notes:
 - Lobby status becomes `IN_GAME` while a game is active, then returns to `OPEN` after the game ends.
 
 ## WebSocket (STOMP)
-The backend exposes a STOMP WebSocket endpoint for real-time notifications.
-This is **event-based** (to keep per-player answer option ordering correct): when you receive an event, fetch the latest state via REST (`GET /api/lobbies/{code}/game/state`).
+The backend exposes STOMP WebSocket channels for lobby/game/chat updates.
+Handshake requires a valid `guestSessionId` cookie.
 
 - WebSocket endpoint: `ws://localhost:8080/ws`
-- Topic: `/topic/lobbies/{code}/game`
-- Message payload: `{"type":"GAME_UPDATED","lobbyCode":"ABC123","serverTime":"..."}`
+- Topics:
+  - `/topic/lobbies/{code}/lobby` -> broadcast lobby update event
+  - `/topic/lobbies/{code}/game` -> broadcast game update event
+  - `/topic/lobbies/{code}/chat` -> lobby chat messages
+- User queue:
+  - `/user/queue/lobbies/{code}/lobby` -> per-user lobby snapshot (includes viewer-specific fields like `isOwner`, `isParticipant`, owner PIN visibility)
+
+Payload examples:
+- Lobby broadcast event:
+  - `{"type":"LOBBY_UPDATED","lobbyCode":"ABC123","serverTime":"...","state":null}`
+- Lobby per-user snapshot:
+  - `{"type":"LOBBY_SNAPSHOT","lobbyCode":"ABC123","serverTime":"...","state":{...}}`
+- Game event:
+  - `{"type":"GAME_UPDATED","lobbyCode":"ABC123","serverTime":"...","lobbyStatus":"IN_GAME","stage":"QUESTION"}`
 
 If you run the frontend on a different origin, make sure cookies are sent and CORS/allowed origins are configured properly (currently `*` for dev).
 
@@ -216,6 +250,9 @@ If you run the frontend on a different origin, make sure cookies are sent and CO
 ```powershell
 cd backend
 .\mvnw.cmd test
+
+cd ..\frontend
+npm test -- --watch=false --browsers=ChromeHeadless
 ```
 
 ## License
