@@ -79,8 +79,8 @@ export class StompClientService {
     const client = new Client({
       brokerURL: wsUrl,
       reconnectDelay: 2000,
-      heartbeatIncoming: 0,
-      heartbeatOutgoing: 0
+      heartbeatIncoming: 10_000,
+      heartbeatOutgoing: 10_000
     });
     this.client = client;
     this.connected = false;

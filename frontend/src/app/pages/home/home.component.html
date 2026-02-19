@@ -1,4 +1,4 @@
-<main class="dashboard">
+<main class="dashboard" [class.is-busy]="lobbyNavigationBusy">
   <svg class="svg-defs" aria-hidden="true" focusable="false">
     <defs>
       <linearGradient id="mrTitleGradHome" x1="0" y1="0" x2="0" y2="20" gradientUnits="userSpaceOnUse">
@@ -307,7 +307,7 @@
               aria-label="Create lobby"
               [attr.aria-busy]="creating"
               (click)="createLobby()"
-              [disabled]="creating"
+              [disabled]="lobbyNavigationBusy"
             >
               <div class="mini__icon" aria-hidden="true">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -384,7 +384,11 @@
               </div>
             </a>
 
-            <section class="mode-btn mode-btn--cp join mode-btn--join wm--trophy accent--orange" aria-label="Join lobby">
+            <section
+              class="mode-btn mode-btn--cp join mode-btn--join wm--trophy accent--orange"
+              aria-label="Join lobby"
+              [attr.aria-busy]="lobbyNavigationBusy"
+            >
               <div class="mini__icon" aria-hidden="true">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
                     <path
@@ -427,6 +431,7 @@
               <div class="join-controls" aria-label="Join controls">
                 <div class="join-pin" aria-label="Lobby code">
                   <input
+                    #joinCodeInput
                     id="join-code"
                     class="join-pin__hidden"
                     type="text"
@@ -436,6 +441,7 @@
                     spellcheck="false"
                     placeholder="AB1234"
                     maxlength="6"
+                    [disabled]="lobbyNavigationBusy"
                     [ngModel]="joinCode"
                     (ngModelChange)="onJoinCodeChange($event)"
                     (keydown.enter)="joinLobby()"
@@ -456,7 +462,12 @@
                   </div>
                 </div>
 
-                <button class="join-cta" type="button" (click)="joinLobby()" [disabled]="!isJoinCodeComplete()">
+                <button
+                  class="join-cta"
+                  type="button"
+                  (click)="joinLobby()"
+                  [disabled]="lobbyNavigationBusy || !isJoinCodeComplete()"
+                >
                   Join
                 </button>
               </div>
@@ -477,8 +488,6 @@
             </header>
 
             <div class="leader__body" aria-label="Top 5 players list">
-              <div class="error" *ngIf="leaderboardError">{{ leaderboardError }}</div>
-
               <div class="leader__rows leader__rows--skel" *ngIf="leaderboardLoading" aria-hidden="true">
                 <div class="leader-row" *ngFor="let _ of leaderboardSkeleton">
                   <div class="leader-row__place skel"></div>
@@ -495,11 +504,11 @@
                 </div>
               </div>
 
-              <div class="leader__empty muted" *ngIf="!leaderboardError && !leaderboardLoading && leaderboardRows.length === 0">
+              <div class="leader__empty muted" *ngIf="!leaderboardLoading && leaderboardRows.length === 0">
                 No players yet.
               </div>
 
-              <div class="leader__rows" *ngIf="!leaderboardError && !leaderboardLoading && leaderboardRows.length > 0">
+              <div class="leader__rows" *ngIf="!leaderboardLoading && leaderboardRows.length > 0">
                 <div
                   class="leader-row"
                   *ngFor="let p of leaderboardRows; let i = index"
@@ -542,6 +551,28 @@
       </div>
     </header>
   </section>
-</main>
 
-<p class="error" *ngIf="error">{{ error }}</p>
+  <div
+    class="mr-flow-overlay"
+    *ngIf="lobbyNavigationBusy"
+    role="status"
+    aria-live="polite"
+    aria-atomic="true"
+  >
+    <div class="mr-flow-overlay__panel">
+      <p class="mr-flow-overlay__title">
+        {{ creating ? "Creating lobby" : "Joining lobby" }}
+        <span class="mr-flow-dots" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </span>
+      </p>
+      <p class="mr-flow-overlay__text">
+        {{
+          creating
+            ? "Preparing your room and connecting you."
+            : "Connecting to room " + (joinCode.trim().toUpperCase() || "......") + "."
+        }}
+      </p>
+    </div>
+  </div>
+</main>

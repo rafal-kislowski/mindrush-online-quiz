@@ -1,4 +1,9 @@
-﻿<div class="lobby-page" [class.is-join]="joinState !== 'joined'" *ngIf="lobby as l; else loading">
+﻿<div
+  class="lobby-page"
+  [class.is-join]="joinState !== 'joined'"
+  [class.is-joining]="joinBusy"
+  *ngIf="lobby as l; else loading"
+>
   <div class="lobby-frame">
     <section class="card panel lobby-shell">
     <svg class="svg-defs" aria-hidden="true" focusable="false">
@@ -67,7 +72,7 @@
           Back
         </button>
         <button
-          class="btn danger leave-btn"
+          class="btn secondary leave-btn"
           type="button"
           (click)="leave()"
           *ngIf="joinState === 'joined' && view !== 'picker'"
@@ -1109,7 +1114,12 @@
 
         <ng-template #joinCard>
           <div class="join-shell">
-            <section class="join-modal" aria-label="Join lobby">
+            <section
+              class="join-modal"
+              aria-label="Join lobby"
+              [class.is-busy]="joinBusy"
+              [attr.aria-busy]="joinBusy"
+            >
               <div class="join-banner" *ngIf="l.hasPassword && !l.isOwner">
                 <div class="join-banner__icon" aria-hidden="true">
                   <svg
@@ -1153,7 +1163,7 @@
                     pattern="[0-9]*"
                     autocomplete="one-time-code"
                     maxlength="4"
-                    [disabled]="joinState === 'viewOnly'"
+                    [disabled]="joinState === 'viewOnly' || joinBusy"
                     aria-label="Lobby PIN input"
                     (input)="onJoinPinHiddenInput($event)"
                     (keydown)="onJoinPinHiddenKeydown($event)"
@@ -1173,7 +1183,12 @@
               </div>
 
               <div class="join-actions">
-                <button class="btn secondary" type="button" (click)="cancelJoin()">
+                <button
+                  class="btn secondary"
+                  type="button"
+                  (click)="cancelJoin()"
+                  [disabled]="joinBusy"
+                >
                   Cancel
                 </button>
                 <button
@@ -1181,13 +1196,15 @@
                   type="button"
                   (click)="join()"
                   [disabled]="
+                    joinBusy ||
                     joinState === 'viewOnly' ||
                     (l.hasPassword && !l.isOwner && !isJoinPinComplete)
                   "
                 >
-                  Join room
+                  {{ joinBusy ? "Joining..." : "Join room" }}
                 </button>
               </div>
+
             </section>
           </div>
         </ng-template>
@@ -1196,7 +1213,25 @@
     </section>
   </div>
 
-  <p class="error" *ngIf="error">{{ error }}</p>
+  <div
+    class="mr-flow-overlay"
+    *ngIf="joinBusy"
+    role="status"
+    aria-live="polite"
+    aria-atomic="true"
+  >
+    <div class="mr-flow-overlay__panel">
+      <p class="mr-flow-overlay__title">
+        {{ joinBusyText }}
+        <span class="mr-flow-dots" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </span>
+      </p>
+      <p class="mr-flow-overlay__text">
+        Please wait while we connect you to this room.
+      </p>
+    </div>
+  </div>
 </div>
 
 <ng-template #loading>
@@ -1204,6 +1239,6 @@
     <div class="skeleton-title"></div>
     <div class="skeleton-line"></div>
     <div class="skeleton-line short"></div>
-    <p class="error" *ngIf="error">{{ error }}</p>
   </section>
 </ng-template>
+

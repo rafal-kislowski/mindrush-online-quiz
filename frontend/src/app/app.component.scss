@@ -24,12 +24,13 @@
   --nav-item-active: rgba(255, 255, 255, 0.08);
   --nav-cyan: rgba(56, 189, 248, 0.85);
   --nav-gold: rgba(255, 205, 77, 0.9);
-  --fs-brand: clamp(16px, 1.2vw, 18px);
+  --fs-brand: clamp(17px, 1.28vw, 19px);
   --fs-nav-section: 10px;
-  --fs-nav-label: clamp(12px, 0.9vw, 13px);
-  --fs-name: clamp(12px, 0.9vw, 13px);
+  --fs-nav-label: clamp(12.8px, 0.96vw, 14px);
+  --fs-name: clamp(13px, 0.96vw, 15px);
   --fs-stat-label: 10px;
-  --fs-stat-value: clamp(11px, 0.85vw, 12px);
+  --fs-stat-value: clamp(11.8px, 0.88vw, 13px);
+  --fs-rank-pill: clamp(10.6px, 0.8vw, 11.6px);
 
   position: sticky;
   top: 0;
@@ -404,17 +405,16 @@
 .rank-pill {
   display: inline-flex;
   align-items: center;
-  height: 20px;
-  padding: 0 10px;
+  height: 19px;
+  padding: 0 9px;
   border-radius: 999px;
-  font-size: var(--fs-stat-value);
+  font-size: var(--fs-rank-pill);
   font-weight: 900;
   color: var(--rank-color);
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.12), var(--rank-soft));
-  border: 1px solid var(--rank-glow);
+  background: color-mix(in srgb, var(--rank-color) 10%, transparent);
+  border: 1px solid var(--rank-color);
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
     0 8px 18px rgba(0, 0, 0, 0.24);
 }
 
@@ -594,11 +594,11 @@
 .app-item:hover {
   color: rgba(255, 255, 255, 0.94);
   background:
-    linear-gradient(100deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.015));
+    linear-gradient(100deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
   box-shadow:
-    0 10px 22px rgba(0, 0, 0, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  transform: translateX(2px);
+    0 6px 14px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transform: translateX(1px);
 }
 
 .ico {
@@ -634,17 +634,17 @@
 .app-item.active {
   color: rgba(255, 255, 255, 0.96);
   background:
-    linear-gradient(100deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.02));
+    linear-gradient(100deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.015));
   box-shadow:
-    0 12px 26px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    0 8px 18px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
 .menu__item:hover::after,
 .menu__item.active::after,
 .app-item:hover::after,
 .app-item.active::after {
-  opacity: 0.75;
+  opacity: 0.48;
 }
 
 .menu__item:hover .ico,
@@ -652,7 +652,7 @@
 .app-item:hover .app-ico,
 .app-item.active .app-ico {
   color: rgba(255, 255, 255, 0.96);
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
 }
 
 .menu__item.active .ico {

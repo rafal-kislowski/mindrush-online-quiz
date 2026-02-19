@@ -2,11 +2,13 @@ import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
+import { apiErrorMessage } from '../../core/api/api-error.util';
 import { GameApi } from '../../core/api/game.api';
 import { LobbyApi } from '../../core/api/lobby.api';
 import { AuthService } from '../../core/auth/auth.service';
 import { GameStateDto } from '../../core/models/game.models';
 import { SessionService } from '../../core/session/session.service';
+import { ToastService } from '../../core/ui/toast.service';
 import { GameEventsService } from '../../core/ws/game-events.service';
 import { StompClientService } from '../../core/ws/stomp-client.service';
 
@@ -25,7 +27,7 @@ export class GameComponent implements OnInit, OnDestroy {
 
   code = '';
   state: GameStateDto | null = null;
-  error: string | null = null;
+  private _error: string | null = null;
   isOwner = false;
 
   meDisplayName: string | null = null;
@@ -60,8 +62,19 @@ export class GameComponent implements OnInit, OnDestroy {
     private readonly gameEvents: GameEventsService,
     private readonly sessionService: SessionService,
     private readonly stompClient: StompClientService,
-    private readonly authService: AuthService
+    private readonly authService: AuthService,
+    private readonly toast: ToastService
   ) {}
+
+  get error(): string | null {
+    return this._error;
+  }
+
+  set error(value: string | null) {
+    this._error = value;
+    if (!value) return;
+    this.toast.error(value, { dedupeKey: `game:error:${value}` });
+  }
 
   ngOnInit(): void {
     this.code = (this.route.snapshot.paramMap.get('code') ?? '').toUpperCase();
@@ -120,7 +133,7 @@ export class GameComponent implements OnInit, OnDestroy {
         this.onStateUpdated(state);
       },
       error: (err) =>
-        (this.error = err?.error?.message ?? 'Failed to load game state'),
+        (this.error = apiErrorMessage(err, 'Failed to load game state')),
     });
   }
 
@@ -153,7 +166,7 @@ export class GameComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.submittingAnswer = false;
-        this.error = err?.error?.message ?? 'Failed to submit answer';
+        this.error = apiErrorMessage(err, 'Failed to submit answer');
       },
     });
   }
@@ -166,7 +179,7 @@ export class GameComponent implements OnInit, OnDestroy {
         this.onStateUpdated(state);
       },
       error: (err) =>
-        (this.error = err?.error?.message ?? 'Failed to end game'),
+        (this.error = apiErrorMessage(err, 'Failed to end game')),
     });
   }
 

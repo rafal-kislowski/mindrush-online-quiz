@@ -11,6 +11,7 @@ import { combineLatest, filter, map } from 'rxjs';
 import { AuthService } from './core/auth/auth.service';
 import { SessionService } from './core/session/session.service';
 import { computeLevelProgress, levelTheme, rankForPoints } from './core/progression/progression';
+import { ToastViewportComponent } from './core/ui/toast-viewport.component';
 
 function clamp01(n: number): number {
   return Math.max(0, Math.min(1, n));
@@ -52,7 +53,7 @@ function tintHex(hex: string, amount: number): string {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, AsyncPipe, NgIf, NgFor, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, AsyncPipe, NgIf, NgFor, RouterLink, RouterLinkActive, ToastViewportComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
 })
@@ -143,7 +144,11 @@ export class AppComponent implements OnInit {
     const path = (url ?? '').split('?')[0]?.split('#')[0] ?? '';
     this.contentWide = path.startsWith('/create-quiz');
     this.contentFull =
-      path === '/' || path.startsWith('/leaderboards') || path.startsWith('/lobby');
+      path === '/' ||
+      path.startsWith('/leaderboards') ||
+      path.startsWith('/lobby') ||
+      path.startsWith('/login') ||
+      path.startsWith('/register');
   }
 
   toggleSidebar(): void {

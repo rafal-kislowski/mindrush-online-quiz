@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
+import { apiErrorMessage } from '../../core/api/api-error.util';
 import {
   LeaderboardApi,
   LeaderboardEntryDto,
@@ -10,6 +11,7 @@ import {
 } from '../../core/api/leaderboard.api';
 import { AuthService } from '../../core/auth/auth.service';
 import { rankForPoints } from '../../core/progression/progression';
+import { ToastService } from '../../core/ui/toast.service';
 
 type LeaderboardRowVm = LeaderboardEntryDto & {
   rankName: string;
@@ -33,7 +35,7 @@ type LeaderboardMeVm = LeaderboardMeDto & {
 export class LeaderboardsComponent implements OnInit {
   loading = true;
   rows: LeaderboardRowVm[] = [];
-  error: string | null = null;
+  private _error: string | null = null;
 
   stats: LeaderboardStatsDto | null = null;
   page = 1;
@@ -44,8 +46,19 @@ export class LeaderboardsComponent implements OnInit {
   constructor(
     private readonly api: LeaderboardApi,
     private readonly auth: AuthService,
-    private readonly router: Router
+    private readonly router: Router,
+    private readonly toast: ToastService
   ) {}
+
+  get error(): string | null {
+    return this._error;
+  }
+
+  set error(value: string | null) {
+    this._error = value;
+    if (!value) return;
+    this.toast.error(value, { title: 'Leaderboards', dedupeKey: `leaderboards:error:${value}` });
+  }
 
   ngOnInit(): void {
     this.api.stats().subscribe({
@@ -157,7 +170,7 @@ export class LeaderboardsComponent implements OnInit {
           })
         ),
         catchError((err) => {
-          this.error = err?.error?.message ?? 'Failed to load leaderboards';
+          this.error = apiErrorMessage(err, 'Failed to load leaderboards');
           return of([] as LeaderboardRowVm[]);
         })
       )

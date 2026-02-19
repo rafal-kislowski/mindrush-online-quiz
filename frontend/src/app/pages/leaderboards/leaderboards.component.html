@@ -66,10 +66,9 @@
       </div>
 
       <div class="table-wrap" [class.is-loading]="loading">
-        <div class="empty" *ngIf="!loading && !rows.length && !error">
+        <div class="empty" *ngIf="!loading && !rows.length">
           No players yet.
         </div>
-        <div class="empty error" *ngIf="!!error">{{ error }}</div>
 
         <div
           class="row"

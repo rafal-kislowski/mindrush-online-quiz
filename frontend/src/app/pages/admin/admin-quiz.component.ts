@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, HostListener, OnInit } from '@angular/core';
 import { AbstractControl, FormControl, FormGroup, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
+import { apiErrorMessage } from '../../core/api/api-error.util';
 import {
   AdminQuestionDto,
   AdminQuizApi,
@@ -9,6 +10,7 @@ import {
   GameMode,
   QuizStatus,
 } from '../../core/api/admin-quiz.api';
+import { ToastService } from '../../core/ui/toast.service';
 
 const MIN_QUESTION_TIME_LIMIT_SECONDS = 5;
 const MAX_QUESTION_TIME_LIMIT_SECONDS = 600;
@@ -42,7 +44,7 @@ export class AdminQuizComponent implements OnInit {
   openQuizActionsId: number | null = null;
   quizActionsMenuStyle: Record<string, string> | null = null;
   private lastQuizActionsOpenedAtMs = 0;
-  error: string | null = null;
+  private _error: string | null = null;
 
   quizzes: AdminQuizListItemDto[] = [];
   selectedQuiz: AdminQuizDetailDto | null = null;
@@ -140,7 +142,20 @@ export class AdminQuizComponent implements OnInit {
     o4ImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
   });
 
-  constructor(private readonly api: AdminQuizApi) {}
+  constructor(
+    private readonly api: AdminQuizApi,
+    private readonly toast: ToastService
+  ) {}
+
+  get error(): string | null {
+    return this._error;
+  }
+
+  set error(value: string | null) {
+    this._error = value;
+    if (!value) return;
+    this.toast.error(value, { title: 'Admin', dedupeKey: `admin:error:${value}` });
+  }
 
   ngOnInit(): void {
     this.loadList();
@@ -384,7 +399,7 @@ export class AdminQuizComponent implements OnInit {
       },
       error: (err) => {
         this.deletingQuiz = false;
-        this.error = err?.error?.message ?? 'Failed to update quiz status';
+        this.error = apiErrorMessage(err, 'Failed to update quiz status');
       },
     });
   }
@@ -406,7 +421,7 @@ export class AdminQuizComponent implements OnInit {
       },
       error: (err) => {
         this.deletingQuiz = false;
-        this.error = err?.error?.message ?? 'Failed to delete quiz permanently';
+        this.error = apiErrorMessage(err, 'Failed to delete quiz permanently');
       },
     });
   }
@@ -468,7 +483,7 @@ export class AdminQuizComponent implements OnInit {
       },
       error: (err) => {
         this.loadingList = false;
-        this.error = err?.error?.message ?? 'Failed to load quizzes';
+        this.error = apiErrorMessage(err, 'Failed to load quizzes');
       },
     });
   }
@@ -519,7 +534,7 @@ export class AdminQuizComponent implements OnInit {
       },
       error: (err) => {
         this.loadingQuiz = false;
-        this.error = err?.error?.message ?? 'Failed to load quiz';
+        this.error = apiErrorMessage(err, 'Failed to load quiz');
       },
     });
   }
@@ -591,7 +606,7 @@ export class AdminQuizComponent implements OnInit {
         },
         error: (err) => {
           this.savingQuiz = false;
-          this.error = err?.error?.message ?? 'Failed to save quiz';
+          this.error = apiErrorMessage(err, 'Failed to save quiz');
         },
       });
   }
@@ -758,7 +773,7 @@ export class AdminQuizComponent implements OnInit {
         },
         error: (err) => {
           this.savingQuestion = false;
-          this.error = err?.error?.message ?? 'Failed to save question';
+          this.error = apiErrorMessage(err, 'Failed to save question');
         },
       });
   }
@@ -783,7 +798,7 @@ export class AdminQuizComponent implements OnInit {
       },
       error: (err) => {
         this.deletingQuestion = false;
-        this.error = err?.error?.message ?? 'Failed to delete question';
+        this.error = apiErrorMessage(err, 'Failed to delete question');
       },
     });
   }
@@ -861,7 +876,7 @@ export class AdminQuizComponent implements OnInit {
         },
         error: (err) => {
           this.addingExistingQuestion = false;
-          this.error = err?.error?.message ?? 'Failed to add question';
+          this.error = apiErrorMessage(err, 'Failed to add question');
         },
       });
   }
@@ -908,7 +923,7 @@ export class AdminQuizComponent implements OnInit {
         },
         error: (err) => {
           this.creating = false;
-          this.error = err?.error?.message ?? 'Failed to create quiz';
+          this.error = apiErrorMessage(err, 'Failed to create quiz');
         },
       });
   }
@@ -936,7 +951,7 @@ export class AdminQuizComponent implements OnInit {
       },
       error: (err) => {
         this.uploadingImage = false;
-        this.error = err?.error?.message ?? 'Failed to upload image';
+        this.error = apiErrorMessage(err, 'Failed to upload image');
       },
     });
   }
@@ -961,7 +976,7 @@ export class AdminQuizComponent implements OnInit {
       },
       error: (err) => {
         this.uploadingQuizAvatar = false;
-        this.error = err?.error?.message ?? 'Failed to upload image';
+        this.error = apiErrorMessage(err, 'Failed to upload image');
       },
     });
   }
@@ -1069,7 +1084,7 @@ export class AdminQuizComponent implements OnInit {
       },
       error: (err) => {
         this.uploadingImage = false;
-        this.error = err?.error?.message ?? 'Failed to upload image';
+        this.error = apiErrorMessage(err, 'Failed to upload image');
       },
     });
   }
@@ -1230,3 +1245,4 @@ export class AdminQuizComponent implements OnInit {
     return `#${hex.toUpperCase()}`;
   }
 }
+

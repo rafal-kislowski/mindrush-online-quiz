@@ -1,45 +1,80 @@
-<section class="auth">
-  <div class="card auth__card">
-    <div class="auth__top">
-      <h1>{{ mode === 'login' ? 'Login' : 'Register' }}</h1>
-      <p class="muted">
+<section class="auth" [class.auth--register]="mode === 'register'">
+  <article class="auth__card">
+    <header class="auth__top">
+      <p class="auth__kicker">MindRush Account</p>
+      <h1>{{ mode === 'login' ? 'Welcome back' : 'Create your account' }}</h1>
+      <p class="auth__lead muted">
         {{ mode === 'login'
-          ? 'Sign in to access admin features.'
-          : 'Create an account to unlock more features.' }}
+          ? 'Sign in and jump straight into your dashboard and lobby.'
+          : 'Register to unlock lobbies, progression, and all game features.' }}
       </p>
-    </div>
+    </header>
+
+    <nav class="auth__switch" aria-label="Authentication mode">
+      <a class="auth__switchBtn" [class.is-active]="mode === 'login'" routerLink="/login">Login</a>
+      <a class="auth__switchBtn" [class.is-active]="mode === 'register'" routerLink="/register">Register</a>
+    </nav>
 
     <form class="auth__form" (ngSubmit)="submit()" [formGroup]="form">
-      <label class="field" *ngIf="mode === 'register'">
+      <label class="field" *ngIf="mode === 'register'" [class.has-error]="!!controlError('displayName')">
         <span class="field__label">Nickname</span>
         <input type="text" formControlName="displayName" placeholder="Visible in game" autocomplete="nickname" />
+        <span class="field__meta">
+          <span class="field__error" [class.is-visible]="!!controlError('displayName')">
+            {{ controlError('displayName') || '' }}
+          </span>
+        </span>
       </label>
 
-      <label class="field">
+      <label class="field" [class.has-error]="!!controlError('email')">
         <span class="field__label">Email</span>
-        <input type="email" formControlName="email" placeholder="you@example.com" autocomplete="email" />
+        <input #authEmailInput type="email" formControlName="email" placeholder="you@example.com" autocomplete="email" />
+        <span class="field__meta">
+          <span class="field__error" [class.is-visible]="!!controlError('email')">
+            {{ controlError('email') || '' }}
+          </span>
+        </span>
       </label>
 
-      <label class="field">
+      <label class="field" [class.has-error]="!!controlError('password')">
         <span class="field__label">Password</span>
-        <input type="password" formControlName="password" placeholder="Min 8 characters" autocomplete="current-password" />
+        <input
+          type="password"
+          formControlName="password"
+          placeholder="Min 8 characters"
+          [attr.autocomplete]="mode === 'login' ? 'current-password' : 'new-password'"
+        />
+        <span class="field__meta">
+          <span class="field__error" [class.is-visible]="!!controlError('password')">
+            {{ controlError('password') || '' }}
+          </span>
+        </span>
       </label>
 
-      <label class="field" *ngIf="mode === 'register'">
+      <label class="field" *ngIf="mode === 'register'" [class.has-error]="!!controlError('confirmPassword')">
         <span class="field__label">Confirm password</span>
         <input type="password" formControlName="confirmPassword" placeholder="Repeat password" autocomplete="new-password" />
+        <span class="field__meta">
+          <span class="field__error" [class.is-visible]="!!controlError('confirmPassword')">
+            {{ controlError('confirmPassword') || '' }}
+          </span>
+        </span>
       </label>
 
-      <div class="error" *ngIf="error">{{ error }}</div>
-
       <button class="btn primary auth__submit" type="submit" [disabled]="loading || form.invalid">
-        {{ mode === 'login' ? 'Login' : 'Create account' }}
+        <span *ngIf="!loading">{{ mode === 'login' ? 'Login' : 'Create account' }}</span>
+        <span class="auth__submitState" *ngIf="loading">
+          <span class="auth__spinner" aria-hidden="true"></span>
+          Please wait
+        </span>
       </button>
 
-      <div class="auth__links">
-        <a class="muted" *ngIf="mode === 'login'" routerLink="/register">Need an account? Register</a>
-        <a class="muted" *ngIf="mode === 'register'" routerLink="/login">Already have an account? Login</a>
-      </div>
+      <p class="auth__foot muted">
+        {{ mode === 'login' ? 'No account yet?' : 'Already have an account?' }}
+        <a [routerLink]="mode === 'login' ? '/register' : '/login'">
+          {{ mode === 'login' ? 'Create one' : 'Login instead' }}
+        </a>
+      </p>
     </form>
-  </div>
+  </article>
 </section>

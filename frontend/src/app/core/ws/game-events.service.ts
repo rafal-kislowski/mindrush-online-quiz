@@ -6,6 +6,8 @@ export interface GameEventDto {
   type: 'GAME_UPDATED';
   lobbyCode: string;
   serverTime: string;
+  lobbyStatus?: string | null;
+  stage?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })

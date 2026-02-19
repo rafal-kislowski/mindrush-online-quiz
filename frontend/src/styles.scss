@@ -160,6 +160,72 @@ a {
   color: #ff5a7a;
 }
 
+.mr-flow-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: clamp(24px, 4.8vw, 52px);
+  background: rgba(5, 10, 24, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.mr-flow-overlay__panel {
+  position: relative;
+  z-index: 1;
+  width: min(520px, 100%);
+  padding: clamp(16px, 2.8vw, 30px);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.mr-flow-overlay__title {
+  margin: 0;
+  font-size: clamp(20px, 2.6vw, 24px);
+  font-weight: 900;
+  letter-spacing: 0.2px;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.mr-flow-dots {
+  display: inline-flex;
+  gap: 6px;
+  margin-left: 10px;
+  transform: translateY(-1px);
+}
+
+.mr-flow-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  opacity: 0.35;
+  animation: lobbyPulse 1.2s ease-in-out infinite;
+}
+
+.mr-flow-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.mr-flow-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.mr-flow-overlay__text {
+  margin: 0;
+  max-width: 40ch;
+  font-size: 15px;
+  line-height: 1.42;
+  color: rgba(255, 255, 255, 0.72);
+}
+
 .card {
   border-radius: 18px;
   padding: 16px;
@@ -1134,45 +1200,26 @@ input[type="color"]::-moz-color-swatch {
 /* Lobby buttons: align with dashboard's neutral + glow style (less saturated). */
 .lobby-page .btn {
   border-color: rgba(255, 255, 255, 0.12);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(0, 0, 0, 0.12) 72%, rgba(0, 0, 0, 0.16) 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.05),
+    rgba(255, 255, 255, 0.016)
+  );
   box-shadow:
-    0 14px 34px rgba(0, 0, 0, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 8px 20px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
 .lobby-page .btn.secondary {
-  border-color: rgba(255, 255, 255, 0.14);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.14));
+  border-color: rgba(255, 255, 255, 0.13);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.055),
+    rgba(255, 255, 255, 0.018)
+  );
   box-shadow:
-    0 14px 34px rgba(0, 0, 0, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
-/* Lobby: "Leave lobby" should look like the Leaderboards back button (clean pill, no bounce). */
-.lobby-page .leave-btn {
-  height: 38px;
-  padding: 0 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.14));
-  box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.92);
-  font-weight: 900;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-size: 13px;
-  letter-spacing: 0.02em;
-  line-height: 1;
-  transition: filter 180ms ease, background 180ms ease;
-}
-
-.lobby-page .leave-btn:hover {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.16));
-  filter: brightness(1.05);
+    0 8px 20px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
 .lobby-page.is-join {
@@ -1220,6 +1267,8 @@ input[type="color"]::-moz-color-swatch {
 }
 
 .lobby-page .join-modal {
+  position: relative;
+  isolation: isolate;
   width: min(400px, 100%);
   padding: 0;
   background: transparent;
@@ -1335,14 +1384,35 @@ input[type="color"]::-moz-color-swatch {
 }
 
 .lobby-page.is-join .join-actions .btn.secondary {
-  border-color: rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.88);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.13);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.055),
+    rgba(255, 255, 255, 0.018)
+  );
+  color: rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  transition:
+    filter 170ms ease,
+    box-shadow 200ms ease,
+    background 200ms ease;
 }
 
 .lobby-page.is-join .join-actions .btn.secondary:hover {
-  filter: brightness(1.06);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.07),
+    rgba(255, 255, 255, 0.024)
+  );
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  filter: brightness(1.03);
 }
 
 .lobby-page.is-join .join-actions .btn.join-primary {
@@ -1582,28 +1652,43 @@ input[type="color"]::-moz-color-swatch {
   position: static;
 }
 
-.lobby-page .lobby-actions--picker .btn.secondary {
+.lobby-page .lobby-actions--picker .btn.secondary,
+.lobby-page .leave-btn {
   height: 38px;
-  padding: 0 14px;
+  padding: 0 16px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.14));
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.055),
+    rgba(255, 255, 255, 0.018)
+  );
   box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.92);
+    0 8px 20px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.9);
   font-weight: 900;
   font-size: 13px;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   line-height: 1;
   transform: none;
-  transition: filter 180ms ease, background 180ms ease;
+  transition:
+    filter 170ms ease,
+    box-shadow 200ms ease,
+    background 200ms ease;
 }
 
-.lobby-page .lobby-actions--picker .btn.secondary:hover {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.16));
-  filter: brightness(1.05);
-  transform: none;
+.lobby-page .lobby-actions--picker .btn.secondary:hover,
+.lobby-page .leave-btn:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.07),
+    rgba(255, 255, 255, 0.024)
+  );
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  filter: brightness(1.03);
 }
 
 .lobby-page .leave-btn__icon {

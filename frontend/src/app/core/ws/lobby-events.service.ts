@@ -1,11 +1,13 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { LobbyDto } from '../models/lobby.models';
 import { StompClientService } from './stomp-client.service';
 
 export interface LobbyEventDto {
-  type: 'LOBBY_UPDATED';
+  type: 'LOBBY_UPDATED' | 'LOBBY_SNAPSHOT';
   lobbyCode: string;
   serverTime: string;
+  state?: LobbyDto | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -14,19 +16,31 @@ export class LobbyEventsService {
 
   subscribeLobby(lobbyCode: string): Observable<LobbyEventDto> {
     return new Observable<LobbyEventDto>(subscriber => {
-      const destination = `/topic/lobbies/${lobbyCode}/lobby`;
-      const sub = this.stompClient.subscribe(destination).subscribe({
-        next: message => {
-          try {
-            subscriber.next(JSON.parse(message.body) as LobbyEventDto);
-          } catch (e) {
-            subscriber.error(e);
-          }
-        },
+      const parseAndEmit = (rawBody: string) => {
+        try {
+          subscriber.next(JSON.parse(rawBody) as LobbyEventDto);
+        } catch (e) {
+          subscriber.error(e);
+        }
+      };
+
+      const topicDestination = `/topic/lobbies/${lobbyCode}/lobby`;
+      const userDestination = `/user/queue/lobbies/${lobbyCode}/lobby`;
+
+      const topicSub = this.stompClient.subscribe(topicDestination).subscribe({
+        next: message => parseAndEmit(message.body),
         error: err => subscriber.error(err)
       });
-      return () => sub.unsubscribe();
+
+      const userSub = this.stompClient.subscribe(userDestination).subscribe({
+        next: message => parseAndEmit(message.body),
+        error: err => subscriber.error(err)
+      });
+
+      return () => {
+        topicSub.unsubscribe();
+        userSub.unsubscribe();
+      };
     });
   }
 }
-

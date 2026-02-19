@@ -1,6 +1,4 @@
 <div class="quiz">
-  <p class="error" *ngIf="error">{{ error }}</p>
-
   <ng-container *ngIf="state as s; else loading">
     <!-- Start countdown (backend-driven, full screen) -->
     <div class="quiz-precountdown" *ngIf="s.stage === 'PRE_COUNTDOWN'">

@@ -14,6 +14,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Inject } from '@angular/core';
 import { Subscription, switchMap } from 'rxjs';
+import { apiErrorMessage } from '../../core/api/api-error.util';
 import { GameApi } from '../../core/api/game.api';
 import { LobbyApi } from '../../core/api/lobby.api';
 import { QuizApi } from '../../core/api/quiz.api';
@@ -21,6 +22,7 @@ import { LobbyDto } from '../../core/models/lobby.models';
 import { QuizListItemDto } from '../../core/models/quiz.models';
 import { AuthService } from '../../core/auth/auth.service';
 import { SessionService } from '../../core/session/session.service';
+import { ToastService } from '../../core/ui/toast.service';
 import { GameEventsService } from '../../core/ws/game-events.service';
 import { LobbyChatMessageDto, LobbyChatService } from '../../core/ws/lobby-chat.service';
 import { LobbyEventsService } from '../../core/ws/lobby-events.service';
@@ -66,8 +68,9 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   quizSearch = '';
   categoryOptions: ReadonlyArray<{ name: string | null; label: string; count: number }> = [];
 
-  error: string | null = null;
+  private _error: string | null = null;
   joinState: 'unknown' | 'joined' | 'viewOnly' = 'unknown';
+  joinRequestInFlight = false;
   get session$() {
     return this.sessionService.session$;
   }
@@ -86,6 +89,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   private gameEventsSubscription: Subscription | null = null;
   private lobbyEventsSubscription: Subscription | null = null;
   private chatEventsSubscription: Subscription | null = null;
+  private hasLiveLobbySnapshot = false;
   private quizzesLoaded = false;
   private unloadHandler: (() => void) | null = null;
   private autoJoinInFlight = false;
@@ -127,6 +131,21 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
 
   codeCopied = false;
   private codeCopiedTimeout: number | null = null;
+  private readonly minJoinTransitionMs = 2000;
+  private readonly joinDelayTimers = new Set<number>();
+  private destroyed = false;
+
+  get joinBusy(): boolean {
+    return this.joinRequestInFlight || this.autoJoinInFlight;
+  }
+
+  get joinBusyText(): string {
+    if (this.autoJoinInFlight) return 'Joining lobby';
+    if (this.lobby?.hasPassword && !this.lobby?.isOwner) {
+      return 'Verifying PIN and joining';
+    }
+    return 'Joining lobby';
+  }
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -140,9 +159,20 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     private readonly chat: LobbyChatService,
     private readonly lobbyEvents: LobbyEventsService,
     private readonly stompClient: StompClientService,
+    private readonly toast: ToastService,
     private readonly el: ElementRef<HTMLElement>,
     @Inject(DOCUMENT) private readonly document: Document
   ) {}
+
+  get error(): string | null {
+    return this._error;
+  }
+
+  set error(value: string | null) {
+    this._error = value;
+    if (!value) return;
+    this.toast.error(value, { title: 'Lobby', dedupeKey: `lobby:error:${value}` });
+  }
 
   ngOnInit(): void {
     this.auth.ensureLoaded().subscribe({ error: () => {} });
@@ -154,6 +184,9 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.subscriptions.add(
       this.stompClient.state$.subscribe((state) => {
+        if (state === 'disconnected') {
+          this.hasLiveLobbySnapshot = false;
+        }
         if (state === 'connected' && this.code) {
           this.lobbyApi.get(this.code).subscribe({
             next: (lobby) => this.onLobbyUpdate(lobby),
@@ -182,7 +215,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
         .subscribe({
           next: (lobby) => this.initLobby(lobby),
           error: (err) => {
-            this.error = err?.error?.message ?? 'Lobby not found';
+            this.error = apiErrorMessage(err, 'Lobby not found');
           },
         })
     );
@@ -200,7 +233,12 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
     this.updateBodyScrollLock(false);
+    for (const timerId of this.joinDelayTimers) {
+      window.clearTimeout(timerId);
+    }
+    this.joinDelayTimers.clear();
     if (this.codeCopiedTimeout != null) {
       window.clearTimeout(this.codeCopiedTimeout);
       this.codeCopiedTimeout = null;
@@ -234,8 +272,20 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.gameEventsSubscription = this.gameEvents
       .subscribeLobbyGame(this.code)
       .subscribe({
-        next: () => {
+        next: (event) => {
           if (this.joinState !== 'joined') return;
+          if (
+            event.lobbyStatus === 'IN_GAME' &&
+            event.stage != null &&
+            event.stage !== 'NO_GAME'
+          ) {
+            this.router.navigate(['/lobby', this.code, 'game']);
+            return;
+          }
+          if (event.lobbyStatus != null && event.lobbyStatus !== 'IN_GAME') {
+            return;
+          }
+
           this.gameApi.state(this.code).subscribe({
             next: (state) => {
               if (
@@ -277,7 +327,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.lobbyApi.get(this.code).subscribe({
       next: (lobby) => this.onLobbyUpdate(lobby),
       error: (err) =>
-        (this.error = err?.error?.message ?? 'Failed to refresh lobby'),
+        (this.error = apiErrorMessage(err, 'Failed to refresh lobby')),
     });
   }
 
@@ -437,19 +487,25 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       this.joinState = 'viewOnly';
       return;
     }
-    if (this.autoJoinInFlight) return;
+    if (this.joinBusy) return;
 
     this.autoJoinInFlight = true;
+    const startedAt = performance.now();
+    this.error = null;
     this.lobbyApi.join(this.code).subscribe({
       next: (joined) => {
-        this.autoJoinInFlight = false;
-        this.onLobbyUpdate(joined);
+        this.runAfterMinimumJoinTransition(startedAt, () => {
+          this.autoJoinInFlight = false;
+          this.onLobbyUpdate(joined);
+        });
       },
       error: (err) => {
-        this.autoJoinInFlight = false;
-        if (err?.status === 409) {
-          this.joinState = 'viewOnly';
-        }
+        this.runAfterMinimumJoinTransition(startedAt, () => {
+          this.autoJoinInFlight = false;
+          if (err?.status === 409) {
+            this.joinState = 'viewOnly';
+          }
+        });
       },
     });
   }
@@ -459,7 +515,18 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.lobbyEventsSubscription = this.lobbyEvents
       .subscribeLobby(this.code)
       .subscribe({
-        next: () => {
+        next: (event) => {
+          if (event.state) {
+            this.hasLiveLobbySnapshot = true;
+            this.onLobbyUpdate(event.state);
+            this.attemptAutoJoinIfPossible(event.state);
+            return;
+          }
+
+          if (this.hasLiveLobbySnapshot) {
+            return;
+          }
+
           this.lobbyApi.get(this.code).subscribe({
             next: (lobby) => {
               this.onLobbyUpdate(lobby);
@@ -494,6 +561,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   join(): void {
+    if (this.joinBusy) return;
     this.error = null;
     const lobby = this.lobby;
     const needsPin = !!lobby?.hasPassword && !lobby.isOwner;
@@ -503,18 +571,29 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
+    this.joinRequestInFlight = true;
+    const startedAt = performance.now();
     this.lobbyApi.join(this.code, needsPin ? pin : undefined).subscribe({
       next: (lobby) => {
-        this.joinPinDigits = ['', '', '', ''];
-        this.joinPinActiveIndex = 0;
-        this.joinPinAutoFocusDone = false;
-        this.onLobbyUpdate(lobby);
+        this.runAfterMinimumJoinTransition(startedAt, () => {
+          this.joinRequestInFlight = false;
+          this.clearJoinPinInput(false);
+          this.joinPinAutoFocusDone = false;
+          this.onLobbyUpdate(lobby);
+        });
       },
       error: (err) => {
-        if (err?.status === 409) {
-          this.joinState = 'viewOnly';
-        }
-        this.error = err?.error?.message ?? 'Failed to join lobby';
+        const message = apiErrorMessage(err, 'Failed to join lobby');
+        this.runAfterMinimumJoinTransition(startedAt, () => {
+          this.joinRequestInFlight = false;
+          if (needsPin) {
+            this.clearJoinPinInput(true);
+          }
+          if (err?.status === 409) {
+            this.joinState = 'viewOnly';
+          }
+          this.error = message;
+        });
       },
     });
   }
@@ -528,7 +607,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.lobbyApi.leave(this.code).subscribe({
       next: () => this.router.navigate(['/']),
       error: (err) =>
-        (this.error = err?.error?.message ?? 'Failed to leave lobby'),
+        (this.error = apiErrorMessage(err, 'Failed to leave lobby')),
     });
   }
 
@@ -538,7 +617,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.gameApi.start(this.code, this.selectedQuizId).subscribe({
       next: () => this.router.navigate(['/lobby', this.code, 'game']),
       error: (err) =>
-        (this.error = err?.error?.message ?? 'Failed to start game'),
+        (this.error = apiErrorMessage(err, 'Failed to start game')),
     });
   }
 
@@ -596,6 +675,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const done = () => {
       this.codeCopied = true;
+      this.toast.success('Lobby code copied', { title: 'Lobby', dedupeKey: 'lobby:copy-code' });
       if (this.codeCopiedTimeout != null) {
         window.clearTimeout(this.codeCopiedTimeout);
       }
@@ -870,7 +950,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       error: (err) => {
         this.selectedQuizSaving = false;
         this.selectedQuizId = previous ?? null;
-        this.error = err?.error?.message ?? 'Failed to update selected quiz';
+        this.error = apiErrorMessage(err, 'Failed to update selected quiz');
       },
     });
   }
@@ -891,7 +971,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       error: (err) => {
         this.selectedQuizSaving = false;
         this.selectedQuizId = previous ?? null;
-        this.error = err?.error?.message ?? 'Failed to clear selected quiz';
+        this.error = apiErrorMessage(err, 'Failed to clear selected quiz');
       },
     });
   }
@@ -1006,7 +1086,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onJoinPinAreaClick(): void {
-    if (this.joinState === 'viewOnly') return;
+    if (this.joinState === 'viewOnly' || this.joinBusy) return;
     this.focusJoinPin();
   }
 
@@ -1019,6 +1099,19 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       el.focus();
     }
     this.joinPinActiveIndex = Math.min(this.joinPinDigits.filter(Boolean).length, 3);
+  }
+
+  private clearJoinPinInput(focus: boolean): void {
+    this.joinPinDigits = ['', '', '', ''];
+    this.joinPinActiveIndex = 0;
+
+    const input = this.joinPinHidden?.nativeElement;
+    if (input) {
+      input.value = '';
+    }
+
+    if (!focus) return;
+    this.focusJoinPin();
   }
 
   onJoinPinHiddenInput(ev: Event): void {
@@ -1068,9 +1161,15 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private resetTransientState(): void {
+    for (const timerId of this.joinDelayTimers) {
+      window.clearTimeout(timerId);
+    }
+    this.joinDelayTimers.clear();
     this.view = 'lobby';
     this.error = null;
     this.joinState = 'unknown';
+    this.joinRequestInFlight = false;
+    this.autoJoinInFlight = false;
     this.joinPinDigits = ['', '', '', ''];
     this.joinPinActiveIndex = 0;
     this.joinPinAutoFocusDone = false;
@@ -1080,6 +1179,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.categoryMenuSearch = '';
     this.chatText = '';
     this.chatMessages = [];
+    this.hasLiveLobbySnapshot = false;
     this.chatEventsSubscription?.unsubscribe();
     this.chatEventsSubscription = null;
     this.quizzesLoaded = false;
@@ -1091,6 +1191,25 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.categoryOptions = [];
     this.selectedQuizId = null;
     this.selectedQuizSaving = false;
+  }
+
+  private runAfterMinimumJoinTransition(
+    startedAt: number,
+    action: () => void
+  ): void {
+    const elapsed = performance.now() - startedAt;
+    const remaining = Math.max(0, this.minJoinTransitionMs - elapsed);
+    if (remaining <= 0) {
+      action();
+      return;
+    }
+
+    const timerId = window.setTimeout(() => {
+      this.joinDelayTimers.delete(timerId);
+      if (this.destroyed) return;
+      action();
+    }, remaining);
+    this.joinDelayTimers.add(timerId);
   }
 
   private scrollChatToBottomIfNearBottom(): void {
@@ -1128,7 +1247,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
         error: (err) => {
           this.privacySaving = false;
           this.privacyDirty = false;
-          this.error = err?.error?.message ?? 'Failed to update lobby privacy';
+          this.error = apiErrorMessage(err, 'Failed to update lobby privacy');
           this.privacyMode = this.lobby?.hasPassword ? 'private' : 'public';
         },
       });
@@ -1342,7 +1461,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       error: (err) => {
         this.privacySaving = false;
         this.privacyDirty = false;
-        this.error = err?.error?.message ?? 'Failed to update lobby privacy';
+        this.error = apiErrorMessage(err, 'Failed to update lobby privacy');
         this.privacyMode = this.lobby?.hasPassword ? 'private' : 'public';
       },
     });
@@ -1476,8 +1595,9 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
         if (previous === 2 || previous === 3 || previous === 4 || previous === 5) {
           this.maxPlayersDraft = previous;
         }
-        this.error = err?.error?.message ?? 'Failed to update max players';
+        this.error = apiErrorMessage(err, 'Failed to update max players');
       },
     });
   }
 }
+
