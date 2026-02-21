@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { StompClientService } from './stomp-client.service';
 
@@ -11,7 +12,18 @@ export interface LobbyChatMessageDto {
 
 @Injectable({ providedIn: 'root' })
 export class LobbyChatService {
-  constructor(private readonly stompClient: StompClientService) {}
+  constructor(
+    private readonly stompClient: StompClientService,
+    private readonly http: HttpClient
+  ) {}
+
+  history(lobbyCode: string): Observable<LobbyChatMessageDto[]> {
+    const code = (lobbyCode ?? '').trim().toUpperCase();
+    return this.http.get<LobbyChatMessageDto[]>(
+      `/api/lobbies/${encodeURIComponent(code)}/chat`,
+      { withCredentials: true }
+    );
+  }
 
   subscribe(lobbyCode: string): Observable<LobbyChatMessageDto> {
     return new Observable<LobbyChatMessageDto>((subscriber) => {
@@ -30,8 +42,12 @@ export class LobbyChatService {
     });
   }
 
-  send(lobbyCode: string, text: string): void {
-    this.stompClient.publish(`/app/lobbies/${lobbyCode}/chat`, { text });
+  send(lobbyCode: string, text: string): Observable<LobbyChatMessageDto> {
+    const code = (lobbyCode ?? '').trim().toUpperCase();
+    return this.http.post<LobbyChatMessageDto>(
+      `/api/lobbies/${encodeURIComponent(code)}/chat`,
+      { text },
+      { withCredentials: true }
+    );
   }
 }
-

@@ -58,6 +58,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   }
   readonly maxPlayersOptions = [2, 3, 4, 5] as const;
   readonly maxChatMessageLength = 300;
+  readonly maxChatMessages = 2000;
 
   code = '';
   lobby: LobbyDto | null = null;
@@ -82,6 +83,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   maxPlayersDraft: 2 | 3 | 4 | 5 = 2;
   maxPlayersSaving = false;
   private maxPlayersDirty = false;
+  readySaving = false;
   maxPlayersMenuOpen = false;
   quizMenuOpen = false;
 
@@ -90,12 +92,21 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   private lobbyEventsSubscription: Subscription | null = null;
   private chatEventsSubscription: Subscription | null = null;
   private hasLiveLobbySnapshot = false;
+  private lobbySnapshotFetchInFlight = false;
   private quizzesLoaded = false;
-  private unloadHandler: (() => void) | null = null;
   private autoJoinInFlight = false;
+  private autoJoinFailed = false;
+  private autoJoinBlocked = false;
+  private intentionalLeaveInProgress = false;
+  private lastForegroundSyncAt = 0;
   private scrollLockY: number | null = null;
   private marqueeRafId: number | null = null;
   private readonly onWindowResize = () => this.scheduleMarqueeMeasure();
+  private readonly onWindowFocus = () => this.syncLobbyOnForeground();
+  private readonly onVisibilityChange = () => {
+    if (this.document?.visibilityState !== 'visible') return;
+    this.syncLobbyOnForeground();
+  };
 
   @ViewChild('chatLog')
   private chatLog?: ElementRef<HTMLElement>;
@@ -127,13 +138,17 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
 
   chatText = '';
   chatMessages: LobbyChatMessageDto[] = [];
+  private chatMessageKeys = new Set<string>();
   meDisplayName: string | null = null;
 
   codeCopied = false;
   private codeCopiedTimeout: number | null = null;
-  private readonly minJoinTransitionMs = 2000;
+  private readonly minJoinTransitionMs = 1500;
   private readonly joinDelayTimers = new Set<number>();
   private destroyed = false;
+  private redirectingToDashboard = false;
+  private lobbyLoadStartedAt = performance.now();
+  private suppressInitialLoadingOverlay = false;
   private initialLobbyReady = false;
   private quizzesReady = false;
 
@@ -142,46 +157,79 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   get roomTransitionBusy(): boolean {
+    return this.joinBusy;
+  }
+
+  get readyPlayersCount(): number {
+    return this.lobby?.players?.filter((p) => !!p.ready).length ?? 0;
+  }
+
+  get lobbyPlayersCount(): number {
+    return this.lobby?.players?.length ?? 0;
+  }
+
+  get meReady(): boolean {
+    return !!this.myLobbyPlayer?.ready;
+  }
+
+  get hasSelectedQuiz(): boolean {
+    return (this.selectedQuizId ?? this.lobby?.selectedQuizId ?? null) != null;
+  }
+
+  get hasRequiredPlayers(): boolean {
+    const playersCount = this.lobby?.players?.length ?? 0;
+    const maxPlayers = this.lobby?.maxPlayers ?? 0;
+    return maxPlayers > 0 && playersCount >= maxPlayers;
+  }
+
+  get canToggleReady(): boolean {
     return (
-      this.joinBusy ||
-      !this.initialLobbyReady ||
-      !this.quizzesReady ||
-      !this.lobbyViewReady
+      !!this.lobby?.isParticipant &&
+      this.joinState === 'joined' &&
+      this.lobby?.status === 'OPEN' &&
+      this.hasSelectedQuiz &&
+      this.hasRequiredPlayers &&
+      !this.readySaving
     );
   }
 
-  private get lobbyViewReady(): boolean {
+  get readyActionLabel(): string {
+    if (!this.hasSelectedQuiz) return 'Select quiz first';
+    if (!this.hasRequiredPlayers) return 'Waiting for players';
+    return this.meReady ? 'Cancel readiness' : "I'm ready";
+  }
+
+  private get myLobbyPlayer() {
+    const players = this.lobby?.players ?? [];
+    const explicit = players.find((p) => p.isYou);
+    if (explicit) return explicit;
+    const myName = (this.meDisplayName ?? '').trim();
+    if (!myName) return null;
+    return players.find((p) => p.displayName === myName) ?? null;
+  }
+
+  get showJoinCard(): boolean {
     const lobby = this.lobby;
     if (!lobby) return false;
-    if (typeof lobby.isOwner !== 'boolean') return false;
-    if (typeof lobby.hasPassword !== 'boolean') return false;
-
-    if (this.joinState === 'joined') {
-      if (!Array.isArray(lobby.players)) return false;
-      if (typeof lobby.maxPlayers !== 'number') return false;
-    }
-
+    if (this.intentionalLeaveInProgress) return false;
+    if (this.roomTransitionBusy) return false;
+    if (this.joinState === 'joined') return false;
+    if (this.joinState === 'viewOnly') return true;
+    if (lobby.hasPassword && !lobby.isOwner) return true;
+    if (this.canAutoJoinLobby(lobby) && !this.autoJoinFailed) return false;
     return true;
   }
 
-  get joinBusyText(): string {
-    if (this.autoJoinInFlight) return 'Joining lobby';
-    if (this.lobby?.hasPassword && !this.lobby?.isOwner) {
-      return 'Verifying PIN and joining';
-    }
-    return 'Joining lobby';
-  }
-
   get roomTransitionTitle(): string {
-    if (this.joinBusy) return this.joinBusyText;
-    return 'Preparing lobby';
+    return 'Please wait';
   }
 
   get roomTransitionText(): string {
-    if (this.joinBusy) {
-      return 'Please wait while we connect you to this room.';
-    }
-    return 'Finalizing room setup and syncing player data.';
+    return 'Establishing secure connection.';
+  }
+
+  get showInitialLoadingOverlay(): boolean {
+    return !this.suppressInitialLoadingOverlay;
   }
 
   constructor(
@@ -225,12 +273,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
           this.hasLiveLobbySnapshot = false;
         }
         if (state === 'connected' && this.code) {
-          this.lobbyApi.get(this.code).subscribe({
-            next: (lobby) => this.onLobbyUpdate(lobby),
-            error: () => {
-              // ignore
-            },
-          });
+          this.fetchLobbySnapshotFromServer();
         }
       })
     );
@@ -244,6 +287,12 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
               this.code = nextCode;
               this.resetTransientState();
             }
+            this.updateInitialLoadingOverlayPreference(nextCode);
+            const prefetchedLobby = this.consumePrefetchedLobby(nextCode);
+            if (prefetchedLobby) {
+              this.initLobby(prefetchedLobby);
+            }
+            this.lobbyLoadStartedAt = performance.now();
             return this.sessionService
               .ensure()
               .pipe(switchMap(() => this.lobbyApi.get(this.code)));
@@ -251,15 +300,19 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
         )
         .subscribe({
           next: (lobby) => this.initLobby(lobby),
-          error: (err) => {
-            this.error = apiErrorMessage(err, 'Lobby not found');
-          },
+          error: () =>
+            this.redirectToDashboardForUnavailableLobby(
+              'Lobby does not exist or is no longer active.',
+              this.lobbyLoadStartedAt
+            ),
         })
     );
   }
 
   ngAfterViewInit(): void {
     window.addEventListener('resize', this.onWindowResize, { passive: true });
+    window.addEventListener('focus', this.onWindowFocus, { passive: true });
+    this.document.addEventListener('visibilitychange', this.onVisibilityChange);
     this.scheduleMarqueeMeasure();
 
     if (this.quizTitleEls) {
@@ -280,9 +333,9 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       window.clearTimeout(this.codeCopiedTimeout);
       this.codeCopiedTimeout = null;
     }
-    this.unloadHandler &&
-      window.removeEventListener('beforeunload', this.unloadHandler);
     window.removeEventListener('resize', this.onWindowResize);
+    window.removeEventListener('focus', this.onWindowFocus);
+    this.document.removeEventListener('visibilitychange', this.onVisibilityChange);
     if (this.marqueeRafId != null) {
       cancelAnimationFrame(this.marqueeRafId);
       this.marqueeRafId = null;
@@ -292,6 +345,15 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private initLobby(lobby: LobbyDto): void {
+    this.suppressInitialLoadingOverlay = false;
+    if (this.isLobbyUnavailable(lobby)) {
+      this.redirectToDashboardForUnavailableLobby(
+        'Lobby does not exist or is no longer active.',
+        this.lobbyLoadStartedAt
+      );
+      return;
+    }
+
     this.initialLobbyReady = true;
     this.onLobbyUpdate(lobby);
     this.ensureChatUpdates();
@@ -345,21 +407,6 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.subscriptions.add(this.gameEventsSubscription);
   }
 
-  private ensureLeaveOnUnload(): void {
-    if (this.unloadHandler) return;
-    this.unloadHandler = () => {
-      try {
-        navigator.sendBeacon(
-          `/api/lobbies/${encodeURIComponent(this.code)}/leave`,
-          ''
-        );
-      } catch {
-        // ignore
-      }
-    };
-    window.addEventListener('beforeunload', this.unloadHandler);
-  }
-
   refresh(): void {
     this.error = null;
     this.lobbyApi.get(this.code).subscribe({
@@ -370,6 +417,14 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private onLobbyUpdate(lobby: LobbyDto): void {
+    if (this.isLobbyUnavailable(lobby)) {
+      this.redirectToDashboardForUnavailableLobby(
+        'Lobby does not exist or is no longer active.',
+        this.initialLobbyReady ? undefined : this.lobbyLoadStartedAt
+      );
+      return;
+    }
+
     const prevSelectedQuizId = this.selectedQuizId ?? null;
     this.lobby = lobby;
 
@@ -436,11 +491,26 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       this.quizzesLoaded = true;
     }
 
+    if (
+      !lobby.isParticipant &&
+      this.joinState === 'joined' &&
+      !this.intentionalLeaveInProgress
+    ) {
+      this.joinState = 'unknown';
+      this.joinRequestInFlight = false;
+      this.autoJoinInFlight = false;
+      this.autoJoinFailed = false;
+      this.toast.warning('Lobby presence lost. Trying to rejoin...', {
+        title: 'Lobby',
+        dedupeKey: 'lobby:presence-lost',
+      });
+    }
+
     if (lobby.isParticipant && this.joinState !== 'joined') {
       this.joinState = 'joined';
+      this.autoJoinFailed = false;
       this.updateBodyScrollLock(false);
       this.ensureGameAutoSwitch();
-      this.ensureLeaveOnUnload();
       return;
     }
 
@@ -512,21 +582,37 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  private attemptAutoJoinIfPossible(lobby: LobbyDto | null): void {
-    if (!lobby) return;
-    if (this.joinState === 'joined') return;
-    if (lobby.hasPassword && !lobby.isOwner) return;
-    if (lobby.status !== 'OPEN') return;
+  private canAutoJoinLobby(lobby: LobbyDto | null): boolean {
+    if (!lobby) return false;
+    if (lobby.hasPassword && !lobby.isOwner) return false;
+    if (lobby.status !== 'OPEN') return false;
     if (
       lobby.players &&
       lobby.maxPlayers &&
       lobby.players.length >= lobby.maxPlayers
     ) {
-      this.joinState = 'viewOnly';
+      return false;
+    }
+    return true;
+  }
+
+  private attemptAutoJoinIfPossible(lobby: LobbyDto | null): void {
+    if (!lobby) return;
+    if (this.autoJoinBlocked) return;
+    if (this.joinState === 'joined') return;
+    if (!this.canAutoJoinLobby(lobby)) {
+      if (
+        lobby.players &&
+        lobby.maxPlayers &&
+        lobby.players.length >= lobby.maxPlayers
+      ) {
+        this.joinState = 'viewOnly';
+      }
       return;
     }
     if (this.joinBusy) return;
 
+    this.autoJoinFailed = false;
     this.autoJoinInFlight = true;
     const startedAt = performance.now();
     this.error = null;
@@ -534,12 +620,14 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       next: (joined) => {
         this.runAfterMinimumJoinTransition(startedAt, () => {
           this.autoJoinInFlight = false;
+          this.autoJoinFailed = false;
           this.onLobbyUpdate(joined);
         });
       },
       error: (err) => {
         this.runAfterMinimumJoinTransition(startedAt, () => {
           this.autoJoinInFlight = false;
+          this.autoJoinFailed = true;
           if (err?.status === 409) {
             this.joinState = 'viewOnly';
           }
@@ -560,20 +648,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
             this.attemptAutoJoinIfPossible(event.state);
             return;
           }
-
-          if (this.hasLiveLobbySnapshot) {
-            return;
-          }
-
-          this.lobbyApi.get(this.code).subscribe({
-            next: (lobby) => {
-              this.onLobbyUpdate(lobby);
-              this.attemptAutoJoinIfPossible(lobby);
-            },
-            error: () => {
-              // ignore
-            },
-          });
+          this.fetchLobbySnapshotFromServer();
         },
         error: () => {
           // ignore; user can refresh manually if WS is down
@@ -582,15 +657,74 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.subscriptions.add(this.lobbyEventsSubscription);
   }
 
+  private fetchLobbySnapshotFromServer(): void {
+    if (!this.code) return;
+    if (this.lobbySnapshotFetchInFlight) return;
+    this.lobbySnapshotFetchInFlight = true;
+    this.lobbyApi.get(this.code).subscribe({
+      next: (lobby) => {
+        this.lobbySnapshotFetchInFlight = false;
+        this.onLobbyUpdate(lobby);
+        this.attemptAutoJoinIfPossible(lobby);
+      },
+      error: (err) => {
+        this.lobbySnapshotFetchInFlight = false;
+        if (err?.status === 404 || err?.status === 410) {
+          this.redirectToDashboardForUnavailableLobby(
+            'Lobby does not exist or is no longer active.',
+            this.initialLobbyReady ? undefined : this.lobbyLoadStartedAt
+          );
+        }
+      },
+    });
+  }
+
+  private isLobbyUnavailable(lobby: LobbyDto | null): boolean {
+    const status = String(lobby?.status ?? '').toUpperCase();
+    if (!status) return false;
+    return status !== 'OPEN' && status !== 'IN_GAME';
+  }
+
+  private redirectToDashboardForUnavailableLobby(
+    message: string,
+    startedAt?: number
+  ): void {
+    if (this.redirectingToDashboard || this.destroyed) return;
+    this.redirectingToDashboard = true;
+    this.joinRequestInFlight = false;
+    this.autoJoinInFlight = false;
+    this.runAfterMinimumJoinTransition(startedAt ?? performance.now(), () => {
+      this.toast.warning(message, {
+        title: 'Lobby',
+        dedupeKey: 'lobby:unavailable',
+      });
+      void this.router.navigate(['/']);
+    });
+  }
+
   private ensureChatUpdates(): void {
     if (this.chatEventsSubscription) return;
-    this.chatEventsSubscription = this.chat.subscribe(this.code).subscribe({
+
+    const lobbyCode = this.code;
+
+    this.chatEventsSubscription = this.chat.subscribe(lobbyCode).subscribe({
       next: (msg) => {
-        this.chatMessages.push(msg);
-        if (this.chatMessages.length > 200) {
-          this.chatMessages.splice(0, this.chatMessages.length - 200);
-        }
+        if (this.code !== lobbyCode) return;
+        this.appendChatMessage(msg);
         this.scrollChatToBottomIfNearBottom();
+      },
+      error: () => {
+        // ignore; chat is optional
+      },
+    });
+
+    this.chat.history(lobbyCode).subscribe({
+      next: (messages) => {
+        if (this.code !== lobbyCode) return;
+        for (const msg of messages ?? []) {
+          this.appendChatMessage(msg);
+        }
+        queueMicrotask(() => this.scrollChatToBottomIfNearBottom());
       },
       error: () => {
         // ignore; chat is optional
@@ -640,22 +774,68 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.router.navigate(['/']);
   }
 
+  leaveOnRouteChange(nextUrl?: string): void {
+    if (this.joinState !== 'joined') return;
+    if (!this.code) return;
+
+    const targetPath = this.pathFromUrl(nextUrl).toLowerCase();
+    const lobbyGamePath = `/lobby/${this.code}/game`.toLowerCase();
+    if (targetPath === lobbyGamePath) return;
+
+    this.autoJoinBlocked = true;
+    this.joinState = 'viewOnly';
+    this.joinRequestInFlight = false;
+    this.autoJoinInFlight = false;
+
+    let beaconSent = false;
+    try {
+      beaconSent = navigator.sendBeacon(
+        `/api/lobbies/${encodeURIComponent(this.code)}/leave`,
+        ''
+      );
+    } catch {
+      beaconSent = false;
+    }
+
+    if (!beaconSent) {
+      this.lobbyApi.leave(this.code).subscribe({
+        next: () => {},
+        error: () => {},
+      });
+    }
+  }
+
   leave(): void {
     this.error = null;
+    this.intentionalLeaveInProgress = true;
+    this.autoJoinBlocked = true;
     this.lobbyApi.leave(this.code).subscribe({
-      next: () => this.router.navigate(['/']),
-      error: (err) =>
-        (this.error = apiErrorMessage(err, 'Failed to leave lobby')),
+      next: () => {
+        this.router.navigate(['/']);
+      },
+      error: (err) => {
+        this.intentionalLeaveInProgress = false;
+        this.autoJoinBlocked = false;
+        this.joinState = 'joined';
+        this.error = apiErrorMessage(err, 'Failed to leave lobby');
+      },
     });
   }
 
-  startGame(): void {
-    if (!this.selectedQuizId) return;
+  toggleReady(): void {
+    if (!this.canToggleReady) return;
+    const nextReady = !this.meReady;
     this.error = null;
-    this.gameApi.start(this.code, this.selectedQuizId).subscribe({
-      next: () => this.router.navigate(['/lobby', this.code, 'game']),
-      error: (err) =>
-        (this.error = apiErrorMessage(err, 'Failed to start game')),
+    this.readySaving = true;
+    this.lobbyApi.setReady(this.code, nextReady).subscribe({
+      next: (lobby) => {
+        this.readySaving = false;
+        this.onLobbyUpdate(lobby);
+      },
+      error: (err) => {
+        this.readySaving = false;
+        this.error = apiErrorMessage(err, 'Failed to update readiness');
+      },
     });
   }
 
@@ -1026,9 +1206,16 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     const raw = (this.chatText ?? '').trim();
     if (!raw) return;
     const text = raw.length > this.maxChatMessageLength ? raw.slice(0, this.maxChatMessageLength) : raw;
-    this.chat.send(this.code, text);
-    this.chatText = '';
-    queueMicrotask(() => this.scrollChatToBottom());
+    this.chat.send(this.code, text).subscribe({
+      next: (msg) => {
+        this.appendChatMessage(msg);
+        this.chatText = '';
+        queueMicrotask(() => this.scrollChatToBottom());
+      },
+      error: (err) => {
+        this.error = apiErrorMessage(err, 'Failed to send chat message');
+      },
+    });
   }
 
   trackChatMessage(_index: number, msg: LobbyChatMessageDto): string {
@@ -1209,11 +1396,18 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       window.clearTimeout(timerId);
     }
     this.joinDelayTimers.clear();
+    this.lobby = null;
+    this.redirectingToDashboard = false;
+    this.lobbyLoadStartedAt = performance.now();
+    this.suppressInitialLoadingOverlay = false;
     this.view = 'lobby';
     this.error = null;
     this.joinState = 'unknown';
     this.joinRequestInFlight = false;
     this.autoJoinInFlight = false;
+    this.autoJoinFailed = false;
+    this.autoJoinBlocked = false;
+    this.intentionalLeaveInProgress = false;
     this.joinPinDigits = ['', '', '', ''];
     this.joinPinActiveIndex = 0;
     this.joinPinAutoFocusDone = false;
@@ -1223,6 +1417,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.categoryMenuSearch = '';
     this.chatText = '';
     this.chatMessages = [];
+    this.chatMessageKeys.clear();
     this.hasLiveLobbySnapshot = false;
     this.chatEventsSubscription?.unsubscribe();
     this.chatEventsSubscription = null;
@@ -1237,6 +1432,41 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.categoryOptions = [];
     this.selectedQuizId = null;
     this.selectedQuizSaving = false;
+    this.readySaving = false;
+  }
+
+  private updateInitialLoadingOverlayPreference(nextCode: string): void {
+    const state = (this.router.getCurrentNavigation()?.extras?.state ??
+      history.state ??
+      null) as Record<string, unknown> | null;
+    const suppress = state?.['suppressInitialLobbyOverlay'] === true;
+    const stateCode = String(state?.['lobbyCode'] ?? '')
+      .trim()
+      .toUpperCase();
+    this.suppressInitialLoadingOverlay =
+      suppress && !!nextCode && stateCode === nextCode;
+  }
+
+  private consumePrefetchedLobby(nextCode: string): LobbyDto | null {
+    const state = (this.router.getCurrentNavigation()?.extras?.state ??
+      history.state ??
+      null) as Record<string, unknown> | null;
+    const raw = state?.['prefetchedLobby'];
+    if (!raw || typeof raw !== 'object') return null;
+
+    const prefetched = raw as LobbyDto;
+    const code = String(prefetched?.code ?? '')
+      .trim()
+      .toUpperCase();
+    if (!code || code !== nextCode) return null;
+    return prefetched;
+  }
+
+  private pathFromUrl(url: string | undefined): string {
+    const raw = String(url ?? '').trim();
+    if (!raw) return '';
+    const noHash = raw.split('#')[0] ?? '';
+    return noHash.split('?')[0] ?? '';
   }
 
   private runAfterMinimumJoinTransition(
@@ -1258,6 +1488,18 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.joinDelayTimers.add(timerId);
   }
 
+  private syncLobbyOnForeground(): void {
+    if (!this.code || this.destroyed) return;
+    const now = performance.now();
+    if (now - this.lastForegroundSyncAt < 3000) return;
+    this.lastForegroundSyncAt = now;
+
+    this.sessionService.refresh().subscribe({
+      next: () => this.fetchLobbySnapshotFromServer(),
+      error: () => this.fetchLobbySnapshotFromServer(),
+    });
+  }
+
   private scrollChatToBottomIfNearBottom(): void {
     const el = this.chatLog?.nativeElement;
     if (!el) return;
@@ -1270,6 +1512,26 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     const el = this.chatLog?.nativeElement;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
+  }
+
+  private appendChatMessage(msg: LobbyChatMessageDto): void {
+    const key = this.chatMessageKey(msg);
+    if (this.chatMessageKeys.has(key)) return;
+
+    this.chatMessages.push(msg);
+    this.chatMessageKeys.add(key);
+
+    if (this.chatMessages.length <= this.maxChatMessages) return;
+
+    const overflow = this.chatMessages.length - this.maxChatMessages;
+    const removed = this.chatMessages.splice(0, overflow);
+    for (const item of removed) {
+      this.chatMessageKeys.delete(this.chatMessageKey(item));
+    }
+  }
+
+  private chatMessageKey(msg: LobbyChatMessageDto): string {
+    return `${msg.serverTime}:${msg.displayName}:${msg.text}`;
   }
 
   setPrivacyMode(mode: 'public' | 'private'): void {
@@ -1622,28 +1884,43 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
-    const isLoggedIn = !!this.auth.snapshot;
-    if (!isLoggedIn && desired > 2) {
-      this.error = 'Login required for lobbies larger than 2 players';
+    const submitUpdate = () => {
+      this.lobbyApi.setMaxPlayers(this.code, desired).subscribe({
+        next: (updated) => {
+          this.maxPlayersSaving = false;
+          this.maxPlayersDirty = false;
+          this.onLobbyUpdate(updated);
+        },
+        error: (err) => {
+          this.maxPlayersSaving = false;
+          this.maxPlayersDirty = false;
+          if (previous === 2 || previous === 3 || previous === 4 || previous === 5) {
+            this.maxPlayersDraft = previous;
+          }
+          this.error = apiErrorMessage(err, 'Failed to update max players');
+        },
+      });
+    };
+
+    this.maxPlayersSaving = true;
+    if (desired > 2) {
+      this.auth.reloadMe().subscribe({
+        next: (user) => {
+          if (!user && !this.auth.snapshot) {
+            this.maxPlayersSaving = false;
+            this.error = 'Login required for lobbies larger than 2 players';
+            return;
+          }
+          submitUpdate();
+        },
+        error: () => {
+          this.maxPlayersSaving = false;
+          this.error = 'Login required for lobbies larger than 2 players';
+        },
+      });
       return;
     }
 
-    this.maxPlayersSaving = true;
-    this.lobbyApi.setMaxPlayers(this.code, desired).subscribe({
-      next: (updated) => {
-        this.maxPlayersSaving = false;
-        this.maxPlayersDirty = false;
-        this.onLobbyUpdate(updated);
-      },
-      error: (err) => {
-        this.maxPlayersSaving = false;
-        this.maxPlayersDirty = false;
-        if (previous === 2 || previous === 3 || previous === 4 || previous === 5) {
-          this.maxPlayersDraft = previous;
-        }
-        this.error = apiErrorMessage(err, 'Failed to update max players');
-      },
-    });
+    submitUpdate();
   }
 }
-

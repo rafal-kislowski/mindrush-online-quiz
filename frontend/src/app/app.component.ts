@@ -1,5 +1,5 @@
 import { AsyncPipe, NgFor, NgIf } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import {
   NavigationEnd,
   Router,
@@ -7,8 +7,10 @@ import {
   RouterLinkActive,
   RouterOutlet,
 } from '@angular/router';
-import { combineLatest, filter, map } from 'rxjs';
+import { Subscription, catchError, combineLatest, filter, interval, map, of, startWith, switchMap } from 'rxjs';
 import { AuthService } from './core/auth/auth.service';
+import { LobbyApi } from './core/api/lobby.api';
+import { LobbyDto } from './core/models/lobby.models';
 import { SessionService } from './core/session/session.service';
 import { computeLevelProgress, levelTheme, rankForPoints } from './core/progression/progression';
 import { ParticlesService } from './core/ui/particles.service';
@@ -58,11 +60,13 @@ function tintHex(hex: string, amount: number): string {
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, OnDestroy {
   private readonly particlesService = inject(ParticlesService);
   private readonly sessionService = inject(SessionService);
   private readonly authService = inject(AuthService);
+  private readonly lobbyApi = inject(LobbyApi);
   private readonly router = inject(Router);
+  private readonly subscriptions = new Subscription();
   readonly session$ = this.sessionService.session$;
   readonly authUser$ = this.authService.user$;
   readonly isAdmin$ = this.authService.user$.pipe(map(u => !!u?.roles?.includes('ADMIN')));
@@ -113,6 +117,7 @@ export class AppComponent implements OnInit {
   sidebarCollapsed = false;
   contentWide = false;
   contentFull = false;
+  currentLobby: LobbyDto | null = null;
 
   readonly menuItems: Array<{
     label: string;
@@ -135,14 +140,22 @@ export class AppComponent implements OnInit {
       }
     });
 
-    this.router.events
-      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
-      .subscribe(() => {
-        this.sidebarOpen = false;
-        this.updateContentFlags(this.router.url);
-      });
+    this.subscriptions.add(
+      this.router.events
+        .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+        .subscribe(() => {
+          this.sidebarOpen = false;
+          this.updateContentFlags(this.router.url);
+          this.refreshCurrentLobby();
+        })
+    );
 
     this.updateContentFlags(this.router.url);
+    this.startCurrentLobbyTracking();
+  }
+
+  ngOnDestroy(): void {
+    this.subscriptions.unsubscribe();
   }
 
   private updateContentFlags(url: string): void {
@@ -151,6 +164,7 @@ export class AppComponent implements OnInit {
     this.contentFull =
       path === '/' ||
       path.startsWith('/leaderboards') ||
+      path.startsWith('/lobbies') ||
       path.startsWith('/lobby') ||
       path.startsWith('/login') ||
       path.startsWith('/register');
@@ -176,12 +190,57 @@ export class AppComponent implements OnInit {
 
   logout(): void {
     this.authService.logout().subscribe(() => {
+      this.currentLobby = null;
       this.router.navigate(['/']);
     });
+  }
+
+  openCurrentLobby(): void {
+    const code = (this.currentLobby?.code ?? '').trim().toUpperCase();
+    if (!code) return;
+    void this.router.navigate(['/lobby', code], {
+      state: {
+        suppressInitialLobbyOverlay: true,
+        lobbyCode: code,
+        prefetchedLobby: this.currentLobby,
+      },
+    });
+  }
+
+  get currentLobbyPlayerCount(): number {
+    return this.currentLobby?.players?.length ?? 0;
+  }
+
+  get currentLobbyCapacity(): number {
+    return this.currentLobby?.maxPlayers ?? 0;
   }
 
   formatInt(n: number | null | undefined): string {
     const v = Math.max(0, Math.floor(n ?? 0));
     return new Intl.NumberFormat('en-US').format(v);
+  }
+
+  private startCurrentLobbyTracking(): void {
+    this.subscriptions.add(
+      interval(5000)
+        .pipe(
+          startWith(0),
+          switchMap(() =>
+            this.lobbyApi.getCurrent().pipe(catchError(() => of(null)))
+          )
+        )
+        .subscribe((lobby) => {
+          this.currentLobby = lobby;
+        })
+    );
+  }
+
+  private refreshCurrentLobby(): void {
+    this.lobbyApi
+      .getCurrent()
+      .pipe(catchError(() => of(null)))
+      .subscribe((lobby) => {
+        this.currentLobby = lobby;
+      });
   }
 }

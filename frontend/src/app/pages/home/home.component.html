@@ -561,17 +561,13 @@
   >
     <div class="mr-flow-overlay__panel">
       <p class="mr-flow-overlay__title">
-        {{ creating ? "Creating lobby" : "Joining lobby" }}
+        Please wait
         <span class="mr-flow-dots" aria-hidden="true">
           <span></span><span></span><span></span>
         </span>
       </p>
       <p class="mr-flow-overlay__text">
-        {{
-          creating
-            ? "Preparing your room and connecting you."
-            : "Connecting to room " + (joinCode.trim().toUpperCase() || "......") + "."
-        }}
+        Establishing secure connection.
       </p>
     </div>
   </div>

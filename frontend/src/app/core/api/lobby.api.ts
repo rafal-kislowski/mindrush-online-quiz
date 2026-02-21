@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
-import { LobbyDto } from '../models/lobby.models';
+import { map, Observable } from 'rxjs';
+import { ActiveLobbyDto, LobbyDto } from '../models/lobby.models';
 
 @Injectable({ providedIn: 'root' })
 export class LobbyApi {
@@ -16,6 +16,28 @@ export class LobbyApi {
 
   get(code: string): Observable<LobbyDto> {
     return this.http.get<LobbyDto>(`/api/lobbies/${encodeURIComponent(code)}`, { withCredentials: true });
+  }
+
+  listActive(): Observable<ActiveLobbyDto[]> {
+    return this.http.get<ActiveLobbyDto[]>('/api/lobbies/active', { withCredentials: true });
+  }
+
+  getOwnedOpen(): Observable<LobbyDto | null> {
+    return this.http
+      .get<LobbyDto | null>('/api/lobbies/owned', {
+        withCredentials: true,
+        observe: 'response',
+      })
+      .pipe(map((response) => response.body ?? null));
+  }
+
+  getCurrent(): Observable<LobbyDto | null> {
+    return this.http
+      .get<LobbyDto | null>('/api/lobbies/current', {
+        withCredentials: true,
+        observe: 'response',
+      })
+      .pipe(map((response) => response.body ?? null));
   }
 
   join(code: string, password?: string): Observable<LobbyDto> {
@@ -44,6 +66,14 @@ export class LobbyApi {
     return this.http.post<LobbyDto>(
       `/api/lobbies/${encodeURIComponent(code)}/selected-quiz`,
       { quizId },
+      { withCredentials: true }
+    );
+  }
+
+  setReady(code: string, ready: boolean): Observable<LobbyDto> {
+    return this.http.post<LobbyDto>(
+      `/api/lobbies/${encodeURIComponent(code)}/ready`,
+      { ready },
       { withCredentials: true }
     );
   }

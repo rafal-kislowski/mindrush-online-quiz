@@ -323,6 +323,17 @@
       </div>
 
       <div class="topbar__right">
+        <button
+          class="btn owned-lobby-btn"
+          type="button"
+          *ngIf="currentLobby as lobby"
+          (click)="openCurrentLobby()"
+          [attr.aria-label]="'Open current lobby ' + lobby.code + ', players ' + currentLobbyPlayerCount + ' of ' + currentLobbyCapacity"
+        >
+          <span class="owned-lobby-btn__label">In lobby</span>
+          <span class="owned-lobby-btn__code">{{ lobby.code }}</span>
+          <span class="owned-lobby-btn__meta">{{ currentLobbyPlayerCount }}/{{ currentLobbyCapacity }}</span>
+        </button>
         <ng-container *ngIf="authUser$ | async as user; else guestActions">
           <span class="topbar__user">{{ user.displayName }}</span>
           <button class="btn" type="button" (click)="logout()">Logout</button>

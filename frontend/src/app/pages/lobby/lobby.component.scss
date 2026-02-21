@@ -3,3 +3,19 @@
   height: 100%;
   min-height: 0;
 }
+
+:host .mr-flow-overlay {
+  background:
+    radial-gradient(
+      1100px 420px at 50% 16%,
+      rgba(56, 189, 248, 0.12),
+      rgba(56, 189, 248, 0) 62%
+    ),
+    rgba(6, 12, 30, 0.58);
+}
+
+.lobby-page.is-joining.is-join .lobby-frame {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}

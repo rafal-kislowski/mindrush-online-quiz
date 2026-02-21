@@ -5,6 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 import { Subject, catchError, map, of, takeUntil } from 'rxjs';
 import { apiErrorMessage } from '../../core/api/api-error.util';
 import { LobbyApi } from '../../core/api/lobby.api';
+import { LobbyDto } from '../../core/models/lobby.models';
 import {
   LeaderboardApi,
   LeaderboardEntryDto,
@@ -32,7 +33,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   readonly joinCodeLength = 6;
   readonly joinCodeSlots = Array.from({ length: this.joinCodeLength });
   readonly leaderboardSkeleton = Array.from({ length: 5 });
-  private readonly minLobbyTransitionMs = 2000;
+  private readonly minLobbyTransitionMs = 1500;
 
   get authUser$() {
     return this.auth.user$;
@@ -170,24 +171,106 @@ export class HomeComponent implements OnInit, OnDestroy {
   createLobby(): void {
     if (this.lobbyNavigationBusy) return;
     this.error = null;
+    this.lobbyApi.getCurrent().subscribe({
+      next: (currentLobby) => {
+        const currentCode = (currentLobby?.code ?? '').trim().toUpperCase();
+        if (currentCode) {
+          this.openOwnedLobbyInstant(currentCode, currentLobby);
+          return;
+        }
+        this.createNewLobbyWithTransition();
+      },
+      error: () => {
+        this.createNewLobbyWithTransition();
+      },
+    });
+  }
+
+  private createNewLobbyWithTransition(): void {
     this.creating = true;
     const startedAt = performance.now();
     this.lobbyApi
       .create({})
       .subscribe({
-        next: (res) =>
-          this.runAfterMinimumTransition(startedAt, () =>
-            this.navigateToLobby(res.code)
-          ),
+        next: (res) => this.joinCreatedLobbyThenNavigate(res.code, startedAt),
         error: (err) => {
-          const message = apiErrorMessage(err, 'Failed to create lobby');
-          this.runAfterMinimumTransition(startedAt, () => {
-            this.error = message;
-            this.creating = false;
-            this.joiningLobby = false;
+          this.lobbyApi.getCurrent().subscribe({
+            next: (currentLobby) => {
+              const currentCode = (currentLobby?.code ?? '').trim().toUpperCase();
+              if (currentCode) {
+                this.openOwnedLobbyInstant(currentCode, currentLobby);
+                return;
+              }
+              const message = apiErrorMessage(err, 'Failed to create lobby');
+              this.runAfterMinimumTransition(startedAt, () => {
+                this.error = message;
+                this.creating = false;
+                this.joiningLobby = false;
+              });
+            },
+            error: () => {
+              const message = apiErrorMessage(err, 'Failed to create lobby');
+              this.runAfterMinimumTransition(startedAt, () => {
+                this.error = message;
+                this.creating = false;
+                this.joiningLobby = false;
+              });
+            },
           });
         },
       });
+  }
+
+  private openOwnedLobbyInstant(
+    code: string,
+    prefetchedLobby?: LobbyDto | null
+  ): void {
+    const targetCode = (code ?? '').trim().toUpperCase();
+    if (!targetCode) return;
+    this.creating = false;
+    this.joiningLobby = false;
+    const state: Record<string, unknown> = {
+      suppressInitialLobbyOverlay: true,
+      lobbyCode: targetCode,
+    };
+    if (
+      prefetchedLobby &&
+      (prefetchedLobby.code ?? '').trim().toUpperCase() === targetCode
+    ) {
+      state['prefetchedLobby'] = prefetchedLobby;
+    }
+
+    void this.router
+      .navigate(['/lobby', targetCode], { state })
+      .then((ok) => {
+        if (ok) return;
+        this.error = 'Failed to open lobby';
+      })
+      .catch(() => {
+        this.error = 'Failed to open lobby';
+      });
+  }
+
+  private rejoinOwnedLobbyWithTransition(
+    code: string,
+    prefetchedLobby?: LobbyDto | null
+  ): void {
+    const targetCode = (code ?? '').trim().toUpperCase();
+    if (!targetCode) return;
+
+    this.creating = true;
+    const startedAt = performance.now();
+
+    this.lobbyApi.join(targetCode).subscribe({
+      next: (joined) =>
+        this.runAfterMinimumTransition(startedAt, () =>
+          this.navigateToLobby(targetCode, joined)
+        ),
+      error: () =>
+        this.runAfterMinimumTransition(startedAt, () =>
+          this.navigateToLobby(targetCode, prefetchedLobby ?? null)
+        ),
+    });
   }
 
   joinLobby(): void {
@@ -197,16 +280,115 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.error = null;
     this.joiningLobby = true;
     const startedAt = performance.now();
+    this.lobbyApi.getCurrent().subscribe({
+      next: (currentLobby) => {
+        const currentCode = (currentLobby?.code ?? '').trim().toUpperCase();
+        if (currentCode && currentCode !== code) {
+          this.notifyMustLeaveCurrentLobby(currentCode);
+          this.runAfterMinimumTransition(startedAt, () =>
+            this.navigateToLobby(currentCode, currentLobby)
+          );
+          return;
+        }
+        this.continueJoinLobbyByCode(code, startedAt);
+      },
+      error: () => this.continueJoinLobbyByCode(code, startedAt),
+    });
+  }
+
+  private continueJoinLobbyByCode(code: string, startedAt: number): void {
     this.lobbyApi.get(code).subscribe({
-      next: () =>
-        this.runAfterMinimumTransition(startedAt, () =>
-          this.navigateToLobby(code)
-        ),
+      next: (lobby) => {
+        const requiresPin = !!lobby?.hasPassword && !lobby?.isOwner;
+        if (requiresPin) {
+          this.runAfterMinimumTransition(startedAt, () =>
+            this.navigateToLobby(code)
+          );
+          return;
+        }
+        this.joinPublicLobbyThenNavigate(code, startedAt);
+      },
       error: (err) => {
         const message =
           err?.status === 404
             ? 'Lobby with this code does not exist'
             : apiErrorMessage(err, 'Failed to open lobby');
+        this.runAfterMinimumTransition(startedAt, () => {
+          this.joiningLobby = false;
+          this.clearJoinCodeInput(true);
+          this.error = message;
+        });
+      },
+    });
+  }
+
+  private joinCreatedLobbyThenNavigate(code: string, startedAt: number): void {
+    const targetCode = (code ?? '').trim().toUpperCase();
+    if (!targetCode) {
+      this.creating = false;
+      this.joiningLobby = false;
+      this.error = 'Failed to create lobby';
+      return;
+    }
+
+    // Keep create flow resilient: if eager join fails, fall back to legacy open.
+    this.lobbyApi.join(targetCode).subscribe({
+      next: (lobby) =>
+        this.runAfterMinimumTransition(startedAt, () =>
+          this.navigateToLobby(targetCode, lobby)
+        ),
+      error: () =>
+        this.runAfterMinimumTransition(startedAt, () =>
+          this.navigateToLobby(targetCode)
+        ),
+    });
+  }
+
+  private joinPublicLobbyThenNavigate(code: string, startedAt: number): void {
+    const targetCode = (code ?? '').trim().toUpperCase();
+    if (!targetCode) {
+      this.joiningLobby = false;
+      return;
+    }
+
+    this.lobbyApi.join(targetCode).subscribe({
+      next: (lobby) =>
+        this.runAfterMinimumTransition(startedAt, () =>
+          this.navigateToLobby(targetCode, lobby)
+        ),
+      error: (err) => {
+        if (err?.status === 409) {
+          this.lobbyApi.getCurrent().subscribe({
+            next: (currentLobby) => {
+              const currentCode = (currentLobby?.code ?? '').trim().toUpperCase();
+              if (currentCode) {
+                if (currentCode !== targetCode) {
+                  this.notifyMustLeaveCurrentLobby(currentCode);
+                }
+                this.runAfterMinimumTransition(startedAt, () =>
+                  this.navigateToLobby(currentCode, currentLobby)
+                );
+                return;
+              }
+              const message = apiErrorMessage(err, 'Failed to join lobby');
+              this.runAfterMinimumTransition(startedAt, () => {
+                this.joiningLobby = false;
+                this.clearJoinCodeInput(true);
+                this.error = message;
+              });
+            },
+            error: () => {
+              const message = apiErrorMessage(err, 'Failed to join lobby');
+              this.runAfterMinimumTransition(startedAt, () => {
+                this.joiningLobby = false;
+                this.clearJoinCodeInput(true);
+                this.error = message;
+              });
+            },
+          });
+          return;
+        }
+        const message = apiErrorMessage(err, 'Failed to join lobby');
         this.runAfterMinimumTransition(startedAt, () => {
           this.joiningLobby = false;
           this.clearJoinCodeInput(true);
@@ -243,7 +425,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     );
   }
 
-  private navigateToLobby(code: string): void {
+  private navigateToLobby(code: string, prefetchedLobby?: LobbyDto | null): void {
     const targetCode = (code ?? '').trim().toUpperCase();
     if (!targetCode) {
       this.creating = false;
@@ -251,9 +433,18 @@ export class HomeComponent implements OnInit, OnDestroy {
       return;
     }
 
+    const state =
+      prefetchedLobby && (prefetchedLobby.code ?? '').trim().toUpperCase() === targetCode
+        ? {
+            suppressInitialLobbyOverlay: true,
+            lobbyCode: targetCode,
+            prefetchedLobby,
+          }
+        : undefined;
+
     this.joiningLobby = true;
     void this.router
-      .navigate(['/lobby', targetCode])
+      .navigate(['/lobby', targetCode], state ? { state } : undefined)
       .then((ok) => {
         if (ok) return;
         this.onLobbyNavigationFailed();
@@ -299,5 +490,15 @@ export class HomeComponent implements OnInit, OnDestroy {
       input.focus();
     }
     this.joinCodeFocused = true;
+  }
+
+  private notifyMustLeaveCurrentLobby(currentCode: string): void {
+    this.toast.warning(
+      `You are already in lobby ${currentCode}. Leave your current lobby before joining another one.`,
+      {
+        title: 'Lobby',
+        dedupeKey: `home:lobby-switch-blocked:${currentCode}`,
+      }
+    );
   }
 }
