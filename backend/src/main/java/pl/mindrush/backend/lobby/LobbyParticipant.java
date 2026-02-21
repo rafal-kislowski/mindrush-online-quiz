@@ -37,12 +37,16 @@ public class LobbyParticipant {
     @Column(name = "joined_at", nullable = false, updatable = false)
     private Instant joinedAt;
 
+    @Column(name = "ready")
+    private Boolean ready;
+
     public static LobbyParticipant createGuest(Lobby lobby, String guestSessionId, String displayName, Instant now) {
         LobbyParticipant p = new LobbyParticipant();
         p.lobby = lobby;
         p.guestSessionId = guestSessionId;
         p.displayName = displayName;
         p.joinedAt = now;
+        p.ready = false;
         return p;
     }
 
@@ -65,5 +69,12 @@ public class LobbyParticipant {
     public Instant getJoinedAt() {
         return joinedAt;
     }
-}
 
+    public boolean isReady() {
+        return Boolean.TRUE.equals(ready);
+    }
+
+    public void setReady(boolean ready) {
+        this.ready = ready;
+    }
+}

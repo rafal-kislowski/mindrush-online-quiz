@@ -182,27 +182,29 @@ public class GameService {
             throw new ResponseStatusException(CONFLICT, "Game is already in progress");
         }
 
-        Instant now = clock.instant();
-        Integer qDurationMs;
-        Integer quizSeconds = quiz.getQuestionTimeLimitSeconds();
-        int seconds = (quizSeconds == null || quizSeconds <= 0) ? pl.mindrush.backend.quiz.Quiz.DEFAULT_QUESTION_TIME_LIMIT_SECONDS : quizSeconds;
-        long computed = Math.min(Integer.MAX_VALUE, seconds * 1000L);
-        qDurationMs = (int) computed;
+        return startGameInternal(lobby, quiz, guestSession.getId());
+    }
 
-        GameSession session = GameSession.startNew(lobby.getId(), quiz.getId(), now, preCountdownDuration, qDurationMs);
-        gameSessionRepository.save(session);
+    public Optional<GameStateDto> tryStartGameFromReady(String lobbyCode) {
+        Lobby lobby = lobbyRepository.findByCode(lobbyCode).orElse(null);
+        if (lobby == null) return Optional.empty();
+        if (lobby.getStatus() != LobbyStatus.OPEN) return Optional.empty();
+        if (lobby.getSelectedQuizId() == null) return Optional.empty();
 
         List<LobbyParticipant> lobbyPlayers = participantRepository.findAllByLobbyIdOrderByJoinedAtAsc(lobby.getId());
-        for (int i = 0; i < lobbyPlayers.size(); i++) {
-            LobbyParticipant p = lobbyPlayers.get(i);
-            gamePlayerRepository.save(GamePlayer.create(session, p.getGuestSessionId(), p.getDisplayName(), i + 1));
-        }
+        if (lobbyPlayers.size() < 2) return Optional.empty();
+        boolean allReady = lobbyPlayers.stream().allMatch(LobbyParticipant::isReady);
+        if (!allReady) return Optional.empty();
 
-        lobby.setStatus(LobbyStatus.IN_GAME);
-        lobbyRepository.save(lobby);
+        Optional<GameSession> existing = gameSessionRepository.findFirstByLobbyIdAndStatusOrderByStartedAtDesc(lobby.getId(), GameStatus.IN_PROGRESS);
+        if (existing.isPresent()) return Optional.empty();
 
-        gameEventPublisher.gameUpdated(lobby.getCode());
-        return buildState(lobby, session, guestSession.getId());
+        Quiz quiz = quizRepository.findById(lobby.getSelectedQuizId()).orElse(null);
+        if (quiz == null || quiz.getStatus() != QuizStatus.ACTIVE) return Optional.empty();
+        long questionCount = questionRepository.countByQuizId(quiz.getId());
+        if (questionCount == 0) return Optional.empty();
+
+        return Optional.of(startGameInternal(lobby, quiz, lobby.getOwnerGuestSessionId()));
     }
 
     public GameStateDto getState(HttpServletRequest request, String lobbyCode) {
@@ -731,5 +733,30 @@ public class GameService {
 
     private record CurrentQuestion(QuizQuestion question, List<QuizAnswerOption> options, int indexOneBased,
                                    int totalQuestions) {
+    }
+
+    private GameStateDto startGameInternal(Lobby lobby, Quiz quiz, String viewerGuestSessionId) {
+        Instant now = clock.instant();
+        Integer qDurationMs;
+        Integer quizSeconds = quiz.getQuestionTimeLimitSeconds();
+        int seconds = (quizSeconds == null || quizSeconds <= 0) ? pl.mindrush.backend.quiz.Quiz.DEFAULT_QUESTION_TIME_LIMIT_SECONDS : quizSeconds;
+        long computed = Math.min(Integer.MAX_VALUE, seconds * 1000L);
+        qDurationMs = (int) computed;
+
+        GameSession session = GameSession.startNew(lobby.getId(), quiz.getId(), now, preCountdownDuration, qDurationMs);
+        gameSessionRepository.save(session);
+
+        List<LobbyParticipant> lobbyPlayers = participantRepository.findAllByLobbyIdOrderByJoinedAtAsc(lobby.getId());
+        for (int i = 0; i < lobbyPlayers.size(); i++) {
+            LobbyParticipant p = lobbyPlayers.get(i);
+            gamePlayerRepository.save(GamePlayer.create(session, p.getGuestSessionId(), p.getDisplayName(), i + 1));
+        }
+
+        participantRepository.clearReadyByLobbyId(lobby.getId());
+        lobby.setStatus(LobbyStatus.IN_GAME);
+        lobbyRepository.save(lobby);
+
+        gameEventPublisher.gameUpdated(lobby.getCode());
+        return buildState(lobby, session, viewerGuestSessionId);
     }
 }

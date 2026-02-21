@@ -6,7 +6,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import pl.mindrush.backend.guest.GuestSession;
+import pl.mindrush.backend.guest.GuestSessionRepository;
 import pl.mindrush.backend.guest.GuestSessionService;
+import pl.mindrush.backend.game.GameService;
 import pl.mindrush.backend.lobby.events.LobbyEventPublisher;
 import pl.mindrush.backend.quiz.Quiz;
 import pl.mindrush.backend.quiz.QuizRepository;
@@ -14,8 +16,13 @@ import pl.mindrush.backend.quiz.QuizStatus;
 
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.Optional;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.CONFLICT;
@@ -29,6 +36,8 @@ public class LobbyService {
     public static final int GUEST_LOBBY_MAX_PLAYERS = 2;
     public static final int AUTH_LOBBY_MIN_PLAYERS = 2;
     public static final int AUTH_LOBBY_MAX_PLAYERS = 5;
+    private static final List<LobbyStatus> ACTIVE_OWNED_STATUSES = List.of(LobbyStatus.OPEN, LobbyStatus.IN_GAME);
+    private static final List<LobbyStatus> ACTIVE_PARTICIPATION_STATUSES = List.of(LobbyStatus.OPEN, LobbyStatus.IN_GAME);
 
     private static final char[] CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".toCharArray();
     private static final int CODE_LENGTH = 6;
@@ -37,26 +46,32 @@ public class LobbyService {
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     private final GuestSessionService guestSessionService;
+    private final GuestSessionRepository guestSessionRepository;
     private final LobbyRepository lobbyRepository;
     private final LobbyParticipantRepository participantRepository;
     private final LobbySummaryMapper lobbySummaryMapper;
     private final LobbyEventPublisher lobbyEventPublisher;
     private final QuizRepository quizRepository;
+    private final GameService gameService;
 
     public LobbyService(
             GuestSessionService guestSessionService,
+            GuestSessionRepository guestSessionRepository,
             LobbyRepository lobbyRepository,
             LobbyParticipantRepository participantRepository,
             LobbySummaryMapper lobbySummaryMapper,
             LobbyEventPublisher lobbyEventPublisher,
-            QuizRepository quizRepository
+            QuizRepository quizRepository,
+            GameService gameService
     ) {
         this.guestSessionService = guestSessionService;
+        this.guestSessionRepository = guestSessionRepository;
         this.lobbyRepository = lobbyRepository;
         this.participantRepository = participantRepository;
         this.lobbySummaryMapper = lobbySummaryMapper;
         this.lobbyEventPublisher = lobbyEventPublisher;
         this.quizRepository = quizRepository;
+        this.gameService = gameService;
     }
 
     public Map<String, Object> createLobby(
@@ -66,6 +81,19 @@ public class LobbyService {
             boolean authenticatedUser
     ) {
         GuestSession guestSession = guestSessionService.requireValidSession(request);
+        Optional<Lobby> existingJoinedLobby = findActiveLobbyForGuestSession(guestSession.getId());
+        if (existingJoinedLobby.isPresent()) {
+            Lobby lobby = existingJoinedLobby.get();
+            boolean shouldBeAuthenticatedOwner = authenticatedUser || guestSession.getUserId() != null;
+            if (guestSession.getId().equals(lobby.getOwnerGuestSessionId())
+                    && lobby.isOwnerAuthenticated() != shouldBeAuthenticatedOwner) {
+                lobby.setOwnerAuthenticated(shouldBeAuthenticatedOwner);
+                lobbyRepository.save(lobby);
+                lobbyEventPublisher.lobbyUpdated(lobby.getCode());
+            }
+            return lobbySummary(lobby, guestSession.getId());
+        }
+
         Instant now = Instant.now();
 
         String code = generateUniqueCode();
@@ -77,7 +105,16 @@ public class LobbyService {
         String passwordHash = pinCode == null ? null : passwordEncoder.encode(pinCode);
 
         int maxPlayers = resolveMaxPlayers(requestedMaxPlayers, authenticatedUser);
-        Lobby lobby = Lobby.createNew(code, guestSession.getId(), maxPlayers, passwordHash, pinCode, now);
+        boolean ownerAuthenticated = authenticatedUser || guestSession.getUserId() != null;
+        Lobby lobby = Lobby.createNew(
+                code,
+                guestSession.getId(),
+                ownerAuthenticated,
+                maxPlayers,
+                passwordHash,
+                pinCode,
+                now
+        );
         lobbyRepository.save(lobby);
 
         String displayName = uniqueDisplayNameForLobby(lobby.getId(), guestSession.getDisplayName());
@@ -85,6 +122,97 @@ public class LobbyService {
 
         lobbyEventPublisher.lobbyUpdated(lobby.getCode());
         return lobbySummary(lobby, guestSession.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> findOwnedOpenLobby(HttpServletRequest request) {
+        String viewerGuestSessionId = guestSessionService.findValidSession(request)
+                .map(GuestSession::getId)
+                .orElse(null);
+        if (viewerGuestSessionId == null) return null;
+
+        Lobby lobby = lobbyRepository
+                .findFirstByOwnerGuestSessionIdAndStatusInOrderByCreatedAtDesc(viewerGuestSessionId, ACTIVE_OWNED_STATUSES)
+                .orElse(null);
+        if (lobby == null) return null;
+        return lobbySummary(lobby, viewerGuestSessionId);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> findCurrentLobby(HttpServletRequest request) {
+        String viewerGuestSessionId = guestSessionService.findValidSession(request)
+                .map(GuestSession::getId)
+                .orElse(null);
+        if (viewerGuestSessionId == null) return null;
+
+        Lobby lobby = findActiveLobbyForGuestSession(viewerGuestSessionId).orElse(null);
+        if (lobby == null) return null;
+        return lobbySummary(lobby, viewerGuestSessionId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> listActiveLobbies(HttpServletRequest request) {
+        String viewerGuestSessionId = guestSessionService.findValidSession(request)
+                .map(GuestSession::getId)
+                .orElse(null);
+
+        List<Lobby> lobbies = lobbyRepository.findAllByStatusOrderByCreatedAtDesc(LobbyStatus.OPEN);
+        if (lobbies.isEmpty()) return List.of();
+
+        List<String> lobbyIds = lobbies.stream().map(Lobby::getId).toList();
+        List<LobbyParticipant> participants = participantRepository.findAllByLobbyIdInOrderByLobbyIdAscJoinedAtAsc(lobbyIds);
+
+        Map<String, List<LobbyParticipant>> participantsByLobbyId = new HashMap<>();
+        for (LobbyParticipant participant : participants) {
+            String lobbyId = participant.getLobby().getId();
+            participantsByLobbyId.computeIfAbsent(lobbyId, __ -> new ArrayList<>()).add(participant);
+        }
+
+        Set<String> ownerGuestSessionIds = new HashSet<>();
+        for (Lobby lobby : lobbies) {
+            ownerGuestSessionIds.add(lobby.getOwnerGuestSessionId());
+        }
+        Map<String, GuestSession> ownerSessionById = new HashMap<>();
+        for (GuestSession session : guestSessionRepository.findAllById(ownerGuestSessionIds)) {
+            ownerSessionById.put(session.getId(), session);
+        }
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Lobby lobby : lobbies) {
+            List<LobbyParticipant> lobbyParticipants = participantsByLobbyId.getOrDefault(lobby.getId(), List.of());
+            if (lobbyParticipants.isEmpty()) continue;
+
+            boolean isOwner = viewerGuestSessionId != null && viewerGuestSessionId.equals(lobby.getOwnerGuestSessionId());
+            boolean isParticipant = viewerGuestSessionId != null
+                    && lobbyParticipants.stream().anyMatch(p -> viewerGuestSessionId.equals(p.getGuestSessionId()));
+
+            String leaderDisplayName = lobbyParticipants.stream()
+                    .filter(p -> lobby.getOwnerGuestSessionId().equals(p.getGuestSessionId()))
+                    .map(LobbyParticipant::getDisplayName)
+                    .findFirst()
+                    .orElse(lobbyParticipants.get(0).getDisplayName());
+
+            GuestSession ownerSession = ownerSessionById.get(lobby.getOwnerGuestSessionId());
+            String ownerType = lobby.isOwnerAuthenticated()
+                    || (ownerSession != null && ownerSession.getUserId() != null)
+                    ? "AUTHENTICATED"
+                    : "GUEST";
+
+            Map<String, Object> row = new HashMap<>();
+            row.put("code", lobby.getCode());
+            row.put("status", lobby.getStatus().name());
+            row.put("createdAt", lobby.getCreatedAt().toString());
+            row.put("hasPassword", lobby.hasPassword());
+            row.put("maxPlayers", lobby.getMaxPlayers());
+            row.put("playerCount", lobbyParticipants.size());
+            row.put("leaderDisplayName", leaderDisplayName);
+            row.put("ownerType", ownerType);
+            row.put("isOwner", isOwner);
+            row.put("isParticipant", isParticipant);
+            rows.add(row);
+        }
+
+        return rows;
     }
 
     public Map<String, Object> setLobbyMaxPlayers(
@@ -135,6 +263,11 @@ public class LobbyService {
         Lobby lobby = lobbyRepository.findByCode(code).orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Lobby not found"));
         boolean isOwner = guestSession.getId().equals(lobby.getOwnerGuestSessionId());
 
+        Optional<Lobby> existingJoinedLobby = findActiveLobbyForGuestSession(guestSession.getId());
+        if (existingJoinedLobby.isPresent() && !existingJoinedLobby.get().getId().equals(lobby.getId())) {
+            throw new ResponseStatusException(CONFLICT, "You are already in active lobby " + existingJoinedLobby.get().getCode());
+        }
+
         if (lobby.getStatus() != LobbyStatus.OPEN) {
             throw new ResponseStatusException(CONFLICT, "Lobby is closed");
         }
@@ -167,11 +300,20 @@ public class LobbyService {
 
         Instant now = Instant.now();
         if (count == 0 && lobby.getEmptySince() != null) {
+            boolean lobbyChanged = false;
             lobby.setEmptySince(null);
+            lobbyChanged = true;
             if (!isOwner) {
                 lobby.setOwnerGuestSessionId(guestSession.getId());
+                lobby.setOwnerAuthenticated(guestSession.getUserId() != null);
+                lobbyChanged = true;
             }
-            lobbyRepository.save(lobby);
+            if (enforceGuestOwnerCapacity(lobby, count)) {
+                lobbyChanged = true;
+            }
+            if (lobbyChanged) {
+                lobbyRepository.save(lobby);
+            }
         }
         String displayName = uniqueDisplayNameForLobby(lobby.getId(), guestSession.getDisplayName());
         participantRepository.save(LobbyParticipant.createGuest(lobby, guestSession.getId(), displayName, now));
@@ -209,7 +351,43 @@ public class LobbyService {
 
         lobby.setSelectedQuizId(normalizedQuizId);
         lobbyRepository.save(lobby);
+        participantRepository.clearReadyByLobbyId(lobby.getId());
         lobbyEventPublisher.lobbyUpdated(lobby.getCode());
+        maybeStartGameWhenAllPlayersReady(lobby);
+        return lobbySummary(lobby, guestSession.getId());
+    }
+
+    public Map<String, Object> setPlayerReady(HttpServletRequest request, String code, boolean ready) {
+        GuestSession guestSession = guestSessionService.requireValidSession(request);
+        Lobby lobby = lobbyRepository.findByCode(code).orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Lobby not found"));
+
+        if (lobby.getStatus() != LobbyStatus.OPEN) {
+            throw new ResponseStatusException(CONFLICT, "Lobby is not open");
+        }
+        if (ready && lobby.getSelectedQuizId() == null) {
+            throw new ResponseStatusException(CONFLICT, "Select quiz before marking ready");
+        }
+
+        LobbyParticipant participant = participantRepository.findByLobbyIdAndGuestSessionId(lobby.getId(), guestSession.getId())
+                .orElseThrow(() -> new ResponseStatusException(FORBIDDEN, "Only lobby participants can change readiness"));
+
+        if (ready) {
+            long playersCount = participantRepository.countByLobbyId(lobby.getId());
+            if (playersCount < lobby.getMaxPlayers()) {
+                throw new ResponseStatusException(CONFLICT, "Readiness is available only when lobby is full");
+            }
+        }
+
+        if (participant.isReady() != ready) {
+            participant.setReady(ready);
+            participantRepository.save(participant);
+            lobbyEventPublisher.lobbyUpdated(lobby.getCode());
+        }
+
+        if (ready) {
+            maybeStartGameWhenAllPlayersReady(lobby);
+        }
+
         return lobbySummary(lobby, guestSession.getId());
     }
 
@@ -252,17 +430,29 @@ public class LobbyService {
         long remaining = participantRepository.countByLobbyId(lobby.getId());
         if (remaining == 0) {
             lobby.setEmptySince(Instant.now());
+            enforceGuestOwnerCapacity(lobby, 0);
             lobbyRepository.save(lobby);
             lobbyEventPublisher.lobbyUpdated(lobby.getCode());
             return LeaveResult.deleted();
         }
 
+        boolean lobbyChanged = false;
         if (guestSession.getId().equals(lobby.getOwnerGuestSessionId())) {
             LobbyParticipant newOwner = participantRepository.findAllByLobbyIdOrderByJoinedAtAsc(lobby.getId()).stream()
                     .findFirst()
                     .orElseThrow(() -> new ResponseStatusException(CONFLICT, "Cannot transfer lobby ownership"));
 
             lobby.setOwnerGuestSessionId(newOwner.getGuestSessionId());
+            boolean ownerAuthenticated = guestSessionRepository.findById(newOwner.getGuestSessionId())
+                    .map(s -> s.getUserId() != null)
+                    .orElse(false);
+            lobby.setOwnerAuthenticated(ownerAuthenticated);
+            lobbyChanged = true;
+        }
+        if (enforceGuestOwnerCapacity(lobby, remaining)) {
+            lobbyChanged = true;
+        }
+        if (lobbyChanged) {
             lobbyRepository.save(lobby);
         }
 
@@ -317,19 +507,31 @@ public class LobbyService {
         long remaining = participantRepository.countByLobbyId(lobby.getId());
         if (remaining == 0) {
             lobby.setEmptySince(Instant.now());
+            enforceGuestOwnerCapacity(lobby, 0);
             lobbyRepository.save(lobby);
             lobbyEventPublisher.lobbyUpdated(lobby.getCode());
             return;
         }
 
+        boolean lobbyChanged = false;
         if (guestSessionId.equals(lobby.getOwnerGuestSessionId())) {
             LobbyParticipant newOwner = participantRepository.findAllByLobbyIdOrderByJoinedAtAsc(lobby.getId()).stream()
                     .findFirst()
                     .orElse(null);
             if (newOwner != null) {
                 lobby.setOwnerGuestSessionId(newOwner.getGuestSessionId());
-                lobbyRepository.save(lobby);
+                boolean ownerAuthenticated = guestSessionRepository.findById(newOwner.getGuestSessionId())
+                        .map(s -> s.getUserId() != null)
+                        .orElse(false);
+                lobby.setOwnerAuthenticated(ownerAuthenticated);
+                lobbyChanged = true;
             }
+        }
+        if (enforceGuestOwnerCapacity(lobby, remaining)) {
+            lobbyChanged = true;
+        }
+        if (lobbyChanged) {
+            lobbyRepository.save(lobby);
         }
 
         lobbyEventPublisher.lobbyUpdated(lobby.getCode());
@@ -339,11 +541,44 @@ public class LobbyService {
         return lobbySummaryMapper.summary(lobby, viewerGuestSessionId);
     }
 
+    private Optional<Lobby> findActiveLobbyForGuestSession(String guestSessionId) {
+        if (guestSessionId == null || guestSessionId.isBlank()) return Optional.empty();
+        return participantRepository
+                .findActiveParticipationsByGuestSessionId(guestSessionId, ACTIVE_PARTICIPATION_STATUSES)
+                .stream()
+                .map(LobbyParticipant::getLobby)
+                .filter(l -> l != null)
+                .findFirst();
+    }
+
+    private void maybeStartGameWhenAllPlayersReady(Lobby lobby) {
+        if (lobby == null) return;
+        if (lobby.getStatus() != LobbyStatus.OPEN) return;
+        if (lobby.getSelectedQuizId() == null) return;
+
+        gameService.tryStartGameFromReady(lobby.getCode());
+    }
+
     private static String normalizePin(String rawPassword) {
         if (rawPassword == null) return null;
         String s = rawPassword.trim();
         if (!s.matches("^\\d{4}$")) return null;
         return s;
+    }
+
+    private static boolean enforceGuestOwnerCapacity(Lobby lobby, long participantsCount) {
+        if (lobby.isOwnerAuthenticated()) return false;
+
+        int currentMaxPlayers = lobby.getMaxPlayers();
+        if (currentMaxPlayers <= GUEST_LOBBY_MAX_PLAYERS) return false;
+
+        int cappedMaxPlayers = participantsCount > GUEST_LOBBY_MAX_PLAYERS
+                ? (int) participantsCount
+                : GUEST_LOBBY_MAX_PLAYERS;
+
+        if (currentMaxPlayers == cappedMaxPlayers) return false;
+        lobby.setMaxPlayers(cappedMaxPlayers);
+        return true;
     }
 
     private String generateUniqueCode() {

@@ -1,28 +1,37 @@
 package pl.mindrush.backend.lobby.presence;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 import org.springframework.web.socket.messaging.SessionSubscribeEvent;
+import org.springframework.web.socket.messaging.SessionUnsubscribeEvent;
 import pl.mindrush.backend.lobby.LobbyService;
 
 import java.security.Principal;
-import java.util.Set;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Component
 public class WebSocketLobbyPresenceListener {
 
-    private static final Pattern DESTINATION_PATTERN = Pattern.compile("^/topic/lobbies/([A-Za-z0-9]{6})/(lobby|game|chat)$");
-
     private final LobbyService lobbyService;
-    private final ConcurrentHashMap<String, Presence> presenceBySessionId = new ConcurrentHashMap<>();
+    private final LobbyRealtimePresenceService realtimePresenceService;
+    private final Duration reconnectGrace;
+    private final ConcurrentHashMap<String, PendingDisconnectRemoval> pendingDisconnectRemovals = new ConcurrentHashMap<>();
 
-    public WebSocketLobbyPresenceListener(LobbyService lobbyService) {
+    public WebSocketLobbyPresenceListener(
+            LobbyService lobbyService,
+            LobbyRealtimePresenceService realtimePresenceService,
+            @Value("${lobby.presence.reconnect-grace:PT45S}") Duration reconnectGrace
+    ) {
         this.lobbyService = lobbyService;
+        this.realtimePresenceService = realtimePresenceService;
+        this.reconnectGrace = reconnectGrace;
     }
 
     @EventListener
@@ -30,22 +39,23 @@ public class WebSocketLobbyPresenceListener {
         StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
         String destination = accessor.getDestination();
         String sessionId = accessor.getSessionId();
+        String subscriptionId = accessor.getSubscriptionId();
         Principal user = accessor.getUser();
-        if (destination == null || sessionId == null || user == null || user.getName() == null) return;
+        if (destination == null || sessionId == null || subscriptionId == null || user == null || user.getName() == null) return;
 
-        Matcher matcher = DESTINATION_PATTERN.matcher(destination);
-        if (!matcher.matches()) return;
+        LobbyRealtimePresenceService.TrackedSubscription tracked = realtimePresenceService
+                .onSubscribe(sessionId, subscriptionId, user.getName(), destination);
+        if (tracked == null) return;
+        cancelPendingRemoval(user.getName(), tracked.lobbyCode());
+    }
 
-        String lobbyCode = matcher.group(1).toUpperCase();
-        presenceBySessionId.compute(sessionId, (key, existing) -> {
-            if (existing == null) {
-                Set<String> lobbyCodes = ConcurrentHashMap.newKeySet();
-                lobbyCodes.add(lobbyCode);
-                return new Presence(user.getName(), lobbyCodes);
-            }
-            existing.lobbyCodes.add(lobbyCode);
-            return existing;
-        });
+    @EventListener
+    public void onUnsubscribe(SessionUnsubscribeEvent event) {
+        StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
+        String sessionId = accessor.getSessionId();
+        String subscriptionId = accessor.getSubscriptionId();
+        if (sessionId == null || subscriptionId == null) return;
+        realtimePresenceService.onUnsubscribe(sessionId, subscriptionId);
     }
 
     @EventListener
@@ -54,21 +64,52 @@ public class WebSocketLobbyPresenceListener {
         String sessionId = accessor.getSessionId();
         if (sessionId == null) return;
 
-        Presence presence = presenceBySessionId.remove(sessionId);
-        if (presence == null) return;
+        LobbyRealtimePresenceService.DisconnectPresence presence =
+                realtimePresenceService.onDisconnect(sessionId);
+        if (presence == null || presence.isEmpty()) return;
 
-        for (String lobbyCode : presence.lobbyCodes) {
-            lobbyService.handleGuestDisconnected(presence.guestSessionId, lobbyCode);
+        for (String lobbyCode : presence.lobbyCodes()) {
+            schedulePendingRemoval(presence.guestSessionId(), lobbyCode);
         }
     }
 
-    private static final class Presence {
-        private final String guestSessionId;
-        private final Set<String> lobbyCodes;
+    @Scheduled(fixedDelayString = "${lobby.presence.reconnect-grace.cleanup.fixedDelayMs:2000}")
+    public void processPendingDisconnectRemovals() {
+        if (pendingDisconnectRemovals.isEmpty()) return;
 
-        private Presence(String guestSessionId, Set<String> lobbyCodes) {
-            this.guestSessionId = guestSessionId;
-            this.lobbyCodes = lobbyCodes == null ? ConcurrentHashMap.newKeySet() : lobbyCodes;
+        Instant now = Instant.now();
+        for (Map.Entry<String, PendingDisconnectRemoval> entry : pendingDisconnectRemovals.entrySet()) {
+            PendingDisconnectRemoval pending = entry.getValue();
+            if (pending == null || pending.executeAt().isAfter(now)) continue;
+            if (!pendingDisconnectRemovals.remove(entry.getKey(), pending)) continue;
+            lobbyService.handleGuestDisconnected(pending.guestSessionId(), pending.lobbyCode());
         }
+    }
+
+    private void schedulePendingRemoval(String guestSessionId, String lobbyCode) {
+        if (guestSessionId == null || guestSessionId.isBlank()) return;
+        if (lobbyCode == null || lobbyCode.isBlank()) return;
+        String key = pendingRemovalKey(guestSessionId, lobbyCode);
+        pendingDisconnectRemovals.put(
+                key,
+                new PendingDisconnectRemoval(guestSessionId, lobbyCode, Instant.now().plus(reconnectGrace))
+        );
+    }
+
+    private void cancelPendingRemoval(String guestSessionId, String lobbyCode) {
+        if (guestSessionId == null || guestSessionId.isBlank()) return;
+        if (lobbyCode == null || lobbyCode.isBlank()) return;
+        pendingDisconnectRemovals.remove(pendingRemovalKey(guestSessionId, lobbyCode));
+    }
+
+    private static String pendingRemovalKey(String guestSessionId, String lobbyCode) {
+        return guestSessionId + "|" + lobbyCode;
+    }
+
+    private record PendingDisconnectRemoval(
+            String guestSessionId,
+            String lobbyCode,
+            Instant executeAt
+    ) {
     }
 }

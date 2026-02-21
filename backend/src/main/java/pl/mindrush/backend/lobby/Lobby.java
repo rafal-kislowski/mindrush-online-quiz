@@ -24,6 +24,9 @@ public class Lobby {
     @Column(name = "owner_guest_session_id", length = 36, nullable = false)
     private String ownerGuestSessionId;
 
+    @Column(name = "owner_authenticated", nullable = false)
+    private boolean ownerAuthenticated;
+
     @Column(name = "password_hash")
     private String passwordHash;
 
@@ -46,11 +49,20 @@ public class Lobby {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    public static Lobby createNew(String code, String ownerGuestSessionId, int maxPlayers, String passwordHash, String pinCode, Instant now) {
+    public static Lobby createNew(
+            String code,
+            String ownerGuestSessionId,
+            boolean ownerAuthenticated,
+            int maxPlayers,
+            String passwordHash,
+            String pinCode,
+            Instant now
+    ) {
         Lobby lobby = new Lobby();
         lobby.id = UUID.randomUUID().toString();
         lobby.code = code;
         lobby.ownerGuestSessionId = ownerGuestSessionId;
+        lobby.ownerAuthenticated = ownerAuthenticated;
         lobby.maxPlayers = maxPlayers;
         lobby.passwordHash = passwordHash;
         lobby.pinCode = pinCode;
@@ -74,6 +86,14 @@ public class Lobby {
 
     public void setOwnerGuestSessionId(String ownerGuestSessionId) {
         this.ownerGuestSessionId = ownerGuestSessionId;
+    }
+
+    public boolean isOwnerAuthenticated() {
+        return ownerAuthenticated;
+    }
+
+    public void setOwnerAuthenticated(boolean ownerAuthenticated) {
+        this.ownerAuthenticated = ownerAuthenticated;
     }
 
     public String getPasswordHash() {

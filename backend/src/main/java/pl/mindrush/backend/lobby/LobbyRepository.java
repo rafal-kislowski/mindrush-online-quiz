@@ -9,6 +9,8 @@ import java.util.Optional;
 public interface LobbyRepository extends JpaRepository<Lobby, String> {
     Optional<Lobby> findByCode(String code);
     boolean existsByCode(String code);
+    List<Lobby> findAllByStatusOrderByCreatedAtDesc(LobbyStatus status);
+    Optional<Lobby> findFirstByOwnerGuestSessionIdAndStatusInOrderByCreatedAtDesc(String ownerGuestSessionId, List<LobbyStatus> statuses);
 
     List<Lobby> findAllByEmptySinceIsNotNullAndEmptySinceBefore(Instant cutoff);
 }

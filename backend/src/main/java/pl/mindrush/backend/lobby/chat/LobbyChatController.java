@@ -21,17 +21,20 @@ public class LobbyChatController {
     private final SimpMessagingTemplate messagingTemplate;
     private final LobbyRepository lobbyRepository;
     private final LobbyParticipantRepository participantRepository;
+    private final LobbyChatHistoryService chatHistoryService;
     private final Clock clock;
 
     public LobbyChatController(
             SimpMessagingTemplate messagingTemplate,
             LobbyRepository lobbyRepository,
             LobbyParticipantRepository participantRepository,
+            LobbyChatHistoryService chatHistoryService,
             Clock clock
     ) {
         this.messagingTemplate = messagingTemplate;
         this.lobbyRepository = lobbyRepository;
         this.participantRepository = participantRepository;
+        this.chatHistoryService = chatHistoryService;
         this.clock = clock;
     }
 
@@ -63,11 +66,11 @@ public class LobbyChatController {
         if (participantOpt.isEmpty()) return;
 
         LobbyParticipant participant = participantOpt.get();
-        LobbyChatMessageDto msg = new LobbyChatMessageDto(
+        LobbyChatMessageDto msg = chatHistoryService.append(
                 lobbyCode,
                 participant.getDisplayName(),
                 text,
-                clock.instant().toString()
+                clock.instant()
         );
         messagingTemplate.convertAndSend("/topic/lobbies/" + lobbyCode + "/chat", msg);
     }
@@ -75,4 +78,3 @@ public class LobbyChatController {
     public record LobbyChatSendRequest(String text) {
     }
 }
-

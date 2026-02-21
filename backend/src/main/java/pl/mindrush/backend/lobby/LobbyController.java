@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 @Validated
@@ -42,9 +43,28 @@ public class LobbyController {
         return ResponseEntity.status(201).body(lobbyService.createLobby(request, password, maxPlayers, isAuthenticated(authentication)));
     }
 
+    @GetMapping("/current")
+    public ResponseEntity<Map<String, Object>> current(HttpServletRequest request) {
+        Map<String, Object> lobby = lobbyService.findCurrentLobby(request);
+        if (lobby == null) return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(lobby);
+    }
+
     @GetMapping("/{code}")
     public ResponseEntity<Map<String, Object>> get(HttpServletRequest request, @PathVariable String code) {
         return ResponseEntity.ok(lobbyService.getLobby(request, code));
+    }
+
+    @GetMapping("/active")
+    public ResponseEntity<List<Map<String, Object>>> active(HttpServletRequest request) {
+        return ResponseEntity.ok(lobbyService.listActiveLobbies(request));
+    }
+
+    @GetMapping("/owned")
+    public ResponseEntity<Map<String, Object>> owned(HttpServletRequest request) {
+        Map<String, Object> lobby = lobbyService.findOwnedOpenLobby(request);
+        if (lobby == null) return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(lobby);
     }
 
     @PostMapping("/{code}/join")
@@ -86,6 +106,15 @@ public class LobbyController {
     ) {
         Long quizId = body == null ? null : body.quizId();
         return ResponseEntity.ok(lobbyService.setSelectedQuiz(request, code, quizId));
+    }
+
+    @PostMapping("/{code}/ready")
+    public ResponseEntity<Map<String, Object>> setReady(
+            HttpServletRequest request,
+            @PathVariable String code,
+            @Valid @RequestBody SetReadyRequest body
+    ) {
+        return ResponseEntity.ok(lobbyService.setPlayerReady(request, code, body.ready()));
     }
 
     @PostMapping("/{code}/leave")
@@ -141,6 +170,12 @@ public class LobbyController {
     public record SetSelectedQuizRequest(
             @Positive(message = "quizId must be a positive number")
             Long quizId
+    ) {
+    }
+
+    public record SetReadyRequest(
+            @NotNull(message = "ready is required")
+            Boolean ready
     ) {
     }
 }
