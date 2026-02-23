@@ -45,10 +45,14 @@ class LobbyControllerTest {
     private LobbyParticipantRepository participantRepository;
 
     @Autowired
+    private LobbyBanRepository lobbyBanRepository;
+
+    @Autowired
     private LobbyService lobbyService;
 
     @BeforeEach
     void setUp() {
+        lobbyBanRepository.deleteAll();
         participantRepository.deleteAll();
         lobbyRepository.deleteAll();
         guestSessionRepository.deleteAll();
@@ -909,6 +913,102 @@ class LobbyControllerTest {
     }
 
     @Test
+    void kickParticipant_ownerCanKick_andKickedGuestCanJoinAgain() throws Exception {
+        String ownerSessionId = createGuestSession();
+        String participantSessionId = createGuestSession();
+
+        MvcResult created = mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String code = jsonValue(created.getResponse().getContentAsString(), "\"code\":\"", "\"").orElseThrow();
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", participantSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
+
+        Long participantId = participantIdByLobbyCodeAndSessionId(code, participantSessionId);
+        mockMvc.perform(post("/api/lobbies/" + code + "/players/" + participantId + "/kick")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.length()").value(1));
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", participantSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.length()").value(2));
+    }
+
+    @Test
+    void banParticipant_ownerCanBan_andBannedGuestCannotRejoin() throws Exception {
+        String ownerSessionId = createGuestSession();
+        String participantSessionId = createGuestSession();
+
+        MvcResult created = mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String code = jsonValue(created.getResponse().getContentAsString(), "\"code\":\"", "\"").orElseThrow();
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", participantSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
+
+        Long participantId = participantIdByLobbyCodeAndSessionId(code, participantSessionId);
+        mockMvc.perform(post("/api/lobbies/" + code + "/players/" + participantId + "/ban")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.length()").value(1));
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", participantSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("You are banned from this lobby"));
+    }
+
+    @Test
+    void kickAndBanParticipant_requireOwner() throws Exception {
+        String ownerSessionId = createGuestSession();
+        String participantSessionId = createGuestSession();
+        String nonOwnerSessionId = createGuestSession();
+
+        MvcResult created = mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String code = jsonValue(created.getResponse().getContentAsString(), "\"code\":\"", "\"").orElseThrow();
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", participantSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
+
+        Long participantId = participantIdByLobbyCodeAndSessionId(code, participantSessionId);
+        mockMvc.perform(post("/api/lobbies/" + code + "/players/" + participantId + "/kick")
+                        .cookie(new Cookie("guestSessionId", nonOwnerSessionId)))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/players/" + participantId + "/ban")
+                        .cookie(new Cookie("guestSessionId", nonOwnerSessionId)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void setReady_updatesParticipantReadyFlag() throws Exception {
         String ownerSessionId = createGuestSession();
         String secondSessionId = createGuestSession();
@@ -1146,6 +1246,13 @@ class LobbyControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isConflict());
+    }
+
+    private Long participantIdByLobbyCodeAndSessionId(String lobbyCode, String guestSessionId) {
+        Lobby lobby = lobbyRepository.findByCode(lobbyCode).orElseThrow();
+        return participantRepository.findByLobbyIdAndGuestSessionId(lobby.getId(), guestSessionId)
+                .map(LobbyParticipant::getId)
+                .orElseThrow();
     }
 
     private String createGuestSession() throws Exception {

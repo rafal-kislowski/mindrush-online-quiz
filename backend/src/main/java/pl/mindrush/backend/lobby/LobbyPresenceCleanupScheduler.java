@@ -15,6 +15,7 @@ public class LobbyPresenceCleanupScheduler {
 
     private final GuestSessionRepository guestSessionRepository;
     private final LobbyParticipantRepository participantRepository;
+    private final LobbyBanRepository lobbyBanRepository;
     private final LobbyRepository lobbyRepository;
     private final LobbyService lobbyService;
     private final Duration timeout;
@@ -23,6 +24,7 @@ public class LobbyPresenceCleanupScheduler {
     public LobbyPresenceCleanupScheduler(
             GuestSessionRepository guestSessionRepository,
             LobbyParticipantRepository participantRepository,
+            LobbyBanRepository lobbyBanRepository,
             LobbyRepository lobbyRepository,
             LobbyService lobbyService,
             @Value("${lobby.presence.timeout:PT25S}") Duration timeout,
@@ -30,6 +32,7 @@ public class LobbyPresenceCleanupScheduler {
     ) {
         this.guestSessionRepository = guestSessionRepository;
         this.participantRepository = participantRepository;
+        this.lobbyBanRepository = lobbyBanRepository;
         this.lobbyRepository = lobbyRepository;
         this.lobbyService = lobbyService;
         this.timeout = timeout;
@@ -58,6 +61,8 @@ public class LobbyPresenceCleanupScheduler {
         Instant cutoff = Instant.now().minus(emptyTtl);
         List<Lobby> expired = lobbyRepository.findAllByEmptySinceIsNotNullAndEmptySinceBefore(cutoff);
         if (expired.isEmpty()) return;
+        List<String> lobbyIds = expired.stream().map(Lobby::getId).toList();
+        lobbyBanRepository.deleteAllByLobbyIdIn(lobbyIds);
         lobbyRepository.deleteAll(expired);
     }
 }

@@ -127,6 +127,24 @@ public class LobbyController {
         return ResponseEntity.ok(updated.lobby());
     }
 
+    @PostMapping("/{code}/players/{participantId}/kick")
+    public ResponseEntity<Map<String, Object>> kickPlayer(
+            HttpServletRequest request,
+            @PathVariable String code,
+            @PathVariable @Positive(message = "participantId must be a positive number") Long participantId
+    ) {
+        return ResponseEntity.ok(lobbyService.kickParticipant(request, code, participantId));
+    }
+
+    @PostMapping("/{code}/players/{participantId}/ban")
+    public ResponseEntity<Map<String, Object>> banPlayer(
+            HttpServletRequest request,
+            @PathVariable String code,
+            @PathVariable @Positive(message = "participantId must be a positive number") Long participantId
+    ) {
+        return ResponseEntity.ok(lobbyService.banParticipant(request, code, participantId));
+    }
+
     @PostMapping("/{code}/close")
     public ResponseEntity<Map<String, Object>> close(HttpServletRequest request, @PathVariable String code) {
         return ResponseEntity.ok(lobbyService.closeLobby(request, code));

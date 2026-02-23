@@ -40,26 +40,34 @@ public class WebSocketLobbyEventPublisher implements LobbyEventPublisher {
 
     @Override
     public void lobbyUpdated(String lobbyCode) {
-        Runnable publish = () -> {
+        runAfterCommit(() -> {
             String serverTime = clock.instant().toString();
             messagingTemplate.convertAndSend(
                     "/topic/lobbies/" + lobbyCode + "/lobby",
                     new LobbyEventDto("LOBBY_UPDATED", lobbyCode, serverTime, null)
             );
             publishSnapshotsToLobbyParticipants(lobbyCode, serverTime);
-        };
+        });
+    }
 
-        if (TransactionSynchronizationManager.isActualTransactionActive() && TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    publish.run();
-                }
-            });
-            return;
-        }
+    @Override
+    public void participantKicked(String lobbyCode, String guestSessionId) {
+        if (guestSessionId == null || guestSessionId.isBlank()) return;
+        runAfterCommit(() -> messagingTemplate.convertAndSendToUser(
+                guestSessionId,
+                "/queue/lobbies/" + lobbyCode + "/lobby",
+                new LobbyEventDto("LOBBY_KICKED", lobbyCode, clock.instant().toString(), null)
+        ));
+    }
 
-        publish.run();
+    @Override
+    public void participantBanned(String lobbyCode, String guestSessionId) {
+        if (guestSessionId == null || guestSessionId.isBlank()) return;
+        runAfterCommit(() -> messagingTemplate.convertAndSendToUser(
+                guestSessionId,
+                "/queue/lobbies/" + lobbyCode + "/lobby",
+                new LobbyEventDto("LOBBY_BANNED", lobbyCode, clock.instant().toString(), null)
+        ));
     }
 
     private void publishSnapshotsToLobbyParticipants(String lobbyCode, String serverTime) {
@@ -86,5 +94,18 @@ public class WebSocketLobbyEventPublisher implements LobbyEventPublisher {
                     )
             );
         }
+    }
+
+    private void runAfterCommit(Runnable publish) {
+        if (TransactionSynchronizationManager.isActualTransactionActive() && TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    publish.run();
+                }
+            });
+            return;
+        }
+        publish.run();
     }
 }

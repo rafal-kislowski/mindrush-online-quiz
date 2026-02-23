@@ -45,6 +45,7 @@ public class LobbySummaryMapper {
             boolean isYou = viewerGuestSessionId != null && viewerGuestSessionId.equals(p.getGuestSessionId());
             boolean away = !isYou && !realtimePresenceService.isLobbyViewActive(p.getGuestSessionId(), lobby.getCode());
             return Map.of(
+                    "participantId", p.getId(),
                     "displayName", p.getDisplayName(),
                     "joinedAt", p.getJoinedAt().toString(),
                     "ready", p.isReady(),

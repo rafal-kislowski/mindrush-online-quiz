@@ -16,6 +16,7 @@ import pl.mindrush.backend.guest.GuestSession;
 import pl.mindrush.backend.guest.GuestSessionRepository;
 import pl.mindrush.backend.guest.GuestSessionService;
 import pl.mindrush.backend.lobby.*;
+import pl.mindrush.backend.lobby.chat.LobbySystemMessageService;
 import pl.mindrush.backend.quiz.*;
 
 import java.time.Clock;
@@ -47,6 +48,7 @@ public class GameService {
     private final GameEventPublisher gameEventPublisher;
     private final GuestSessionRepository guestSessionRepository;
     private final AppUserRepository appUserRepository;
+    private final LobbySystemMessageService lobbySystemMessageService;
 
     public GameService(
             Clock clock,
@@ -65,7 +67,8 @@ public class GameService {
             GamePlayerRepository gamePlayerRepository,
             GameEventPublisher gameEventPublisher,
             GuestSessionRepository guestSessionRepository,
-            AppUserRepository appUserRepository
+            AppUserRepository appUserRepository,
+            LobbySystemMessageService lobbySystemMessageService
     ) {
         this.clock = clock;
         this.guestQuestionDuration = guestQuestionDuration;
@@ -84,6 +87,7 @@ public class GameService {
         this.gameEventPublisher = gameEventPublisher;
         this.guestSessionRepository = guestSessionRepository;
         this.appUserRepository = appUserRepository;
+        this.lobbySystemMessageService = lobbySystemMessageService;
     }
 
     private long questionDurationMs() {
@@ -313,6 +317,7 @@ public class GameService {
         gameSessionRepository.save(session);
 
         applyRewardsIfNeeded(session, players, now);
+        publishFinalWinnerMessage(lobby, session, players);
 
         lobby.setStatus(LobbyStatus.OPEN);
         lobbyRepository.save(lobby);
@@ -699,6 +704,36 @@ public class GameService {
         }
 
         return false;
+    }
+
+    private void publishFinalWinnerMessage(Lobby lobby, GameSession session, List<GamePlayer> players) {
+        if (lobby == null || session == null || players == null || players.isEmpty()) return;
+
+        Map<String, PlayerTotals> totalsByGuest = computeTotalsByGuest(session.getId());
+        List<PlayerStanding> standings = computeStandings(players, totalsByGuest);
+        if (standings.isEmpty()) return;
+
+        int bestRank = standings.get(0).rank();
+        LinkedHashSet<String> winners = new LinkedHashSet<>();
+        for (PlayerStanding standing : standings) {
+            if (standing.rank() != bestRank) continue;
+            String winnerName = players.stream()
+                    .filter(p -> Objects.equals(p.getGuestSessionId(), standing.guestSessionId()))
+                    .map(GamePlayer::getDisplayName)
+                    .filter(name -> name != null && !name.isBlank())
+                    .findFirst()
+                    .orElse("Player");
+            winners.add(winnerName);
+        }
+
+        if (winners.isEmpty()) return;
+        if (winners.size() == 1) {
+            String winner = winners.iterator().next();
+            lobbySystemMessageService.publish(lobby.getCode(), "Game winner: " + winner + ".");
+            return;
+        }
+
+        lobbySystemMessageService.publish(lobby.getCode(), "Game draw: " + String.join(", ", winners) + ".");
     }
 
     private void ensureTimeoutAnswers(GameSession session, Long questionId, Instant now) {

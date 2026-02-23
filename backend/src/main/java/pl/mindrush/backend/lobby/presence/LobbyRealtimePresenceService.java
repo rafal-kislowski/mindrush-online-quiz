@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 public class LobbyRealtimePresenceService {
 
     private static final Pattern DESTINATION_PATTERN =
-            Pattern.compile("^/(?:topic|user/queue)/lobbies/([A-Za-z0-9]{6})/(lobby|game|chat)$");
+            Pattern.compile("^/(topic|user/queue)/lobbies/([A-Za-z0-9]{6})/(lobby|game|chat)$");
 
     private final ConcurrentHashMap<String, SubscriptionInfo> subscriptionsByKey = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Set<String>> subscriptionKeysBySessionId = new ConcurrentHashMap<>();
@@ -35,7 +35,8 @@ public class LobbyRealtimePresenceService {
                 sessionId,
                 guestSessionId,
                 parsed.lobbyCode(),
-                parsed.channel()
+                parsed.channel(),
+                parsed.isTopic() && parsed.channel() == Channel.LOBBY
         );
 
         SubscriptionInfo previous = subscriptionsByKey.put(subscriptionKey, next);
@@ -101,9 +102,10 @@ public class LobbyRealtimePresenceService {
         Matcher matcher = DESTINATION_PATTERN.matcher(destination);
         if (!matcher.matches()) return null;
 
-        String lobbyCode = matcher.group(1).toUpperCase();
-        Channel channel = Channel.valueOf(matcher.group(2).toUpperCase());
-        return new Destination(lobbyCode, channel);
+        String lobbyCode = matcher.group(2).toUpperCase();
+        String scope = matcher.group(1);
+        Channel channel = Channel.valueOf(matcher.group(3).toUpperCase());
+        return new Destination(lobbyCode, channel, "topic".equalsIgnoreCase(scope));
     }
 
     private static String subscriptionKey(String sessionId, String subscriptionId) {
@@ -115,13 +117,13 @@ public class LobbyRealtimePresenceService {
     }
 
     private void incrementLobbyViewCounter(SubscriptionInfo info) {
-        if (info == null || info.channel() != Channel.LOBBY) return;
+        if (info == null || !info.lobbyViewTracked()) return;
         String key = guestLobbyKey(info.guestSessionId(), info.lobbyCode());
         lobbyViewCountersByGuestAndLobby.merge(key, 1, Integer::sum);
     }
 
     private void decrementLobbyViewCounter(SubscriptionInfo info) {
-        if (info == null || info.channel() != Channel.LOBBY) return;
+        if (info == null || !info.lobbyViewTracked()) return;
         String key = guestLobbyKey(info.guestSessionId(), info.lobbyCode());
         lobbyViewCountersByGuestAndLobby.computeIfPresent(
                 key,
@@ -155,15 +157,15 @@ public class LobbyRealtimePresenceService {
         }
     }
 
-    private record Destination(String lobbyCode, Channel channel) {
+    private record Destination(String lobbyCode, Channel channel, boolean isTopic) {
     }
 
     private record SubscriptionInfo(
             String sessionId,
             String guestSessionId,
             String lobbyCode,
-            Channel channel
+            Channel channel,
+            boolean lobbyViewTracked
     ) {
     }
 }
-

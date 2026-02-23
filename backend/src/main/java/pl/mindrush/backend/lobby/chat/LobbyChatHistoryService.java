@@ -17,6 +17,9 @@ public class LobbyChatHistoryService {
 
     private static final int MAX_MESSAGES_PER_LOBBY = 2000;
     private static final Duration RETENTION = Duration.ofHours(12);
+    private static final String KIND_USER = "USER";
+    private static final String KIND_SYSTEM = "SYSTEM";
+    private static final String DISPLAY_NAME_SYSTEM = "System";
 
     private final Clock clock;
     private final ConcurrentHashMap<String, Deque<StoredMessage>> messagesByLobbyCode = new ConcurrentHashMap<>();
@@ -31,6 +34,24 @@ public class LobbyChatHistoryService {
             String text,
             Instant serverTime
     ) {
+        return appendInternal(lobbyCode, displayName, text, serverTime, KIND_USER);
+    }
+
+    public LobbyChatMessageDto appendSystem(
+            String lobbyCode,
+            String text,
+            Instant serverTime
+    ) {
+        return appendInternal(lobbyCode, DISPLAY_NAME_SYSTEM, text, serverTime, KIND_SYSTEM);
+    }
+
+    private LobbyChatMessageDto appendInternal(
+            String lobbyCode,
+            String displayName,
+            String text,
+            Instant serverTime,
+            String kind
+    ) {
         String normalizedCode = normalizeCode(lobbyCode);
         if (normalizedCode.isBlank()) {
             throw new IllegalArgumentException("lobbyCode is required");
@@ -39,12 +60,14 @@ public class LobbyChatHistoryService {
         Instant ts = serverTime == null ? clock.instant() : serverTime;
         String safeDisplayName = (displayName == null || displayName.isBlank()) ? "Guest" : displayName.trim();
         String safeText = text == null ? "" : text.trim();
+        String safeKind = KIND_SYSTEM.equalsIgnoreCase(kind) ? KIND_SYSTEM : KIND_USER;
 
         LobbyChatMessageDto dto = new LobbyChatMessageDto(
                 normalizedCode,
                 safeDisplayName,
                 safeText,
-                ts.toString()
+                ts.toString(),
+                safeKind
         );
 
         Deque<StoredMessage> deque = messagesByLobbyCode.computeIfAbsent(normalizedCode, __ -> new ArrayDeque<>());
@@ -104,4 +127,3 @@ public class LobbyChatHistoryService {
     private record StoredMessage(Instant serverTime, LobbyChatMessageDto dto) {
     }
 }
-
