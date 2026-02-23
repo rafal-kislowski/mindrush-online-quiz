@@ -14,7 +14,9 @@ import { LobbyDto } from './core/models/lobby.models';
 import { SessionService } from './core/session/session.service';
 import { computeLevelProgress, levelTheme, rankForPoints } from './core/progression/progression';
 import { ParticlesService } from './core/ui/particles.service';
+import { ToastService } from './core/ui/toast.service';
 import { ToastViewportComponent } from './core/ui/toast-viewport.component';
+import { LobbyEventDto, LobbyEventsService } from './core/ws/lobby-events.service';
 
 function clamp01(n: number): number {
   return Math.max(0, Math.min(1, n));
@@ -65,6 +67,8 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly sessionService = inject(SessionService);
   private readonly authService = inject(AuthService);
   private readonly lobbyApi = inject(LobbyApi);
+  private readonly lobbyEvents = inject(LobbyEventsService);
+  private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
   private readonly subscriptions = new Subscription();
   readonly session$ = this.sessionService.session$;
@@ -114,10 +118,13 @@ export class AppComponent implements OnInit, OnDestroy {
   );
 
   sidebarOpen = false;
-  sidebarCollapsed = false;
+  sidebarCollapsed = true;
+  sidebarTransitionsReady = false;
   contentWide = false;
   contentFull = false;
   currentLobby: LobbyDto | null = null;
+  private currentLobbyEventsSub: Subscription | null = null;
+  private currentLobbyEventsCode: string | null = null;
 
   readonly menuItems: Array<{
     label: string;
@@ -152,9 +159,19 @@ export class AppComponent implements OnInit, OnDestroy {
 
     this.updateContentFlags(this.router.url);
     this.startCurrentLobbyTracking();
+
+    // Prevent sidebar collapse animation flash on initial page load.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        this.sidebarTransitionsReady = true;
+      });
+    });
   }
 
   ngOnDestroy(): void {
+    this.currentLobbyEventsSub?.unsubscribe();
+    this.currentLobbyEventsSub = null;
+    this.currentLobbyEventsCode = null;
     this.subscriptions.unsubscribe();
   }
 
@@ -231,6 +248,7 @@ export class AppComponent implements OnInit, OnDestroy {
         )
         .subscribe((lobby) => {
           this.currentLobby = lobby;
+          this.syncCurrentLobbyEventsSubscription(lobby?.code ?? null);
         })
     );
   }
@@ -241,6 +259,73 @@ export class AppComponent implements OnInit, OnDestroy {
       .pipe(catchError(() => of(null)))
       .subscribe((lobby) => {
         this.currentLobby = lobby;
+        this.syncCurrentLobbyEventsSubscription(lobby?.code ?? null);
       });
+  }
+
+  private syncCurrentLobbyEventsSubscription(code: string | null | undefined): void {
+    const normalized = String(code ?? '').trim().toUpperCase();
+    if (!normalized) {
+      this.currentLobbyEventsSub?.unsubscribe();
+      this.currentLobbyEventsSub = null;
+      this.currentLobbyEventsCode = null;
+      return;
+    }
+
+    if (this.currentLobbyEventsCode === normalized && this.currentLobbyEventsSub) return;
+
+    this.currentLobbyEventsSub?.unsubscribe();
+    this.currentLobbyEventsCode = normalized;
+    this.currentLobbyEventsSub = this.lobbyEvents.subscribeLobbyUserQueue(normalized).subscribe({
+      next: (event) => this.handleCurrentLobbyEvent(event),
+      error: () => {
+        // ignore; periodic current-lobby refresh will resubscribe when needed
+      },
+    });
+  }
+
+  private handleCurrentLobbyEvent(event: LobbyEventDto): void {
+    if (event.type !== 'LOBBY_KICKED' && event.type !== 'LOBBY_BANNED') return;
+
+    const code = String(event.lobbyCode ?? '').trim().toUpperCase();
+    const path = this.currentPath(this.router.url);
+    if (this.isLobbyShellPath(path, code)) {
+      // Lobby component handles its own forced-removal flow.
+      return;
+    }
+
+    this.currentLobby = null;
+    this.syncCurrentLobbyEventsSubscription(null);
+
+    const reason: 'kick' | 'ban' = event.type === 'LOBBY_BANNED' ? 'ban' : 'kick';
+    const actionLabel = reason === 'ban' ? 'banned' : 'kicked';
+    const message = code
+      ? `You were ${actionLabel} from lobby ${code}.`
+      : `You were ${actionLabel} from the lobby.`;
+    const dedupeKey =
+      reason === 'ban'
+        ? `lobby:forced-removal:ban:${code}`
+        : `lobby:forced-removal:kick:${code}`;
+
+    this.toast.warning(message, {
+      title: 'Lobby',
+      dedupeKey,
+    });
+  }
+
+  private currentPath(url: string | undefined): string {
+    const raw = String(url ?? '').trim();
+    if (!raw) return '';
+    const noHash = raw.split('#')[0] ?? '';
+    return noHash.split('?')[0] ?? '';
+  }
+
+  private isLobbyShellPath(path: string, code: string): boolean {
+    // Exact lobby screen path: /lobby/{CODE}
+    const match = path.match(/^\/lobby\/([^/]+)\/?$/);
+    if (!match) return false;
+    const routeCode = String(match[1] ?? '').trim().toUpperCase();
+    if (!routeCode) return false;
+    return !code || routeCode === code;
   }
 }

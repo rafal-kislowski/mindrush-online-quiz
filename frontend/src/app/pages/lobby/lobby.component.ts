@@ -18,7 +18,7 @@ import { apiErrorMessage } from '../../core/api/api-error.util';
 import { GameApi } from '../../core/api/game.api';
 import { LobbyApi } from '../../core/api/lobby.api';
 import { QuizApi } from '../../core/api/quiz.api';
-import { LobbyDto } from '../../core/models/lobby.models';
+import { LobbyDto, LobbyPlayerDto } from '../../core/models/lobby.models';
 import { QuizListItemDto } from '../../core/models/quiz.models';
 import { AuthService } from '../../core/auth/auth.service';
 import { SessionService } from '../../core/session/session.service';
@@ -86,6 +86,8 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   readySaving = false;
   maxPlayersMenuOpen = false;
   quizMenuOpen = false;
+  playerMenuOpenForParticipantId: number | null = null;
+  private playerActionInFlight: { participantId: number; type: 'kick' | 'ban' } | null = null;
 
   private readonly subscriptions = new Subscription();
   private gameEventsSubscription: Subscription | null = null;
@@ -147,6 +149,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly joinDelayTimers = new Set<number>();
   private destroyed = false;
   private redirectingToDashboard = false;
+  private lobbyDiffInitialized = false;
   private lobbyLoadStartedAt = performance.now();
   private suppressInitialLoadingOverlay = false;
   private initialLobbyReady = false;
@@ -425,8 +428,17 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
+    const previousLobby = this.lobby;
     const prevSelectedQuizId = this.selectedQuizId ?? null;
     this.lobby = lobby;
+    if (this.playerMenuOpenForParticipantId != null) {
+      const exists = (lobby.players ?? []).some(
+        (p) => p.participantId === this.playerMenuOpenForParticipantId
+      );
+      if (!exists) {
+        this.playerMenuOpenForParticipantId = null;
+      }
+    }
 
     // If we are not the owner, never keep/reveal PIN digits locally.
     if (!lobby.isOwner) {
@@ -527,6 +539,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // In join view we keep the page fixed (no document scroll).
     this.updateBodyScrollLock(this.joinState !== 'joined');
+    this.emitJoinSystemMessagesFromLobbyDiff(previousLobby, lobby);
   }
 
   private updateBodyScrollLock(locked: boolean): void {
@@ -642,6 +655,14 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       .subscribeLobby(this.code)
       .subscribe({
         next: (event) => {
+          if (event.type === 'LOBBY_KICKED') {
+            this.redirectToDashboardForForcedRemoval('kick');
+            return;
+          }
+          if (event.type === 'LOBBY_BANNED') {
+            this.redirectToDashboardForForcedRemoval('ban');
+            return;
+          }
           if (event.state) {
             this.hasLiveLobbySnapshot = true;
             this.onLobbyUpdate(event.state);
@@ -700,6 +721,35 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       });
       void this.router.navigate(['/']);
     });
+  }
+
+  private redirectToDashboardForForcedRemoval(reason: 'kick' | 'ban'): void {
+    if (this.redirectingToDashboard || this.destroyed) return;
+    this.redirectingToDashboard = true;
+    this.autoJoinBlocked = true;
+    this.joinRequestInFlight = false;
+    this.autoJoinInFlight = false;
+    this.joinState = 'viewOnly';
+
+    const code = (this.code ?? '').trim().toUpperCase();
+    const actionLabel = reason === 'ban' ? 'banned' : 'kicked';
+    const message = code
+      ? `You were ${actionLabel} from lobby ${code}.`
+      : `You were ${actionLabel} from the lobby.`;
+    const dedupeKey = reason === 'ban' ? `lobby:forced-removal:ban:${code}` : `lobby:forced-removal:kick:${code}`;
+
+    this.toast.warning(message, {
+      title: 'Lobby',
+      dedupeKey,
+    });
+
+    this.maxPlayersMenuOpen = false;
+    this.quizMenuOpen = false;
+    this.categoryMenuOpen = false;
+    this.sortMenuOpen = false;
+    this.playerMenuOpenForParticipantId = null;
+
+    void this.router.navigate(['/']);
   }
 
   private ensureChatUpdates(): void {
@@ -1014,6 +1064,90 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     };
   }
 
+  canManagePlayer(player: LobbyPlayerDto): boolean {
+    if (!this.lobby?.isOwner) return false;
+    if (!player) return false;
+    if (player.isOwner) return false;
+    const participantId = this.resolvePlayerParticipantId(player);
+    return participantId != null;
+  }
+
+  isPlayerMenuOpen(player: LobbyPlayerDto): boolean {
+    const participantId = this.resolvePlayerParticipantId(player);
+    if (participantId == null) return false;
+    return this.playerMenuOpenForParticipantId === participantId;
+  }
+
+  togglePlayerMenu(ev: Event, player: LobbyPlayerDto): void {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const participantId = this.resolvePlayerParticipantId(player);
+    if (participantId == null) return;
+    this.playerMenuOpenForParticipantId =
+      this.playerMenuOpenForParticipantId === participantId ? null : participantId;
+  }
+
+  onPlayerMenuKeydown(ev: KeyboardEvent, player: LobbyPlayerDto): void {
+    void player;
+    if (ev.key !== 'Escape') return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    this.playerMenuOpenForParticipantId = null;
+  }
+
+  kickPlayer(ev: Event, player: LobbyPlayerDto): void {
+    ev.preventDefault();
+    ev.stopPropagation();
+    this.managePlayer('kick', player);
+  }
+
+  banPlayer(ev: Event, player: LobbyPlayerDto): void {
+    ev.preventDefault();
+    ev.stopPropagation();
+    this.managePlayer('ban', player);
+  }
+
+  isPlayerActionInFlight(player: LobbyPlayerDto, action: 'kick' | 'ban'): boolean {
+    const participantId = this.resolvePlayerParticipantId(player);
+    if (participantId == null) return false;
+    return this.playerActionInFlight?.participantId === participantId
+      && this.playerActionInFlight?.type === action;
+  }
+
+  private managePlayer(action: 'kick' | 'ban', player: LobbyPlayerDto): void {
+    const participantId = this.resolvePlayerParticipantId(player);
+    if (participantId == null) return;
+    if (!this.canManagePlayer(player)) return;
+    if (this.playerActionInFlight) return;
+
+    this.error = null;
+    this.playerActionInFlight = { participantId, type: action };
+    const request$ = action === 'ban'
+      ? this.lobbyApi.banPlayer(this.code, participantId)
+      : this.lobbyApi.kickPlayer(this.code, participantId);
+    request$.subscribe({
+      next: (updated) => {
+        this.playerActionInFlight = null;
+        this.playerMenuOpenForParticipantId = null;
+        this.onLobbyUpdate(updated);
+      },
+      error: (err) => {
+        this.playerActionInFlight = null;
+        this.error = apiErrorMessage(
+          err,
+          action === 'ban' ? 'Failed to ban player' : 'Failed to kick player'
+        );
+      },
+    });
+  }
+
+  private resolvePlayerParticipantId(player: LobbyPlayerDto): number | null {
+    const raw = player?.participantId;
+    if (typeof raw !== 'number' || !Number.isFinite(raw)) return null;
+    const value = Math.floor(raw);
+    return value > 0 ? value : null;
+  }
+
   private hashString(value: string): number {
     let h = 2166136261;
     for (let i = 0; i < value.length; i++) {
@@ -1042,6 +1176,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       this.categoryMenuOpen = false;
       this.maxPlayersMenuOpen = false;
       this.quizMenuOpen = false;
+      this.playerMenuOpenForParticipantId = null;
     }
   }
 
@@ -1069,6 +1204,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     const next = !this.categoryMenuOpen;
     this.categoryMenuOpen = next;
     if (next) this.categoryMenuSearch = '';
+    if (next) this.playerMenuOpenForParticipantId = null;
   }
 
   clearCategories(): void {
@@ -1218,8 +1354,14 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  isSystemChatMessage(msg: LobbyChatMessageDto | null | undefined): boolean {
+    const kind = String(msg?.kind ?? 'USER').trim().toUpperCase();
+    return kind === 'SYSTEM';
+  }
+
   trackChatMessage(_index: number, msg: LobbyChatMessageDto): string {
-    return `${msg.serverTime}:${msg.displayName}:${msg.text}`;
+    const kind = String(msg.kind ?? 'USER').trim().toUpperCase();
+    return `${msg.serverTime}:${kind}:${msg.displayName}:${msg.text}`;
   }
 
   quizAvatarStyle(q: QuizListItemDto | null): { [key: string]: string } {
@@ -1414,6 +1556,9 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.maxPlayersMenuOpen = false;
     this.quizMenuOpen = false;
     this.categoryMenuOpen = false;
+    this.sortMenuOpen = false;
+    this.playerMenuOpenForParticipantId = null;
+    this.playerActionInFlight = null;
     this.categoryMenuSearch = '';
     this.chatText = '';
     this.chatMessages = [];
@@ -1421,6 +1566,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.hasLiveLobbySnapshot = false;
     this.chatEventsSubscription?.unsubscribe();
     this.chatEventsSubscription = null;
+    this.lobbyDiffInitialized = false;
     this.quizzesLoaded = false;
     this.quizzesReady = false;
     this.initialLobbyReady = false;
@@ -1515,6 +1661,10 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private appendChatMessage(msg: LobbyChatMessageDto): void {
+    if (this.isSystemChatMessage(msg) && this.hasRecentSystemMessageText(msg.text, 5000)) {
+      return;
+    }
+
     const key = this.chatMessageKey(msg);
     if (this.chatMessageKeys.has(key)) return;
 
@@ -1531,7 +1681,73 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private chatMessageKey(msg: LobbyChatMessageDto): string {
-    return `${msg.serverTime}:${msg.displayName}:${msg.text}`;
+    const kind = String(msg.kind ?? 'USER').trim().toUpperCase();
+    return `${msg.serverTime}:${kind}:${msg.displayName}:${msg.text}`;
+  }
+
+  private emitJoinSystemMessagesFromLobbyDiff(previous: LobbyDto | null, current: LobbyDto | null): void {
+    if (!current) return;
+    if (!this.lobbyDiffInitialized) {
+      this.lobbyDiffInitialized = true;
+      return;
+    }
+
+    const prevPlayers = previous?.players ?? [];
+    const nextPlayers = current.players ?? [];
+
+    const prevKeys = new Set(prevPlayers.map((p) => this.playerIdentityKey(p)));
+
+    for (const player of nextPlayers) {
+      const key = this.playerIdentityKey(player);
+      const displayName = String(player.displayName ?? '').trim();
+      if (!displayName) continue;
+
+      if (!key) continue;
+
+      // New participant appeared in the lobby.
+      if (!prevKeys.has(key)) {
+        if (player.isYou) continue;
+        const text = `${displayName} joined the lobby.`;
+        if (this.hasRecentSystemMessageText(text)) continue;
+        this.appendChatMessage({
+          lobbyCode: (this.code ?? '').trim().toUpperCase(),
+          displayName: 'System',
+          text,
+          serverTime: new Date().toISOString(),
+          kind: 'SYSTEM',
+        });
+        this.scrollChatToBottomIfNearBottom();
+        continue;
+      }
+    }
+  }
+
+  private hasRecentSystemMessageText(text: string, withinMs: number = 8000): boolean {
+    const needle = String(text ?? '').trim();
+    if (!needle) return false;
+    const now = Date.now();
+
+    for (let i = this.chatMessages.length - 1; i >= 0; i--) {
+      const msg = this.chatMessages[i];
+      if (!msg) continue;
+      if (!this.isSystemChatMessage(msg)) continue;
+      if (String(msg.text ?? '').trim() !== needle) continue;
+      const ts = new Date(String(msg.serverTime ?? '')).getTime();
+      if (!Number.isFinite(ts)) return true;
+      if (now - ts <= withinMs) return true;
+    }
+    return false;
+  }
+
+  private playerIdentityKey(player: LobbyPlayerDto | null | undefined): string {
+    if (!player) return '';
+    const participantId = player.participantId;
+    if (typeof participantId === 'number' && Number.isFinite(participantId) && participantId > 0) {
+      return `id:${Math.floor(participantId)}`;
+    }
+    const joinedAt = String(player.joinedAt ?? '').trim();
+    const displayName = String(player.displayName ?? '').trim();
+    return `${displayName}|${joinedAt}`;
   }
 
   setPrivacyMode(mode: 'public' | 'private'): void {
@@ -1795,7 +2011,10 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.lobby?.isOwner) return;
     if (!this.isLoggedIn) return;
     this.maxPlayersMenuOpen = !this.maxPlayersMenuOpen;
-    if (this.maxPlayersMenuOpen) this.quizMenuOpen = false;
+    if (this.maxPlayersMenuOpen) {
+      this.quizMenuOpen = false;
+      this.playerMenuOpenForParticipantId = null;
+    }
   }
 
   setMaxPlayersFromMenu(value: 2 | 3 | 4 | 5): void {
@@ -1807,7 +2026,10 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
 
   toggleQuizMenu(): void {
     this.quizMenuOpen = !this.quizMenuOpen;
-    if (this.quizMenuOpen) this.maxPlayersMenuOpen = false;
+    if (this.quizMenuOpen) {
+      this.maxPlayersMenuOpen = false;
+      this.playerMenuOpenForParticipantId = null;
+    }
   }
 
   selectQuizFromMenu(id: number): void {
@@ -1838,15 +2060,17 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       !this.maxPlayersMenuOpen &&
       !this.quizMenuOpen &&
       !this.categoryMenuOpen &&
-      !this.sortMenuOpen
+      !this.sortMenuOpen &&
+      this.playerMenuOpenForParticipantId == null
     )
       return;
     if (!target) return;
-    if (target.closest('.mr-select-wrap')) return;
+    if (target.closest('.mr-select-wrap') || target.closest('.player-actions')) return;
     this.maxPlayersMenuOpen = false;
     this.quizMenuOpen = false;
     this.categoryMenuOpen = false;
     this.sortMenuOpen = false;
+    this.playerMenuOpenForParticipantId = null;
   }
 
   @HostListener('document:keydown', ['$event'])
@@ -1860,11 +2084,13 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
         this.maxPlayersMenuOpen ||
         this.quizMenuOpen ||
         this.categoryMenuOpen ||
-        this.sortMenuOpen;
+        this.sortMenuOpen ||
+        this.playerMenuOpenForParticipantId != null;
       this.maxPlayersMenuOpen = false;
       this.quizMenuOpen = false;
       this.categoryMenuOpen = false;
       this.sortMenuOpen = false;
+      this.playerMenuOpenForParticipantId = null;
       if (!hadMenusOpen && this.view === 'picker') this.closeQuizSelection();
     }
   }

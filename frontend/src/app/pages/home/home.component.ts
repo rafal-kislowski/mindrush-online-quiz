@@ -32,7 +32,8 @@ type LeaderboardRowVm = LeaderboardEntryDto & {
 export class HomeComponent implements OnInit, OnDestroy {
   readonly joinCodeLength = 6;
   readonly joinCodeSlots = Array.from({ length: this.joinCodeLength });
-  readonly leaderboardSkeleton = Array.from({ length: 5 });
+  readonly leaderboardSize = 5;
+  readonly leaderboardSkeleton = Array.from({ length: this.leaderboardSize });
   private readonly minLobbyTransitionMs = 1500;
 
   get authUser$() {
@@ -49,6 +50,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   leaderboardLoading = true;
   private _leaderboardError: string | null = null;
   leaderboardRows: LeaderboardRowVm[] = [];
+  leaderboardSlots: Array<LeaderboardRowVm | null> = Array.from({ length: this.leaderboardSize }, () => null);
   leaderboardStats: LeaderboardStatsDto | null = null;
 
   currentUserId: number | null = null;
@@ -92,7 +94,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     });
 
     this.leaderboardApi
-      .list(5)
+      .list(this.leaderboardSize)
       .pipe(
         map((list) =>
           list.map((p) => {
@@ -101,7 +103,7 @@ export class HomeComponent implements OnInit, OnDestroy {
               ...p,
               rankName: rank.name,
               rankColor: rank.color,
-              rankAccent: this.hexToRgba(rank.color, 0.26),
+              rankAccent: this.hexToRgba(rank.color, 0.18),
               initials: this.initialsFrom(p.displayName),
             };
           })
@@ -112,7 +114,12 @@ export class HomeComponent implements OnInit, OnDestroy {
         })
       )
       .subscribe((rows) => {
-        this.leaderboardRows = rows;
+        const topRows = rows.slice(0, this.leaderboardSize);
+        this.leaderboardRows = topRows;
+        this.leaderboardSlots = [
+          ...topRows,
+          ...Array.from({ length: Math.max(0, this.leaderboardSize - topRows.length) }, () => null),
+        ];
         this.leaderboardLoading = false;
       });
 

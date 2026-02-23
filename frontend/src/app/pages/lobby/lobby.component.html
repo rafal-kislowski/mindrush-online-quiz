@@ -597,40 +597,80 @@
                       <div
                         class="row-item"
                         role="listitem"
-                        *ngFor="let p of l.players; let i = index"
+                        *ngFor="let p of l.players"
                         [class.is-me]="p.isYou"
                         [class.is-ready]="p.ready"
                         [class.is-away]="p.away"
+                        [class.has-actions]="canManagePlayer(p)"
                       >
                         <div class="left">
-                          <span class="pos"
-                            ><span class="pos__n">{{ i + 1 }}</span></span
-                          >
                           <span
                             class="avatar"
                             [ngStyle]="playerAvatarStyle(p.displayName)"
                             >{{ playerInitials(p.displayName) }}</span
                           >
-                          <span class="name" [class.name--away]="p.away">
+                          <span class="name" [class.name--away]="p.away" [class.name--owner]="p.isOwner">
                             {{ p.displayName }}<span class="name-away" *ngIf="p.away"> (Away)</span>
                           </span>
                         </div>
                         <div class="right">
-                          <span class="rank-pill rank-pill--owner" *ngIf="p.isOwner">OWNER</span>
+                          <div
+                            class="player-actions"
+                            *ngIf="canManagePlayer(p)"
+                            [class.is-open]="isPlayerMenuOpen(p)"
+                          >
+                            <button
+                              class="player-actions__trigger"
+                              type="button"
+                              aria-label="Player actions"
+                              [attr.aria-expanded]="isPlayerMenuOpen(p)"
+                              (click)="togglePlayerMenu($event, p)"
+                              (keydown)="onPlayerMenuKeydown($event, p)"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                aria-hidden="true"
+                              >
+                                <circle cx="12" cy="5" r="1.5" />
+                                <circle cx="12" cy="12" r="1.5" />
+                                <circle cx="12" cy="19" r="1.5" />
+                              </svg>
+                            </button>
+
+                            <div class="player-actions__menu" *ngIf="isPlayerMenuOpen(p)">
+                              <button
+                                class="player-actions__item"
+                                type="button"
+                                [disabled]="isPlayerActionInFlight(p, 'kick')"
+                                (click)="kickPlayer($event, p)"
+                              >
+                                Kick
+                              </button>
+                              <button
+                                class="player-actions__item player-actions__item--danger"
+                                type="button"
+                                [disabled]="isPlayerActionInFlight(p, 'ban')"
+                                (click)="banPlayer($event, p)"
+                              >
+                                Ban
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
                       <div
                         class="row-item row-item--placeholder"
                         role="listitem"
-                        *ngFor="let _ of waitingSlots; let j = index"
+                        *ngFor="let _ of waitingSlots"
                       >
                         <div class="left">
-                          <span class="pos"
-                            ><span class="pos__n">{{
-                              l.players.length + j + 1
-                            }}</span></span
-                          >
                           <span
                             class="avatar avatar--ghost"
                             aria-hidden="true"
@@ -672,16 +712,22 @@
                     <div
                       class="chat-line"
                       *ngFor="let m of chatMessages; trackBy: trackChatMessage"
+                      [class.chat-line--system]="isSystemChatMessage(m)"
                     >
                       <span class="time"
                         >[{{ m.serverTime | date: "HH:mm" }}]</span
                       >
-                      <span
-                        class="nick"
-                        [class.me]="m.displayName === meDisplayName"
-                        >{{ m.displayName }}:</span
-                      >
-                      <span class="text">{{ m.text }}</span>
+                      <ng-container *ngIf="isSystemChatMessage(m); else userChatLine">
+                        <span class="text text--system">{{ m.text }}</span>
+                      </ng-container>
+                      <ng-template #userChatLine>
+                        <span
+                          class="nick"
+                          [class.me]="m.displayName === meDisplayName"
+                          >{{ m.displayName }}:</span
+                        >
+                        <span class="text">{{ m.text }}</span>
+                      </ng-template>
                     </div>
                   </div>
 

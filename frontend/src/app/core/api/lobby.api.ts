@@ -77,4 +77,20 @@ export class LobbyApi {
       { withCredentials: true }
     );
   }
+
+  kickPlayer(code: string, participantId: number): Observable<LobbyDto> {
+    return this.http.post<LobbyDto>(
+      `/api/lobbies/${encodeURIComponent(code)}/players/${participantId}/kick`,
+      {},
+      { withCredentials: true }
+    );
+  }
+
+  banPlayer(code: string, participantId: number): Observable<LobbyDto> {
+    return this.http.post<LobbyDto>(
+      `/api/lobbies/${encodeURIComponent(code)}/players/${participantId}/ban`,
+      {},
+      { withCredentials: true }
+    );
+  }
 }

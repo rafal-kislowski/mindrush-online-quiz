@@ -1,6 +1,11 @@
 <div id="particles-js" class="app-particles" aria-hidden="true"></div>
 
-<div class="layout" [class.is-open]="sidebarOpen" [class.is-sidebar-collapsed]="sidebarCollapsed">
+<div
+  class="layout"
+  [class.is-open]="sidebarOpen"
+  [class.is-sidebar-collapsed]="sidebarCollapsed"
+  [class.is-sidebar-transition-ready]="sidebarTransitionsReady"
+>
   <div class="overlay" (click)="closeSidebar()"></div>
 
   <aside class="sidebar">

@@ -8,6 +8,7 @@ export interface LobbyChatMessageDto {
   displayName: string;
   text: string;
   serverTime: string;
+  kind?: 'USER' | 'SYSTEM' | string;
 }
 
 @Injectable({ providedIn: 'root' })

@@ -166,7 +166,7 @@
                   </svg>
                 </div>
                 <div class="mini__text">
-                  <div class="mini__kicker">Mode</div>
+                  <div class="mini__kicker" aria-hidden="true">&nbsp;</div>
                   <div class="mini__t">Casual</div>
                   <div class="mini__d muted">Relaxed game with no pressure.</div>
                 </div>
@@ -194,7 +194,7 @@
                   </svg>
                 </div>
                 <div class="mini__text">
-                  <div class="mini__kicker">Mode</div>
+                  <div class="mini__kicker" aria-hidden="true">&nbsp;</div>
                   <div class="mini__t">Ranked</div>
                   <div class="mini__d muted">Earn rating points and climb.</div>
                 </div>
@@ -222,7 +222,7 @@
                   </svg>
                 </div>
                 <div class="mini__text">
-                  <div class="mini__kicker">Mode</div>
+                  <div class="mini__kicker" aria-hidden="true">&nbsp;</div>
                   <div class="mini__t">Random</div>
                   <div class="mini__d muted">Jump straight into a match.</div>
                 </div>
@@ -504,44 +504,57 @@
                 </div>
               </div>
 
-              <div class="leader__empty muted" *ngIf="!leaderboardLoading && leaderboardRows.length === 0">
-                No players yet.
-              </div>
-
-              <div class="leader__rows" *ngIf="!leaderboardLoading && leaderboardRows.length > 0">
+              <div class="leader__rows" *ngIf="!leaderboardLoading">
                 <div
                   class="leader-row"
-                  *ngFor="let p of leaderboardRows; let i = index"
-                  [style.--accent]="p.rankAccent"
-                  [class.is-me]="currentUserId === p.userId"
+                  *ngFor="let p of leaderboardSlots; let i = index"
+                  [style.--accent]="p ? p.rankAccent : null"
+                  [class.is-me]="!!p && currentUserId === p.userId"
+                  [class.is-empty]="!p"
                 >
                   <div class="leader-row__place" aria-hidden="true">
                     <i
-                      *ngIf="i < 3"
+                      *ngIf="p && i < 3; else placeNumber"
                       class="fa-solid fa-trophy"
                       [class.leader-row__trophy--gold]="i === 0"
                       [class.leader-row__trophy--silver]="i === 1"
                       [class.leader-row__trophy--bronze]="i === 2"
                       aria-hidden="true"
                     ></i>
-                    <span *ngIf="i >= 3">{{ i + 1 }}</span>
+                    <ng-template #placeNumber>
+                      <span>{{ i + 1 }}</span>
+                    </ng-template>
                   </div>
 
-                  <div class="leader-row__avatar" [style.background]="avatarGradient(p.userId)" aria-hidden="true">
-                    {{ p.initials }}
-                  </div>
+                  <ng-container *ngIf="p; else emptyLeaderboardRow">
+                    <div class="leader-row__avatar" [style.background]="avatarGradient(p.userId)" aria-hidden="true">
+                      {{ p.initials }}
+                    </div>
 
-                  <div class="leader-row__main">
-                    <div class="leader-row__nameWrap">
-                      <div class="leader-row__name">{{ p.displayName }}</div>
-                      <span class="rank-pill" [style.--rank-color]="p.rankColor">{{ p.rankName }}</span>
+                    <div class="leader-row__main">
+                      <div class="leader-row__nameWrap">
+                        <div class="leader-row__name">{{ p.displayName }}</div>
+                        <span class="rank-pill" [style.--rank-color]="p.rankColor">{{ p.rankName }}</span>
+                      </div>
+                      <div class="leader-row__meta">
+                        <span class="leader-row__rp">
+                          {{ p.rankPoints | number }}
+                        </span>
+                      </div>
                     </div>
-                    <div class="leader-row__meta">
-                      <span class="leader-row__rp">
-                        {{ p.rankPoints | number }} <span class="rp muted">RP</span>
-                      </span>
+                  </ng-container>
+
+                  <ng-template #emptyLeaderboardRow>
+                    <div class="leader-row__avatar leader-row__avatar--empty" aria-hidden="true"></div>
+                    <div class="leader-row__main">
+                      <div class="leader-row__nameWrap">
+                        <div class="leader-row__name leader-row__name--empty">Waiting for player</div>
+                      </div>
+                      <div class="leader-row__meta">
+                        <span class="leader-row__rp leader-row__rp--empty">—</span>
+                      </div>
                     </div>
-                  </div>
+                  </ng-template>
                 </div>
               </div>
             </div>
