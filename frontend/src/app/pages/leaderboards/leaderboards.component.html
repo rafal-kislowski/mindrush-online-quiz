@@ -87,12 +87,13 @@
               </ng-template>
             </span>
 
-            <span
-              class="avatar"
-              [style.background]="avatarGradient(p.userId)"
-              aria-hidden="true"
-              >{{ p.initials }}</span
-            >
+            <app-player-avatar
+              class="leaderboard-avatar"
+              [displayName]="p.displayName"
+              [isAuthenticated]="true"
+              [size]="34"
+              [decorative]="true"
+            ></app-player-avatar>
 
             <span class="name">{{ p.displayName }}</span>
             <span class="rank-pill" [style.--rank-color]="p.rankColor">
@@ -118,12 +119,13 @@
                 </ng-template>
               </span>
 
-              <span
-                class="avatar avatar--me"
-                [style.background]="avatarGradient(meVm.userId)"
-                aria-hidden="true"
-                >{{ meVm.initials }}</span
-              >
+              <app-player-avatar
+                class="leaderboard-avatar leaderboard-avatar--me"
+                [displayName]="meVm.displayName"
+                [isAuthenticated]="true"
+                [size]="34"
+                [decorative]="true"
+              ></app-player-avatar>
 
               <span class="name">
                 {{ meVm.displayName }}
@@ -162,17 +164,31 @@
 
         <div class="pager__size">
           <span class="pager__label">Show</span>
-          <select
-            class="pager__select"
-            [value]="pageSize"
-            (change)="onPageSizeChange($any($event.target).value)"
-            aria-label="Rows per page"
-          >
-            <option [value]="10">10</option>
-            <option [value]="25">25</option>
-            <option [value]="50">50</option>
-            <option [value]="100">100</option>
-          </select>
+          <div class="mr-select-wrap mr-select-wrap--up pager__select-wrap" [class.menu-open]="pageSizeMenuOpen">
+            <button
+              class="mr-select pager__select-btn"
+              type="button"
+              aria-haspopup="listbox"
+              [attr.aria-expanded]="pageSizeMenuOpen"
+              (click)="togglePageSizeMenu($event)"
+              aria-label="Rows per page"
+            >
+              <span class="mr-select__value">{{ pageSize }}</span>
+              <span class="mr-select__caret" aria-hidden="true"></span>
+            </button>
+
+            <div class="mr-select__menu" *ngIf="pageSizeMenuOpen" role="listbox">
+              <button
+                class="mr-select__item"
+                type="button"
+                *ngFor="let option of pageSizeOptions"
+                [class.active]="pageSize === option"
+                (click)="setPageSize(option)"
+              >
+                {{ option }}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

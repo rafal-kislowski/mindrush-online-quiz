@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, HostListener, OnInit } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 import { apiErrorMessage } from '../../core/api/api-error.util';
@@ -11,24 +11,23 @@ import {
 } from '../../core/api/leaderboard.api';
 import { AuthService } from '../../core/auth/auth.service';
 import { rankForPoints } from '../../core/progression/progression';
+import { PlayerAvatarComponent } from '../../core/ui/player-avatar.component';
 import { ToastService } from '../../core/ui/toast.service';
 
 type LeaderboardRowVm = LeaderboardEntryDto & {
   rankName: string;
   rankColor: string;
-  initials: string;
 };
 
 type LeaderboardMeVm = LeaderboardMeDto & {
   rankName: string;
   rankColor: string;
-  initials: string;
 };
 
 @Component({
   selector: 'app-leaderboards',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, PlayerAvatarComponent],
   templateUrl: './leaderboards.component.html',
   styleUrl: './leaderboards.component.scss',
 })
@@ -40,6 +39,8 @@ export class LeaderboardsComponent implements OnInit {
   stats: LeaderboardStatsDto | null = null;
   page = 1;
   pageSize: 10 | 25 | 50 | 100 = 10;
+  pageSizeMenuOpen = false;
+  readonly pageSizeOptions: ReadonlyArray<10 | 25 | 50 | 100> = [10, 25, 50, 100];
 
   me: LeaderboardMeVm | null = null;
 
@@ -81,7 +82,6 @@ export class LeaderboardsComponent implements OnInit {
               ...me,
               rankName: rank.name,
               rankColor: rank.color,
-              initials: this.initialsFrom(me.displayName),
             };
           },
           error: () => (this.me = null),
@@ -126,19 +126,25 @@ export class LeaderboardsComponent implements OnInit {
   prev(): void {
     if (!this.canPrev()) return;
     this.page -= 1;
+    this.pageSizeMenuOpen = false;
     this.loadPage();
   }
 
   next(): void {
     if (!this.canNext()) return;
     this.page += 1;
+    this.pageSizeMenuOpen = false;
     this.loadPage();
   }
 
   setPageSize(size: 10 | 25 | 50 | 100): void {
-    if (this.pageSize === size) return;
+    if (this.pageSize === size) {
+      this.pageSizeMenuOpen = false;
+      return;
+    }
     this.pageSize = size;
     this.page = 1;
+    this.pageSizeMenuOpen = false;
     this.loadPage();
   }
 
@@ -146,7 +152,26 @@ export class LeaderboardsComponent implements OnInit {
     const n = Number(raw);
     if (n === 10 || n === 25 || n === 50 || n === 100) {
       this.setPageSize(n);
+      return;
     }
+    this.pageSizeMenuOpen = false;
+  }
+
+  togglePageSizeMenu(ev?: Event): void {
+    ev?.stopPropagation();
+    this.pageSizeMenuOpen = !this.pageSizeMenuOpen;
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(ev: MouseEvent): void {
+    const target = ev.target as HTMLElement | null;
+    if (target?.closest('.mr-select-wrap')) return;
+    this.pageSizeMenuOpen = false;
+  }
+
+  @HostListener('document:keydown.escape')
+  onDocumentEscape(): void {
+    this.pageSizeMenuOpen = false;
   }
 
   private loadPage(): void {
@@ -165,7 +190,6 @@ export class LeaderboardsComponent implements OnInit {
               ...p,
               rankName: rank.name,
               rankColor: rank.color,
-              initials: this.initialsFrom(p.displayName),
             };
           })
         ),
@@ -178,24 +202,6 @@ export class LeaderboardsComponent implements OnInit {
         this.rows = rows;
         this.loading = false;
       });
-  }
-
-  initialsFrom(name: string): string {
-    const trimmed = (name ?? '').trim();
-    if (!trimmed) return '?';
-    const parts = trimmed.split(/\s+/).slice(0, 2);
-    const letters = parts
-      .map((p) => p.replace(/[^A-Za-z0-9]/g, '').slice(0, 1))
-      .join('')
-      .toUpperCase();
-    return letters || trimmed.slice(0, 1).toUpperCase();
-  }
-
-  avatarGradient(userId: number): string {
-    const n = Math.abs(Math.floor(userId || 0));
-    const hue1 = n % 360;
-    const hue2 = (hue1 + 35) % 360;
-    return `linear-gradient(135deg, hsla(${hue1}, 90%, 60%, 0.95), hsla(${hue2}, 90%, 55%, 0.85))`;
   }
 
   trophyClassByPosition(pos: number): string | null {

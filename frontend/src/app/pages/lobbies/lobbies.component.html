@@ -139,39 +139,62 @@
           />
         </label>
 
-        <div class="toolbar__control">
+        <div class="toolbar__control mr-select-wrap" [class.menu-open]="openMenu === 'roomFilter'">
           <span class="toolbar__icon toolbar__icon--accent" aria-hidden="true">
             <i class="fa-solid fa-filter"></i>
           </span>
-          <select
-            class="toolbar__select toolbar__select--compact"
-            [value]="roomFilter"
-            (change)="setRoomFilter($any($event.target).value)"
+          <button
+            class="mr-select mr-select--compact"
+            type="button"
+            aria-haspopup="listbox"
+            [attr.aria-expanded]="openMenu === 'roomFilter'"
+            (click)="toggleMenu('roomFilter', $event)"
             aria-label="Room type filter"
           >
-            <option value="all">All rooms</option>
-            <option value="available">Free spots</option>
-            <option value="private">Private rooms</option>
-            <option value="public">Public rooms</option>
-            <option value="full">Full rooms</option>
-          </select>
+            <span class="mr-select__value">{{ roomFilterLabel }}</span>
+            <span class="mr-select__caret" aria-hidden="true"></span>
+          </button>
+
+          <div class="mr-select__menu" *ngIf="openMenu === 'roomFilter'" role="listbox">
+            <button
+              class="mr-select__item"
+              type="button"
+              *ngFor="let option of roomFilterOptions"
+              [class.active]="roomFilter === option.value"
+              (click)="setRoomFilter(option.value)"
+            >
+              {{ option.label }}
+            </button>
+          </div>
         </div>
 
-        <div class="toolbar__control">
+        <div class="toolbar__control mr-select-wrap" [class.menu-open]="openMenu === 'sort'">
           <span class="toolbar__icon toolbar__icon--sort" aria-hidden="true">
             <i class="fa-solid fa-arrow-down-a-z"></i>
           </span>
-          <select
-            class="toolbar__select toolbar__select--compact"
-            [value]="sort"
-            (change)="setSort($any($event.target).value)"
+          <button
+            class="mr-select mr-select--compact"
+            type="button"
+            aria-haspopup="listbox"
+            [attr.aria-expanded]="openMenu === 'sort'"
+            (click)="toggleMenu('sort', $event)"
             aria-label="Sort rooms"
           >
-            <option value="newest">Newest</option>
-            <option value="oldest">Oldest</option>
-            <option value="playersDesc">Players desc</option>
-            <option value="playersAsc">Players asc</option>
-          </select>
+            <span class="mr-select__value">{{ sortLabel }}</span>
+            <span class="mr-select__caret" aria-hidden="true"></span>
+          </button>
+
+          <div class="mr-select__menu" *ngIf="openMenu === 'sort'" role="listbox">
+            <button
+              class="mr-select__item"
+              type="button"
+              *ngFor="let option of sortOptions"
+              [class.active]="sort === option.value"
+              (click)="setSort(option.value)"
+            >
+              {{ option.label }}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -260,16 +283,34 @@
 
         <div class="pager__size">
           <span class="pager__label">Show</span>
-          <select
-            class="pager__select"
-            [value]="pageSize"
-            (change)="onPageSizeChange($any($event.target).value)"
-            aria-label="Rows per page"
+          <div
+            class="mr-select-wrap mr-select-wrap--up pager__select-wrap"
+            [class.menu-open]="openMenu === 'pageSize'"
           >
-            <option [value]="10">10</option>
-            <option [value]="25">25</option>
-            <option [value]="50">50</option>
-          </select>
+            <button
+              class="mr-select pager__select-btn"
+              type="button"
+              aria-haspopup="listbox"
+              [attr.aria-expanded]="openMenu === 'pageSize'"
+              (click)="toggleMenu('pageSize', $event)"
+              aria-label="Rows per page"
+            >
+              <span class="mr-select__value">{{ pageSize }}</span>
+              <span class="mr-select__caret" aria-hidden="true"></span>
+            </button>
+
+            <div class="mr-select__menu" *ngIf="openMenu === 'pageSize'" role="listbox">
+              <button
+                class="mr-select__item"
+                type="button"
+                *ngFor="let option of pageSizeOptions"
+                [class.active]="pageSize === option"
+                (click)="setPageSize(option)"
+              >
+                {{ option }}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

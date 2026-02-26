@@ -2,6 +2,9 @@
   class="lobby-page"
   [class.is-join]="joinState !== 'joined'"
   [class.is-joining]="roomTransitionBusy"
+  [class.view-lobby]="view === 'lobby'"
+  [class.view-picker]="view === 'picker'"
+  [class.has-view-switched]="hasViewSwitched"
   *ngIf="lobby as l; else loading"
 >
   <div class="lobby-frame">
@@ -191,6 +194,9 @@
                     type="button"
                     [class.is-empty]="!selectedQuiz"
                     [class.current-quiz--clickable]="l.isOwner"
+                    [class.current-quiz--hintable]="l.isOwner && !!selectedQuiz"
+                    [class.stat-tile--hintable]="l.isOwner && !!selectedQuiz"
+                    [class.stat-tile--hintableCover]="l.isOwner && !!selectedQuiz"
                     [class.is-muted]="!l.isOwner"
                     (click)="openQuizSelection()"
                     [attr.aria-disabled]="!l.isOwner"
@@ -270,6 +276,16 @@
                             Owner is choosing a quiz...
                           </ng-template>
                         </ng-template>
+                      </div>
+                    </div>
+                    <div
+                      class="stat-tile__hint"
+                      aria-hidden="true"
+                      *ngIf="l.isOwner && selectedQuiz"
+                    >
+                      <div class="stat-tile__hintTitle">Change quiz</div>
+                      <div class="stat-tile__hintSub">
+                        Click to open selection and pick another quiz.
                       </div>
                     </div>
                   </button>
@@ -604,11 +620,13 @@
                         [class.has-actions]="canManagePlayer(p)"
                       >
                         <div class="left">
-                          <span
-                            class="avatar"
-                            [ngStyle]="playerAvatarStyle(p.displayName)"
-                            >{{ playerInitials(p.displayName) }}</span
-                          >
+                          <app-player-avatar
+                            class="player-avatar"
+                            [displayName]="p.displayName"
+                            [isAuthenticated]="isAuthenticatedLobbyPlayer(p)"
+                            [size]="30"
+                            [decorative]="true"
+                          ></app-player-avatar>
                           <span class="name" [class.name--away]="p.away" [class.name--owner]="p.isOwner">
                             {{ p.displayName }}<span class="name-away" *ngIf="p.away"> (Away)</span>
                           </span>
@@ -1019,9 +1037,23 @@
                           [class.active]="isCategorySelected(c)"
                         >
                           <span class="mr-multi__label">{{ c }}</span>
-                          <span class="mr-multi__mark" aria-hidden="true">{{
-                            isCategorySelected(c) ? "✓" : ""
-                          }}</span>
+                          <span
+                            class="mr-multi__mark"
+                            aria-hidden="true"
+                            [class.is-on]="isCategorySelected(c)"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2.5"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                            >
+                              <path d="M20 6 9 17l-5-5" />
+                            </svg>
+                          </span>
                         </button>
                       </div>
                     </div>

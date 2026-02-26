@@ -6,7 +6,7 @@ export const routes: Routes = [
   { path: '', pathMatch: 'full', loadComponent: () => import('./pages/home/home.component').then(m => m.HomeComponent) },
   { path: 'login', loadComponent: () => import('./pages/auth/auth.component').then(m => m.AuthComponent) },
   { path: 'register', loadComponent: () => import('./pages/auth/auth.component').then(m => m.AuthComponent) },
-  { path: 'play-solo', loadComponent: () => import('./pages/placeholder/placeholder.component').then(m => m.PlaceholderComponent), data: { title: 'Play Solo' } },
+  { path: 'play-solo', loadComponent: () => import('./pages/casual/casual.component').then(m => m.CasualComponent) },
   { path: 'play-ranked', loadComponent: () => import('./pages/placeholder/placeholder.component').then(m => m.PlaceholderComponent), data: { title: 'Ranked' } },
   { path: 'play-random', loadComponent: () => import('./pages/placeholder/placeholder.component').then(m => m.PlaceholderComponent), data: { title: 'Random' } },
   { path: 'shop', loadComponent: () => import('./pages/placeholder/placeholder.component').then(m => m.PlaceholderComponent), data: { title: 'Shop' } },
@@ -22,5 +22,6 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/lobby/lobby.component').then(m => m.LobbyComponent),
   },
   { path: 'lobby/:code/game', loadComponent: () => import('./pages/game/game.component').then(m => m.GameComponent) },
+  { path: 'solo-game/:sessionId', loadComponent: () => import('./pages/game/game.component').then(m => m.GameComponent) },
   { path: '**', redirectTo: '' }
 ];

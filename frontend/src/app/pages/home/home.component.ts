@@ -13,19 +13,18 @@ import {
 } from '../../core/api/leaderboard.api';
 import { AuthService } from '../../core/auth/auth.service';
 import { rankForPoints } from '../../core/progression/progression';
+import { PlayerAvatarComponent } from '../../core/ui/player-avatar.component';
 import { ToastService } from '../../core/ui/toast.service';
 
 type LeaderboardRowVm = LeaderboardEntryDto & {
   rankName: string;
   rankColor: string;
-  rankAccent: string;
-  initials: string;
 };
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, PlayerAvatarComponent],
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss',
 })
@@ -103,8 +102,6 @@ export class HomeComponent implements OnInit, OnDestroy {
               ...p,
               rankName: rank.name,
               rankColor: rank.color,
-              rankAccent: this.hexToRgba(rank.color, 0.18),
-              initials: this.initialsFrom(p.displayName),
             };
           })
         ),
@@ -139,36 +136,6 @@ export class HomeComponent implements OnInit, OnDestroy {
       window.clearTimeout(this.transitionDelayTimer);
       this.transitionDelayTimer = null;
     }
-  }
-
-  initialsFrom(name: string): string {
-    const trimmed = (name ?? '').trim();
-    if (!trimmed) return '?';
-    const parts = trimmed.split(/\s+/).slice(0, 2);
-    const letters = parts
-      .map((p) => p.replace(/[^A-Za-z0-9]/g, '').slice(0, 1))
-      .join('')
-      .toUpperCase();
-    return letters || trimmed.slice(0, 1).toUpperCase();
-  }
-
-  private hexToRgba(hex: string, a: number): string {
-    const alpha = Math.max(0, Math.min(1, a));
-    const h = String(hex ?? '').replace('#', '').trim();
-    if (h.length !== 6) return `rgba(56,189,248,${alpha})`;
-    const n = Number.parseInt(h, 16);
-    if (!Number.isFinite(n)) return `rgba(56,189,248,${alpha})`;
-    const r = (n >> 16) & 255;
-    const g = (n >> 8) & 255;
-    const b = n & 255;
-    return `rgba(${r},${g},${b},${alpha})`;
-  }
-
-  avatarGradient(userId: number): string {
-    const n = Math.abs(Math.floor(userId || 0));
-    const hue1 = n % 360;
-    const hue2 = (hue1 + 35) % 360;
-    return `linear-gradient(135deg, hsla(${hue1}, 90%, 60%, 0.95), hsla(${hue2}, 90%, 55%, 0.85))`;
   }
 
   get lobbyNavigationBusy(): boolean {

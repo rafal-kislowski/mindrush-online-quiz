@@ -46,25 +46,13 @@
           >
             <div class="ring" aria-hidden="true"></div>
             <div class="face" aria-hidden="true">
-              <svg
-                class="avatar-svg"
-                viewBox="0 0 100 100"
-                role="img"
-                aria-label="Default avatar"
-              >
-                <defs>
-                  <linearGradient id="avatarGradAuth" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0" stop-color="rgba(255,255,255,0.20)" />
-                    <stop offset="1" stop-color="rgba(255,255,255,0.02)" />
-                  </linearGradient>
-                </defs>
-                <rect x="0" y="0" width="100" height="100" rx="50" fill="url(#avatarGradAuth)" />
-                <circle cx="50" cy="42" r="18" fill="rgba(255,255,255,0.26)" />
-                <path
-                  d="M18 92c4-20 20-30 32-30s28 10 32 30"
-                  fill="rgba(255,255,255,0.22)"
-                />
-              </svg>
+              <app-player-avatar
+                class="profile-avatar"
+                [displayName]="p.displayName"
+                [isAuthenticated]="p.isAuthenticated"
+                [size]="92"
+                [decorative]="true"
+              ></app-player-avatar>
 
               <div class="face__overlay">
                 <div class="face__overlayLabel">XP</div>
@@ -329,16 +317,29 @@
 
       <div class="topbar__right">
         <button
-          class="btn owned-lobby-btn"
+          class="btn active-game-btn"
           type="button"
-          *ngIf="currentLobby as lobby"
-          (click)="openCurrentLobby()"
-          [attr.aria-label]="'Open current lobby ' + lobby.code + ', players ' + currentLobbyPlayerCount + ' of ' + currentLobbyCapacity"
+          *ngIf="currentGame as game"
+          (click)="openCurrentGame()"
+          [attr.aria-label]="game.type === 'LOBBY' ? ('Open current game in lobby ' + game.lobbyCode) : 'Open current solo game'"
         >
-          <span class="owned-lobby-btn__label">In lobby</span>
-          <span class="owned-lobby-btn__code">{{ lobby.code }}</span>
-          <span class="owned-lobby-btn__meta">{{ currentLobbyPlayerCount }}/{{ currentLobbyCapacity }}</span>
+          <span class="owned-lobby-btn__label">In game</span>
+          <span class="owned-lobby-btn__code">{{ game.type === 'LOBBY' ? game.lobbyCode : 'SOLO' }}</span>
+          <span class="owned-lobby-btn__meta">Resume</span>
         </button>
+        <ng-container *ngIf="currentLobby as lobby">
+          <button
+            class="btn owned-lobby-btn"
+            type="button"
+            *ngIf="!currentGame || currentGame.type !== 'LOBBY' || (currentGame.lobbyCode ?? '').toUpperCase() !== (lobby.code ?? '').toUpperCase()"
+            (click)="openCurrentLobby()"
+            [attr.aria-label]="'Open current lobby ' + lobby.code + ', players ' + currentLobbyPlayerCount + ' of ' + currentLobbyCapacity"
+          >
+            <span class="owned-lobby-btn__label">In lobby</span>
+            <span class="owned-lobby-btn__code">{{ lobby.code }}</span>
+            <span class="owned-lobby-btn__meta">{{ currentLobbyPlayerCount }}/{{ currentLobbyCapacity }}</span>
+          </button>
+        </ng-container>
         <ng-container *ngIf="authUser$ | async as user; else guestActions">
           <span class="topbar__user">{{ user.displayName }}</span>
           <button class="btn" type="button" (click)="logout()">Logout</button>

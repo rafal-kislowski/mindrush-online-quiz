@@ -13,3 +13,16 @@ export interface QuizListItemDto {
   questionTimeLimitSeconds?: number | null;
   questionCount: number;
 }
+
+export interface QuizAnswerOptionDto {
+  id: number;
+  text: string | null;
+  imageUrl?: string | null;
+}
+
+export interface QuizQuestionDto {
+  id: number;
+  prompt: string;
+  imageUrl?: string | null;
+  options: QuizAnswerOptionDto[];
+}

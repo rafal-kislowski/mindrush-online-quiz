@@ -17,11 +17,38 @@
     </div>
 
     <!-- Reveal (feedback first, then transition overlay) -->
-    <div class="quiz-outer" *ngIf="s.stage === 'REVEAL' && s.question as q">
-      <div class="quiz-container">
+    <div class="quiz-outer" *ngIf="s.stage === 'REVEAL' && s.question as q" [class.quiz-outer--no-media]="!q.imageUrl?.trim()">
+      <div
+        class="quiz-container"
+        [class.quiz-container--no-media]="!q.imageUrl?.trim()"
+        [class.quiz-container--with-option-media]="hasImageOptions(q.options)"
+        [class.quiz-container--mobile-media-grid]="shouldUseMobileImageAnswerGrid(q)"
+      >
         <div class="quiz-header quiz-header-full">
-          <div class="quiz-number">{{ s.questionIndex }}</div>
-          <div class="quiz-numberText">Pytanie {{ s.questionIndex }}</div>
+          <div class="quiz-meta">
+            <div class="quiz-progress">{{ questionProgressLabel(s.questionIndex, s.totalQuestions) }}</div>
+            <div class="quiz-hearts" *ngIf="showSoloHearts">
+              <span
+                *ngFor="let slot of heartSlots; trackBy: trackByHeartSlot"
+                class="quiz-heart"
+                [class.is-alive]="slot <= visibleLives"
+                [class.is-empty]="slot > visibleLives"
+                [class.is-lost]="slot === heartLostSlot"
+                aria-hidden="true"
+              >
+                <span class="quiz-heart__icon">&#10084;</span>
+              </span>
+            </div>
+            <button
+              *ngIf="!showSoloHearts && canLeaveTraining"
+              class="btn quiz-meta-action__leave"
+              type="button"
+              [disabled]="endingGame"
+              (click)="leaveTraining()"
+            >
+              {{ endingGame ? 'Leaving...' : 'Leave training' }}
+            </button>
+          </div>
           <div class="quiz-title">{{ q.prompt }}</div>
         </div>
 
@@ -31,29 +58,40 @@
 
         <div
           class="quiz-timer"
-          [class.quiz-timer--hidden]="lastQuestionRemainingSeconds === null"
+          *ngIf="lastQuestionRemainingSeconds !== null"
+          [class.quiz-timer--answered-solo]="showSoloAnsweredTimerDim"
         >
           <div
             class="timer-bar timer-bar--noanim"
             [style.width.%]="lastQuestionProgressPct"
           ></div>
           <span class="timer-text"
-            >{{ lastQuestionRemainingSeconds ?? "" }} s</span
+            >{{ lastQuestionRemainingSeconds }} s</span
           >
         </div>
 
-        <div class="quiz-answers">
+        <div
+          class="quiz-answers"
+          [class.quiz-answers--with-media]="hasImageOptions(q.options)"
+          [class.quiz-answers--media-grid-mobile]="shouldUseMobileImageAnswerGrid(q)"
+        >
           <button
-            *ngFor="let o of q.options; let i = index"
+            *ngFor="let o of q.options; let i = index; trackBy: trackByOptionId"
             class="quiz-answer"
             disabled
+            [class.quiz-answer--with-media]="hasOptionImage(o)"
+            [class.quiz-answer--image-only]="isImageOnlyOption(o)"
             [class.selected]="optionState(o.id) === 'selected'"
             [class.correct]="optionState(o.id) === 'correct'"
             [class.wrong]="optionState(o.id) === 'wrong'"
           >
-            <span class="answer-label">{{ optionLabel(i) }}</span>
-            <span class="answer-text" *ngIf="o.text">{{ o.text }}</span>
-            <img class="answer-media__img" *ngIf="o.imageUrl as optUrl" [src]="optUrl" alt="" loading="lazy" />
+            <span class="answer-label">
+              <span class="answer-label__glyph" [attr.data-label]="optionLabel(i)">{{ optionLabel(i) }}</span>
+            </span>
+            <span class="answer-text" *ngIf="hasOptionText(o)">{{ o.text }}</span>
+            <span class="answer-media" *ngIf="hasOptionImage(o)">
+              <img class="answer-media__img" [src]="o.imageUrl" alt="" loading="lazy" />
+            </span>
           </button>
         </div>
       </div>
@@ -62,7 +100,7 @@
     <!-- Between questions overlay (only after brief feedback) -->
     <div class="quiz-question-transition" *ngIf="showRevealTransition">
       <div class="transition-title">
-        Question {{ s.questionIndex }} / {{ s.totalQuestions }}
+        {{ questionProgressLabel(s.questionIndex, s.totalQuestions) }}
       </div>
 
       <div class="transition-progress" *ngIf="questionResults.length">
@@ -79,19 +117,45 @@
         </span>
       </div>
 
-      <div class="transition-sub" *ngIf="remainingSeconds !== null">
+      <!-- <div class="transition-sub" *ngIf="remainingSeconds !== null">
         Next question in <b>{{ remainingSeconds }}s</b>
-      </div>
+      </div> -->
     </div>
 
     <!-- Question -->
-    <div class="quiz-outer" *ngIf="s.stage === 'QUESTION' && s.question as q">
-      <div class="quiz-container">
+    <div class="quiz-outer" *ngIf="s.stage === 'QUESTION' && s.question as q" [class.quiz-outer--no-media]="!q.imageUrl?.trim()">
+      <div
+        class="quiz-container"
+        [class.quiz-container--no-media]="!q.imageUrl?.trim()"
+        [class.quiz-container--with-option-media]="hasImageOptions(q.options)"
+        [class.quiz-container--mobile-media-grid]="shouldUseMobileImageAnswerGrid(q)"
+      >
         <div class="quiz-header quiz-header-full">
-          <div class="quiz-number">{{ s.questionIndex }}</div>
-          <div class="quiz-numberText">Pytanie {{ s.questionIndex }}</div>
+          <div class="quiz-meta">
+            <div class="quiz-progress">{{ questionProgressLabel(s.questionIndex, s.totalQuestions) }}</div>
+            <div class="quiz-hearts" *ngIf="showSoloHearts">
+              <span
+                *ngFor="let slot of heartSlots; trackBy: trackByHeartSlot"
+                class="quiz-heart"
+                [class.is-alive]="slot <= visibleLives"
+                [class.is-empty]="slot > visibleLives"
+                [class.is-lost]="slot === heartLostSlot"
+                aria-hidden="true"
+              >
+                <span class="quiz-heart__icon">&#10084;</span>
+              </span>
+            </div>
+            <button
+              *ngIf="!showSoloHearts && canLeaveTraining"
+              class="btn quiz-meta-action__leave"
+              type="button"
+              [disabled]="endingGame"
+              (click)="leaveTraining()"
+            >
+              {{ endingGame ? 'Leaving...' : 'Leave training' }}
+            </button>
+          </div>
           <div class="quiz-title">{{ q.prompt }}</div>
-
         </div>
 
         <div class="quiz-media" *ngIf="q.imageUrl as imgUrl">
@@ -100,29 +164,51 @@
 
         <div
           class="quiz-timer"
-          [class.quiz-timer--hidden]="remainingSeconds === null"
+          *ngIf="remainingSeconds !== null || showWaitingForPlayersLabel"
+          [class.quiz-timer--waiting]="showWaitingForPlayersLabel"
+          [class.quiz-timer--answered-solo]="showSoloAnsweredTimerDim"
         >
           <div
             class="timer-bar"
             [class.timer-bar--noanim]="timerNoAnim"
             [style.width.%]="progressPct"
           ></div>
-          <span class="timer-text">{{ remainingSeconds ?? "" }} s</span>
+          <span class="timer-text">
+            <ng-container *ngIf="showWaitingForPlayersLabel; else timerValue">
+              <span class="quiz-waiting-label">
+                <span>Waiting for players</span>
+                <span class="quiz-waiting-dots" aria-hidden="true">
+                  <span></span><span></span><span></span>
+                </span>
+              </span>
+            </ng-container>
+            <ng-template #timerValue>{{ remainingSeconds ?? "" }} s</ng-template>
+          </span>
         </div>
 
-        <div class="quiz-answers">
+        <div
+          class="quiz-answers"
+          [class.quiz-answers--with-media]="hasImageOptions(q.options)"
+          [class.quiz-answers--media-grid-mobile]="shouldUseMobileImageAnswerGrid(q)"
+        >
           <button
-            *ngFor="let o of q.options; let i = index"
+            *ngFor="let o of q.options; let i = index; trackBy: trackByOptionId"
             class="quiz-answer"
             [disabled]="!canAnswer"
+            [class.quiz-answer--with-media]="hasOptionImage(o)"
+            [class.quiz-answer--image-only]="isImageOnlyOption(o)"
             [class.selected]="optionState(o.id) === 'selected'"
             [class.correct]="optionState(o.id) === 'correct'"
             [class.wrong]="optionState(o.id) === 'wrong'"
             (click)="answer(o.id)"
           >
-            <span class="answer-label">{{ optionLabel(i) }}</span>
-            <span class="answer-text" *ngIf="o.text">{{ o.text }}</span>
-            <img class="answer-media__img" *ngIf="o.imageUrl as optUrl" [src]="optUrl" alt="" loading="lazy" />
+            <span class="answer-label">
+              <span class="answer-label__glyph" [attr.data-label]="optionLabel(i)">{{ optionLabel(i) }}</span>
+            </span>
+            <span class="answer-text" *ngIf="hasOptionText(o)">{{ o.text }}</span>
+            <span class="answer-media" *ngIf="hasOptionImage(o)">
+              <img class="answer-media__img" [src]="o.imageUrl" alt="" loading="lazy" />
+            </span>
           </button>
         </div>
       </div>
@@ -133,8 +219,8 @@
       <div class="results-panel">
         <div class="results-top">
           <div>
-            <div class="results-title">Game finished</div>
-            <div class="muted">Final scores</div>
+            <div class="results-title">{{ finishedTitle }}</div>
+            <div class="muted">{{ finishedSubtitle }}</div>
           </div>
           <button class="btn primary" (click)="backToLobby()">
             Back to lobby
@@ -168,9 +254,9 @@
                 </span>
                 <span class="name-meta muted">
                   Correct: <b>{{ p.correctAnswers ?? 0 }}</b>
-                  &nbsp;·&nbsp; Time: <b>{{ formatMs(p.totalAnswerTimeMs) }}</b>
+                  &nbsp;&middot;&nbsp; Time: <b>{{ formatMs(p.totalAnswerTimeMs) }}</b>
                   <ng-container *ngIf="p.xpDelta != null || p.rankPointsDelta != null">
-                    &nbsp;·&nbsp;
+                    &nbsp;&middot;&nbsp;
                     <span *ngIf="p.xpDelta != null">+{{ p.xpDelta }} XP</span>
                     <span *ngIf="p.rankPointsDelta != null" class="rp">
                       &nbsp;({{ p.rankPointsDelta >= 0 ? '+' : '' }}{{ p.rankPointsDelta }} RP)
@@ -205,3 +291,4 @@
     </div>
   </ng-template>
 </div>
+

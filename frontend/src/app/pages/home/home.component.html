@@ -484,7 +484,9 @@
                 <div class="leader__title">Leaderboards</div>
                 <div class="leader__sub muted">Top 5 players</div>
               </div>
-              <a class="leader__more muted" routerLink="/leaderboards" aria-label="See more leaderboards">See more</a>
+              <a class="leader__more" routerLink="/leaderboards" aria-label="See more leaderboards">
+                <span>See more</span>
+              </a>
             </header>
 
             <div class="leader__body" aria-label="Top 5 players list">
@@ -508,7 +510,6 @@
                 <div
                   class="leader-row"
                   *ngFor="let p of leaderboardSlots; let i = index"
-                  [style.--accent]="p ? p.rankAccent : null"
                   [class.is-me]="!!p && currentUserId === p.userId"
                   [class.is-empty]="!p"
                 >
@@ -527,9 +528,13 @@
                   </div>
 
                   <ng-container *ngIf="p; else emptyLeaderboardRow">
-                    <div class="leader-row__avatar" [style.background]="avatarGradient(p.userId)" aria-hidden="true">
-                      {{ p.initials }}
-                    </div>
+                    <app-player-avatar
+                      class="leader-row__avatar-icon"
+                      [displayName]="p.displayName"
+                      [isAuthenticated]="true"
+                      [size]="33"
+                      [decorative]="true"
+                    ></app-player-avatar>
 
                     <div class="leader-row__main">
                       <div class="leader-row__nameWrap">

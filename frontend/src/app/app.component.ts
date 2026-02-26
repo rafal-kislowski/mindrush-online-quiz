@@ -9,11 +9,14 @@ import {
 } from '@angular/router';
 import { Subscription, catchError, combineLatest, filter, interval, map, of, startWith, switchMap } from 'rxjs';
 import { AuthService } from './core/auth/auth.service';
+import { GameApi } from './core/api/game.api';
 import { LobbyApi } from './core/api/lobby.api';
+import { ActiveGameDto } from './core/models/game.models';
 import { LobbyDto } from './core/models/lobby.models';
 import { SessionService } from './core/session/session.service';
 import { computeLevelProgress, levelTheme, rankForPoints } from './core/progression/progression';
 import { ParticlesService } from './core/ui/particles.service';
+import { PlayerAvatarComponent } from './core/ui/player-avatar.component';
 import { ToastService } from './core/ui/toast.service';
 import { ToastViewportComponent } from './core/ui/toast-viewport.component';
 import { LobbyEventDto, LobbyEventsService } from './core/ws/lobby-events.service';
@@ -58,7 +61,7 @@ function tintHex(hex: string, amount: number): string {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, AsyncPipe, NgIf, NgFor, RouterLink, RouterLinkActive, ToastViewportComponent],
+  imports: [RouterOutlet, AsyncPipe, NgIf, NgFor, RouterLink, RouterLinkActive, ToastViewportComponent, PlayerAvatarComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
 })
@@ -66,6 +69,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly particlesService = inject(ParticlesService);
   private readonly sessionService = inject(SessionService);
   private readonly authService = inject(AuthService);
+  private readonly gameApi = inject(GameApi);
   private readonly lobbyApi = inject(LobbyApi);
   private readonly lobbyEvents = inject(LobbyEventsService);
   private readonly toast = inject(ToastService);
@@ -123,6 +127,7 @@ export class AppComponent implements OnInit, OnDestroy {
   contentWide = false;
   contentFull = false;
   currentLobby: LobbyDto | null = null;
+  currentGame: ActiveGameDto | null = null;
   private currentLobbyEventsSub: Subscription | null = null;
   private currentLobbyEventsCode: string | null = null;
 
@@ -154,11 +159,13 @@ export class AppComponent implements OnInit, OnDestroy {
           this.sidebarOpen = false;
           this.updateContentFlags(this.router.url);
           this.refreshCurrentLobby();
+          this.refreshCurrentGame();
         })
     );
 
     this.updateContentFlags(this.router.url);
     this.startCurrentLobbyTracking();
+    this.startCurrentGameTracking();
 
     // Prevent sidebar collapse animation flash on initial page load.
     requestAnimationFrame(() => {
@@ -180,6 +187,8 @@ export class AppComponent implements OnInit, OnDestroy {
     this.contentWide = path.startsWith('/create-quiz');
     this.contentFull =
       path === '/' ||
+      path.startsWith('/play-solo') ||
+      path.startsWith('/solo-game') ||
       path.startsWith('/leaderboards') ||
       path.startsWith('/lobbies') ||
       path.startsWith('/lobby') ||
@@ -208,6 +217,7 @@ export class AppComponent implements OnInit, OnDestroy {
   logout(): void {
     this.authService.logout().subscribe(() => {
       this.currentLobby = null;
+      this.currentGame = null;
       this.router.navigate(['/']);
     });
   }
@@ -222,6 +232,23 @@ export class AppComponent implements OnInit, OnDestroy {
         prefetchedLobby: this.currentLobby,
       },
     });
+  }
+
+  openCurrentGame(): void {
+    const current = this.currentGame;
+    if (!current) return;
+
+    const type = String(current.type ?? '').trim().toUpperCase();
+    if (type === 'LOBBY') {
+      const code = String(current.lobbyCode ?? '').trim().toUpperCase();
+      if (!code) return;
+      void this.router.navigate(['/lobby', code, 'game']);
+      return;
+    }
+
+    const gameSessionId = String(current.gameSessionId ?? '').trim();
+    if (!gameSessionId) return;
+    void this.router.navigate(['/solo-game', gameSessionId]);
   }
 
   get currentLobbyPlayerCount(): number {
@@ -253,6 +280,21 @@ export class AppComponent implements OnInit, OnDestroy {
     );
   }
 
+  private startCurrentGameTracking(): void {
+    this.subscriptions.add(
+      interval(5000)
+        .pipe(
+          startWith(0),
+          switchMap(() =>
+            this.gameApi.current().pipe(catchError(() => of(null)))
+          )
+        )
+        .subscribe((game) => {
+          this.currentGame = game;
+        })
+    );
+  }
+
   private refreshCurrentLobby(): void {
     this.lobbyApi
       .getCurrent()
@@ -260,6 +302,15 @@ export class AppComponent implements OnInit, OnDestroy {
       .subscribe((lobby) => {
         this.currentLobby = lobby;
         this.syncCurrentLobbyEventsSubscription(lobby?.code ?? null);
+      });
+  }
+
+  private refreshCurrentGame(): void {
+    this.gameApi
+      .current()
+      .pipe(catchError(() => of(null)))
+      .subscribe((game) => {
+        this.currentGame = game;
       });
   }
 

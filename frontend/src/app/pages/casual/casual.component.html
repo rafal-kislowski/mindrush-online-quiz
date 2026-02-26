@@ -1,0 +1,600 @@
+<section class="page casual-page lobby-page">
+  <div class="frame">
+    <div class="card" aria-label="Casual mode">
+      <svg class="svg-defs" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient
+            id="mrTitleGradCasual"
+            x1="0"
+            y1="0"
+            x2="0"
+            y2="20"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop offset="0" style="stop-color: rgba(255, 205, 77, 0.85)" />
+            <stop offset="1" style="stop-color: rgba(56, 189, 248, 0.85)" />
+          </linearGradient>
+          <symbol id="mrTitleMarkCasual" viewBox="0 0 10 20">
+            <path
+              d="M5 1c2.1 0 3.2 1.6 3.2 3.5v11C8.2 17.4 7.1 19 5 19S1.8 17.4 1.8 15.5v-11C1.8 2.6 2.9 1 5 1Z"
+              fill="url(#mrTitleGradCasual)"
+            />
+          </symbol>
+        </defs>
+      </svg>
+
+      <div class="card__top">
+        <div class="title">
+          <h1>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <line x1="6" x2="10" y1="11" y2="11" />
+              <line x1="8" x2="8" y1="9" y2="13" />
+              <line x1="15" x2="15.01" y1="12" y2="12" />
+              <line x1="18" x2="18.01" y1="10" y2="10" />
+              <path
+                d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"
+              />
+            </svg>
+            Casual Mode
+          </h1>
+        </div>
+
+        <ng-container *ngIf="selectionView === 'picker'; else backToDashboard">
+          <button
+            class="back"
+            type="button"
+            (click)="closePicker()"
+            aria-label="Back to casual"
+          >
+            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+            <span>Back</span>
+          </button>
+        </ng-container>
+        <ng-template #backToDashboard>
+          <a class="back" routerLink="/" aria-label="Back to dashboard">
+            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+            <span>Back</span>
+          </a>
+        </ng-template>
+      </div>
+
+      <section class="active-session" *ngIf="hasActiveSoloGame" aria-label="Unfinished solo game">
+        <div class="active-session__content">
+          <div class="active-session__title">Unfinished {{ activeSoloModeLabel }} session</div>
+          <p class="active-session__hint muted">
+            Resume your current game or close it and start a new one.
+          </p>
+        </div>
+        <div class="active-session__actions">
+          <button
+            class="btn"
+            type="button"
+            [disabled]="starting || activeSoloActionInProgress"
+            (click)="resumeActiveSoloGame()"
+          >
+            Resume
+          </button>
+          <button
+            class="btn warning"
+            type="button"
+            [disabled]="activeSoloActionInProgress"
+            (click)="endActiveSoloGame()"
+          >
+            {{ activeSoloActionInProgress ? 'Closing...' : 'Close current game' }}
+          </button>
+        </div>
+      </section>
+
+      <ng-container *ngIf="selectionView === 'summary'; else pickerScreen">
+        <div
+          class="view-screen"
+          [ngClass]="selectionTransition === 'backward' ? 'view-screen--enter-back' : 'view-screen--enter-forward'"
+        >
+        <section class="top-info" aria-label="Casual info">
+          <h2 class="section-title">
+            <svg class="section-title__mark" aria-hidden="true" focusable="false">
+              <use href="#mrTitleMarkCasual"></use>
+            </svg>
+            No pressure gameplay
+          </h2>
+          <p class="section-hint muted">
+            Choose variant, category and quiz. Each mode starts instantly and opens game immediately.
+          </p>
+        </section>
+
+        <section class="mode-grid" aria-label="Casual variants">
+          <div class="casual-variants" role="tablist" aria-label="Casual variants">
+            <button
+              *ngFor="let mode of modes"
+              class="mode-btn mode-btn--cp casual-variant-card"
+              type="button"
+              role="tab"
+              [ngClass]="[modeAccentClass(mode), activeMode === mode.id ? 'is-active' : '']"
+              [attr.aria-selected]="activeMode === mode.id"
+              (click)="setActiveMode(mode.id)"
+            >
+              <span class="mini__icon" aria-hidden="true">
+                <svg
+                  *ngIf="mode.icon === 'standard'"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polygon
+                    points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+                  />
+                </svg>
+                <svg
+                  *ngIf="mode.icon === 'threeLives'"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M19.5 13.57 12 21l-7.5-7.43a5 5 0 0 1 7.5-6.57 5 5 0 0 1 7.5 6.57z" />
+                </svg>
+                <svg
+                  *ngIf="mode.icon === 'training'"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <circle cx="12" cy="12" r="8" />
+                  <circle cx="12" cy="12" r="2.5" />
+                  <path d="M12 2v2" />
+                  <path d="M12 20v2" />
+                  <path d="M2 12h2" />
+                  <path d="M20 12h2" />
+                </svg>
+              </span>
+              <span class="mini__text">
+                <span class="mini__kicker" aria-hidden="true">&nbsp;</span>
+                <span class="mini__t">{{ mode.title }}</span>
+                <span class="mini__d muted">{{ mode.description }}</span>
+              </span>
+            </button>
+          </div>
+        </section>
+
+        <section class="config-panel" aria-label="Mode configuration">
+          <div class="config-panel__top">
+            <h3>{{ activeModeConfig.title }}</h3>
+            <p class="muted">{{ activeModeConfig.details }}</p>
+          </div>
+
+          <div class="loading" *ngIf="quizzesLoading">Loading casual categories...</div>
+
+          <div class="empty muted" *ngIf="!quizzesLoading && !modeEligibleQuizzes.length">
+            No quizzes are available for this mode.
+          </div>
+
+          <ng-container *ngIf="!quizzesLoading && !!modeEligibleQuizzes.length">
+            <section class="casual-summary" aria-label="Current casual selection">
+              <button
+                class="current-quiz quiz-card current-quiz--clickable"
+                type="button"
+                [class.is-empty]="!selectedQuiz"
+                [class.current-quiz--hintable]="!!selectedQuiz"
+                [class.stat-tile--hintable]="!!selectedQuiz"
+                [class.stat-tile--hintableCover]="!!selectedQuiz"
+                (click)="openPicker()"
+                aria-label="Open category and quiz selection"
+              >
+                <div
+                  class="quiz-card__avatar"
+                  [ngStyle]="selectedQuiz ? quizAvatarStyle(selectedQuiz) : null"
+                >
+                  <span
+                    class="quiz-card__txt"
+                    aria-hidden="true"
+                    *ngIf="selectedQuiz && !selectedQuiz.avatarImageUrl"
+                    >{{ quizInitials(selectedQuiz.title) }}</span
+                  >
+                  <span class="quiz-card__txt" aria-hidden="true" *ngIf="!selectedQuiz">
+                    <svg
+                      class="quiz-card__emptyIcon"
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                      <path d="M12 17h.01" />
+                    </svg>
+                  </span>
+                </div>
+
+                <div class="quiz-card__body">
+                  <div class="quiz-card__title" [attr.title]="categoryCalloutTitle">
+                    {{ categoryCalloutTitle }}
+                  </div>
+                  <div class="quiz-card__meta muted">
+                    <ng-container *ngIf="selectedQuiz as q; else noQuizInSummary">
+                      {{ q.title }}
+                    </ng-container>
+                    <ng-template #noQuizInSummary>
+                      Click to open casual game selection.
+                    </ng-template>
+                  </div>
+                </div>
+                <div class="stat-tile__hint" aria-hidden="true" *ngIf="selectedQuiz">
+                  <div class="stat-tile__hintTitle">Change quiz</div>
+                  <div class="stat-tile__hintSub">
+                    Click to open selection and pick another quiz.
+                  </div>
+                </div>
+              </button>
+            </section>
+
+            <div class="lobby-startbar casual-startbar casual-startbar--summary">
+              <button
+                class="btn success owner-startwide"
+                [class.is-active]="canStartMode"
+                type="button"
+                [disabled]="!canStartMode || activeSoloActionInProgress"
+                (click)="startMode()"
+              >
+                <span class="owner-startwide__content">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <polygon points="6 3 20 12 6 21 6 3" />
+                  </svg>
+                  {{
+                    starting
+                      ? 'Starting...'
+                      : hasActiveSoloGame
+                        ? ('Close current and start ' + activeModeConfig.title)
+                        : ('Start ' + activeModeConfig.title)
+                  }}
+                </span>
+              </button>
+            </div>
+          </ng-container>
+        </section>
+        </div>
+      </ng-container>
+
+      <ng-template #pickerScreen>
+        <div
+          class="view-screen"
+          [ngClass]="selectionTransition === 'backward' ? 'view-screen--enter-back' : 'view-screen--enter-forward'"
+        >
+        <section class="top-info" aria-label="Casual game selection info">
+          <h2 class="section-title">
+            <svg class="section-title__mark" aria-hidden="true" focusable="false">
+              <use href="#mrTitleMarkCasual"></use>
+            </svg>
+            Casual game selection
+          </h2>
+          <p class="section-hint muted">
+            Choose a quiz for casual game. Use filters to narrow results.
+          </p>
+        </section>
+
+        <section class="config-panel config-panel--picker" aria-label="Casual picker">
+          <div class="loading" *ngIf="quizzesLoading">Loading casual categories...</div>
+
+          <div class="empty muted" *ngIf="!quizzesLoading && !modeEligibleQuizzes.length">
+            No quizzes are available for this mode.
+          </div>
+
+          <ng-container *ngIf="!quizzesLoading && !!modeEligibleQuizzes.length">
+            <div class="picker-shell">
+              <section class="picker-panel">
+                <div class="picker-head">
+                  <div class="picker-head__controls picker-head__controls--single">
+                    <div
+                      class="segmented segmented--3 picker-sources"
+                      role="tablist"
+                      aria-label="Quiz sources"
+                    >
+                      <button
+                        class="segmented__btn"
+                        type="button"
+                        role="tab"
+                        [class.active]="pickerScope === 'official'"
+                        [attr.aria-selected]="pickerScope === 'official'"
+                        (click)="setPickerScope('official')"
+                      >
+                        <span class="segmented__icon" aria-hidden="true">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                          >
+                            <path
+                              d="M12 2l7 4v6c0 5-3 9-7 10-4-1-7-5-7-10V6l7-4z"
+                            />
+                            <path d="m9 12 2 2 4-5" />
+                          </svg>
+                        </span>
+                        Official
+                      </button>
+                      <button
+                        class="segmented__btn"
+                        type="button"
+                        role="tab"
+                        [class.active]="pickerScope === 'custom'"
+                        [attr.aria-selected]="pickerScope === 'custom'"
+                        (click)="setPickerScope('custom')"
+                      >
+                        <span class="segmented__icon" aria-hidden="true">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                          >
+                            <path
+                              d="M12 3l1.2 3.8L17 8l-3.8 1.2L12 13l-1.2-3.8L7 8l3.8-1.2L12 3z"
+                            />
+                            <path
+                              d="M5 12l.8 2.4L8 15l-2.2.6L5 18l-.8-2.4L2 15l2.2-.6L5 12z"
+                            />
+                            <path
+                              d="M19 12l.8 2.4L22 15l-2.2.6L19 18l-.8-2.4L16 15l2.2-.6L19 12z"
+                            />
+                          </svg>
+                        </span>
+                        Custom
+                      </button>
+                      <button
+                        class="segmented__btn"
+                        type="button"
+                        role="tab"
+                        [class.active]="pickerScope === 'library'"
+                        [attr.aria-selected]="pickerScope === 'library'"
+                        (click)="setPickerScope('library')"
+                      >
+                        <span class="segmented__icon" aria-hidden="true">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                          >
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                            <path
+                              d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"
+                            />
+                          </svg>
+                        </span>
+                        Library
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="picker-filters" aria-label="Quiz filters">
+                  <input
+                    class="picker-filters__search"
+                    [(ngModel)]="quizSearch"
+                    (ngModelChange)="onQuizSearchChange()"
+                    placeholder="Search quizzes..."
+                    aria-label="Search quizzes"
+                  />
+
+                  <div class="mr-select-wrap mr-multi" aria-label="Category filter">
+                    <button
+                      class="mr-select"
+                      type="button"
+                      (click)="toggleCategoryMenu()"
+                      [attr.aria-expanded]="categoryMenuOpen"
+                      aria-label="Category filter"
+                    >
+                      <span class="mr-select__left">
+                        <span class="mr-select__icon" aria-hidden="true">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                          >
+                            <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z" />
+                          </svg>
+                        </span>
+                        <span class="mr-select__value">{{ categorySelectedLabel }}</span>
+                      </span>
+                      <span class="mr-select__caret" aria-hidden="true"></span>
+                    </button>
+
+                    <div class="mr-select__menu" *ngIf="categoryMenuOpen">
+                      <div class="mr-select__search">
+                        <input
+                          [(ngModel)]="categoryMenuSearch"
+                          placeholder="Search categories..."
+                          aria-label="Search categories"
+                        />
+                      </div>
+
+                      <button
+                        class="mr-select__item"
+                        type="button"
+                        (click)="clearCategories()"
+                        [class.active]="!categorySelected.length"
+                      >
+                        All categories
+                      </button>
+
+                      <button
+                        class="mr-multi__item"
+                        type="button"
+                        *ngFor="let c of categoryMenuItemsFiltered"
+                        (click)="toggleCategory(c)"
+                        [class.active]="isCategorySelected(c)"
+                      >
+                        <span class="mr-multi__label">{{ c }}</span>
+                        <span
+                          class="mr-multi__mark"
+                          aria-hidden="true"
+                          [class.is-on]="isCategorySelected(c)"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2.5"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                          >
+                            <path d="M20 6 9 17l-5-5" />
+                          </svg>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="mr-select-wrap picker-sort" aria-label="Sort">
+                    <button
+                      type="button"
+                      class="mr-select mr-select--purple"
+                      (click)="toggleSortMenu()"
+                      [attr.aria-expanded]="sortMenuOpen"
+                      aria-label="Sort"
+                    >
+                      <span class="mr-select__left">
+                        <span class="mr-select__icon" aria-hidden="true">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                          >
+                            <path d="M3 6h12" />
+                            <path d="M3 12h9" />
+                            <path d="M3 18h6" />
+                            <path d="M18 6v14" />
+                            <path d="m21 17-3 3-3-3" />
+                          </svg>
+                        </span>
+                        <span class="mr-select__value">{{ pickerSortLabel }}</span>
+                      </span>
+                      <span class="mr-select__caret" aria-hidden="true"></span>
+                    </button>
+
+                    <div class="mr-select__menu" *ngIf="sortMenuOpen">
+                      <button
+                        class="mr-select__item"
+                        type="button"
+                        (click)="selectSort('az')"
+                        [class.active]="pickerSort === 'az'"
+                      >
+                        Name A-Z
+                      </button>
+                      <button
+                        class="mr-select__item"
+                        type="button"
+                        (click)="selectSort('za')"
+                        [class.active]="pickerSort === 'za'"
+                      >
+                        Name Z-A
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="picker-list" role="region" aria-label="Quiz list">
+                  <div class="quiz-grid quiz-grid--picker">
+                    <button
+                      class="quiz-card"
+                      *ngFor="let q of filteredQuizzes"
+                      type="button"
+                      [class.active]="selectedQuizId === q.id"
+                      (click)="selectQuiz(q.id)"
+                      [disabled]="starting"
+                    >
+                      <div class="quiz-card__avatar" [ngStyle]="quizAvatarStyle(q)">
+                        <span
+                          class="quiz-card__txt"
+                          aria-hidden="true"
+                          *ngIf="!q.avatarImageUrl"
+                          >{{ quizInitials(q.title) }}</span
+                        >
+                      </div>
+                      <div class="quiz-card__body">
+                        <div class="quiz-card__title" [attr.title]="q.title" #quizTitle>
+                          <span class="quiz-card__titleMarquee">
+                            <span class="quiz-card__titleOnce">{{ q.title }}</span>
+                            <span class="quiz-card__titleGap" aria-hidden="true"></span>
+                            <span class="quiz-card__titleOnce" aria-hidden="true">{{
+                              q.title
+                            }}</span>
+                          </span>
+                        </div>
+                        <div class="quiz-card__meta muted">
+                          {{ q.categoryName ?? "Uncategorized" }}
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+
+                  <div class="muted picker-empty" *ngIf="!filteredQuizzes.length">
+                    No quizzes match your filters.
+                  </div>
+                </div>
+              </section>
+            </div>
+          </ng-container>
+        </section>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+</section>

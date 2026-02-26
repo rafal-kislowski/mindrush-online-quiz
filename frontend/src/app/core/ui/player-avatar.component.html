@@ -1,0 +1,25 @@
+<span
+  class="mr-avatar"
+  [class.mr-avatar--auth]="isAuthenticated"
+  [class.mr-avatar--guest]="!isAuthenticated"
+  [style.--mr-avatar-size.px]="size"
+  [attr.aria-hidden]="decorative ? 'true' : null"
+  [attr.role]="decorative ? null : 'img'"
+  [attr.aria-label]="decorative ? null : resolvedLabel"
+>
+  <span class="mr-avatar__initials" *ngIf="isAuthenticated; else guestIcon">
+    {{ initials }}
+  </span>
+
+  <ng-template #guestIcon>
+    <svg
+      class="mr-avatar__guest-icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle cx="12" cy="8.2" r="3.8"></circle>
+      <path d="M4.6 20c0-3.8 3.2-6.8 7.4-6.8s7.4 3 7.4 6.8"></path>
+    </svg>
+  </ng-template>
+</span>

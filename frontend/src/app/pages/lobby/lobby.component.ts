@@ -22,6 +22,7 @@ import { LobbyDto, LobbyPlayerDto } from '../../core/models/lobby.models';
 import { QuizListItemDto } from '../../core/models/quiz.models';
 import { AuthService } from '../../core/auth/auth.service';
 import { SessionService } from '../../core/session/session.service';
+import { PlayerAvatarComponent } from '../../core/ui/player-avatar.component';
 import { ToastService } from '../../core/ui/toast.service';
 import { GameEventsService } from '../../core/ws/game-events.service';
 import { LobbyChatMessageDto, LobbyChatService } from '../../core/ws/lobby-chat.service';
@@ -31,7 +32,7 @@ import { StompClientService } from '../../core/ws/stomp-client.service';
 @Component({
   selector: 'app-lobby',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, PlayerAvatarComponent],
   templateUrl: './lobby.component.html',
   styleUrl: './lobby.component.scss',
 })
@@ -99,6 +100,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   private autoJoinInFlight = false;
   private autoJoinFailed = false;
   private autoJoinBlocked = false;
+  private joinConflictResolving = false;
   private intentionalLeaveInProgress = false;
   private lastForegroundSyncAt = 0;
   private scrollLockY: number | null = null;
@@ -145,6 +147,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
 
   codeCopied = false;
   private codeCopiedTimeout: number | null = null;
+  hasViewSwitched = false;
   private readonly minJoinTransitionMs = 1500;
   private readonly joinDelayTimers = new Set<number>();
   private destroyed = false;
@@ -156,7 +159,11 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   private quizzesReady = false;
 
   get joinBusy(): boolean {
-    return this.joinRequestInFlight || this.autoJoinInFlight;
+    return (
+      this.joinRequestInFlight ||
+      this.autoJoinInFlight ||
+      this.joinConflictResolving
+    );
   }
 
   get roomTransitionBusy(): boolean {
@@ -638,12 +645,18 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
         });
       },
       error: (err) => {
+        const message = apiErrorMessage(err, 'Failed to join lobby');
         this.runAfterMinimumJoinTransition(startedAt, () => {
           this.autoJoinInFlight = false;
-          this.autoJoinFailed = true;
           if (err?.status === 409) {
-            this.joinState = 'viewOnly';
+            this.joinConflictResolving = true;
+            this.handleJoinError(err, message, true, () => {
+              this.joinConflictResolving = false;
+            });
+            return;
           }
+          this.autoJoinFailed = true;
+          this.handleJoinError(err, message);
         });
       },
     });
@@ -812,9 +825,13 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
             this.clearJoinPinInput(true);
           }
           if (err?.status === 409) {
-            this.joinState = 'viewOnly';
+            this.joinConflictResolving = true;
+            this.handleJoinError(err, message, false, () => {
+              this.joinConflictResolving = false;
+            });
+            return;
           }
-          this.error = message;
+          this.handleJoinError(err, message, false);
         });
       },
     });
@@ -908,6 +925,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   openQuizSelection(): void {
     if (!this.lobby?.isOwner) return;
     this.cancelPrivacyPinEdit();
+    this.hasViewSwitched = true;
     this.view = 'picker';
     this.categoryMenuOpen = false;
     this.categoryMenuSearch = '';
@@ -922,6 +940,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   closeQuizSelection(): void {
+    this.hasViewSwitched = true;
     this.view = 'lobby';
     this.categoryMenuOpen = false;
     this.categoryMenuSearch = '';
@@ -1045,23 +1064,10 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  playerInitials(displayName: string): string {
-    const cleaned = (displayName ?? '').trim();
-    if (!cleaned) return '?';
-    const parts = cleaned.split(/\s+/g).filter(Boolean);
-    const first = parts[0]?.[0] ?? cleaned[0] ?? '?';
-    const second = parts.length > 1 ? parts[1]?.[0] : cleaned[1];
-    const txt = (first + (second ?? '')).toUpperCase();
-    return txt.slice(0, 2);
-  }
-
-  playerAvatarStyle(displayName: string): { [key: string]: string } {
-    const seed = this.hashString(displayName ?? '');
-    const hue = seed % 360;
-    const bg = `hsl(${hue} 68% 52%)`;
-    return {
-      background: bg,
-    };
+  isAuthenticatedLobbyPlayer(player: LobbyPlayerDto): boolean {
+    if (player?.isAuthenticated != null) return player.isAuthenticated;
+    if (player?.isYou) return this.isLoggedIn;
+    return false;
   }
 
   canManagePlayer(player: LobbyPlayerDto): boolean {
@@ -1146,15 +1152,6 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     if (typeof raw !== 'number' || !Number.isFinite(raw)) return null;
     const value = Math.floor(raw);
     return value > 0 ? value : null;
-  }
-
-  private hashString(value: string): number {
-    let h = 2166136261;
-    for (let i = 0; i < value.length; i++) {
-      h ^= value.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return Math.abs(h);
   }
 
   setPickerScope(scope: 'official' | 'custom' | 'library'): void {
@@ -1549,6 +1546,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.autoJoinInFlight = false;
     this.autoJoinFailed = false;
     this.autoJoinBlocked = false;
+    this.joinConflictResolving = false;
     this.intentionalLeaveInProgress = false;
     this.joinPinDigits = ['', '', '', ''];
     this.joinPinActiveIndex = 0;
@@ -1613,6 +1611,121 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!raw) return '';
     const noHash = raw.split('#')[0] ?? '';
     return noHash.split('?')[0] ?? '';
+  }
+
+  private handleJoinError(
+    err: unknown,
+    message: string,
+    fromAutoJoin = false,
+    onSettled?: () => void
+  ): void {
+    if ((err as { status?: number } | null)?.status !== 409) {
+      this.error = message;
+      onSettled?.();
+      return;
+    }
+
+    this.lobbyApi.getCurrent().subscribe({
+      next: (currentLobby) => {
+        const currentCode = (currentLobby?.code ?? '').trim().toUpperCase();
+        if (currentCode && currentCode !== this.code) {
+          this.autoJoinBlocked = true;
+          this.notifyMustLeaveCurrentLobby(currentCode);
+          this.openLobbyInstant(currentCode, currentLobby, onSettled);
+          return;
+        }
+
+        if (currentCode && currentCode === this.code && currentLobby) {
+          this.onLobbyUpdate(currentLobby);
+          onSettled?.();
+          return;
+        }
+
+        this.applyJoinConflictFallback(message, fromAutoJoin);
+        onSettled?.();
+      },
+      error: () => {
+        this.applyJoinConflictFallback(message, fromAutoJoin);
+        onSettled?.();
+      },
+    });
+  }
+
+  private applyJoinConflictFallback(
+    message: string,
+    fromAutoJoin: boolean
+  ): void {
+    if (this.shouldShowViewOnlyState(message)) {
+      this.joinState = 'viewOnly';
+      this.error = null;
+      return;
+    }
+
+    this.autoJoinBlocked = true;
+    this.joinState = 'unknown';
+    if (fromAutoJoin) {
+      this.autoJoinFailed = true;
+    }
+    this.error = message;
+  }
+
+  private shouldShowViewOnlyState(message: string): boolean {
+    const lobby = this.lobby;
+    if (lobby?.status && lobby.status !== 'OPEN') return true;
+    if (
+      lobby?.players &&
+      lobby?.maxPlayers &&
+      lobby.players.length >= lobby.maxPlayers
+    ) {
+      return true;
+    }
+
+    const normalized = (message ?? '').trim().toLowerCase();
+    if (!normalized) return false;
+    return (
+      normalized.includes('full') ||
+      normalized.includes('closed') ||
+      normalized.includes('not open') ||
+      normalized.includes('not joinable')
+    );
+  }
+
+  private openLobbyInstant(
+    code: string,
+    prefetchedLobby?: LobbyDto | null,
+    onFailed?: () => void
+  ): void {
+    const targetCode = (code ?? '').trim().toUpperCase();
+    if (!targetCode) return;
+
+    const state: Record<string, unknown> = {
+      suppressInitialLobbyOverlay: true,
+      lobbyCode: targetCode,
+    };
+    if (
+      prefetchedLobby &&
+      (prefetchedLobby.code ?? '').trim().toUpperCase() === targetCode
+    ) {
+      state['prefetchedLobby'] = prefetchedLobby;
+    }
+
+    void this.router
+      .navigate(['/lobby', targetCode], { state })
+      .then((ok) => {
+        if (ok) return;
+        onFailed?.();
+      })
+      .catch(() => onFailed?.());
+  }
+
+  private notifyMustLeaveCurrentLobby(currentCode: string): void {
+    this.toast.warning(
+      `You are already in lobby ${currentCode}. Leave your current lobby before joining another one.`,
+      {
+        title: 'Lobby',
+        dedupeKey: `lobby:lobby-switch-blocked:${currentCode}`,
+      }
+    );
   }
 
   private runAfterMinimumJoinTransition(

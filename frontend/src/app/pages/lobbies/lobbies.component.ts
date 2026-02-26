@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { apiErrorMessage } from '../../core/api/api-error.util';
@@ -9,6 +9,7 @@ import { ToastService } from '../../core/ui/toast.service';
 
 type LobbySort = 'newest' | 'oldest' | 'playersDesc' | 'playersAsc';
 type LobbyRoomFilter = 'all' | 'private' | 'public' | 'available' | 'full';
+type LobbiesMenuId = 'roomFilter' | 'sort' | 'pageSize';
 
 @Component({
   selector: 'app-lobbies',
@@ -38,8 +39,26 @@ export class LobbiesComponent implements OnInit, OnDestroy {
   pageSize: 10 | 25 | 50 = 10;
 
   ownerFilter: LobbyOwnerType = 'GUEST';
+  openMenu: LobbiesMenuId | null = null;
 
   joiningCode: string | null = null;
+
+  readonly roomFilterOptions: ReadonlyArray<{ value: LobbyRoomFilter; label: string }> = [
+    { value: 'all', label: 'All rooms' },
+    { value: 'available', label: 'Free spots' },
+    { value: 'private', label: 'Private rooms' },
+    { value: 'public', label: 'Public rooms' },
+    { value: 'full', label: 'Full rooms' },
+  ];
+
+  readonly sortOptions: ReadonlyArray<{ value: LobbySort; label: string }> = [
+    { value: 'newest', label: 'Newest' },
+    { value: 'oldest', label: 'Oldest' },
+    { value: 'playersDesc', label: 'Players desc' },
+    { value: 'playersAsc', label: 'Players asc' },
+  ];
+
+  readonly pageSizeOptions: ReadonlyArray<10 | 25 | 50> = [10, 25, 50];
 
   constructor(
     private readonly lobbyApi: LobbyApi,
@@ -83,9 +102,13 @@ export class LobbiesComponent implements OnInit, OnDestroy {
   }
 
   setSort(value: LobbySort): void {
-    if (this.sort === value) return;
+    if (this.sort === value) {
+      this.closeMenus();
+      return;
+    }
     this.sort = value;
     this.page = 1;
+    this.closeMenus();
   }
 
   setOwnerFilter(type: LobbyOwnerType): void {
@@ -95,9 +118,13 @@ export class LobbiesComponent implements OnInit, OnDestroy {
   }
 
   setRoomFilter(value: LobbyRoomFilter): void {
-    if (this.roomFilter === value) return;
+    if (this.roomFilter === value) {
+      this.closeMenus();
+      return;
+    }
     this.roomFilter = value;
     this.page = 1;
+    this.closeMenus();
   }
 
   onSearchTermChange(value: string): void {
@@ -184,6 +211,46 @@ export class LobbiesComponent implements OnInit, OnDestroy {
     if (n !== 10 && n !== 25 && n !== 50) return;
     this.pageSize = n;
     this.page = 1;
+    this.closeMenus();
+  }
+
+  setPageSize(size: 10 | 25 | 50): void {
+    if (this.pageSize === size) {
+      this.closeMenus();
+      return;
+    }
+    this.pageSize = size;
+    this.page = 1;
+    this.closeMenus();
+  }
+
+  toggleMenu(menu: LobbiesMenuId, ev?: Event): void {
+    ev?.stopPropagation();
+    this.openMenu = this.openMenu === menu ? null : menu;
+  }
+
+  closeMenus(): void {
+    this.openMenu = null;
+  }
+
+  get roomFilterLabel(): string {
+    return this.roomFilterOptions.find((o) => o.value === this.roomFilter)?.label ?? 'All rooms';
+  }
+
+  get sortLabel(): string {
+    return this.sortOptions.find((o) => o.value === this.sort)?.label ?? 'Newest';
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(ev: MouseEvent): void {
+    const target = ev.target as HTMLElement | null;
+    if (target?.closest('.mr-select-wrap')) return;
+    this.closeMenus();
+  }
+
+  @HostListener('document:keydown.escape')
+  onDocumentEscape(): void {
+    this.closeMenus();
   }
 
   trackByCode(_: number, row: ActiveLobbyDto): string {

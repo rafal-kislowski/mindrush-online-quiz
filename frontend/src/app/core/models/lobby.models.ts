@@ -1,6 +1,7 @@
 export interface LobbyPlayerDto {
   participantId?: number;
   displayName: string;
+  isAuthenticated?: boolean;
   joinedAt: string;
   ready?: boolean;
   away?: boolean;
