@@ -8,6 +8,7 @@ import org.springframework.web.server.ResponseStatusException;
 import pl.mindrush.backend.guest.GuestSession;
 import pl.mindrush.backend.guest.GuestSessionRepository;
 import pl.mindrush.backend.guest.GuestSessionService;
+import pl.mindrush.backend.game.GameSession;
 import pl.mindrush.backend.game.GameService;
 import pl.mindrush.backend.lobby.chat.LobbySystemMessageService;
 import pl.mindrush.backend.lobby.events.LobbyEventPublisher;
@@ -100,6 +101,7 @@ public class LobbyService {
             }
             return lobbySummary(lobby, guestSession.getId());
         }
+        ensureNoActiveGameForGuestSession(guestSession.getId(), "create a lobby");
 
         Instant now = Instant.now();
 
@@ -275,6 +277,7 @@ public class LobbyService {
         if (existingJoinedLobby.isPresent() && !existingJoinedLobby.get().getId().equals(lobby.getId())) {
             throw new ResponseStatusException(CONFLICT, "You are already in active lobby " + existingJoinedLobby.get().getCode());
         }
+        ensureNoActiveGameForGuestSession(guestSession.getId(), "join a lobby");
 
         if (lobby.getStatus() != LobbyStatus.OPEN) {
             throw new ResponseStatusException(CONFLICT, "Lobby is closed");
@@ -677,6 +680,16 @@ public class LobbyService {
                 .map(LobbyParticipant::getLobby)
                 .filter(l -> l != null)
                 .findFirst();
+    }
+
+    private void ensureNoActiveGameForGuestSession(String guestSessionId, String actionLabel) {
+        Optional<GameSession> activeGame = gameService.findActiveGameSessionForGuestSession(guestSessionId);
+        if (activeGame.isEmpty()) return;
+
+        throw new ResponseStatusException(
+                CONFLICT,
+                "You already have an active game in progress. Finish it before you " + actionLabel + "."
+        );
     }
 
     private void maybeStartGameWhenAllPlayersReady(Lobby lobby) {

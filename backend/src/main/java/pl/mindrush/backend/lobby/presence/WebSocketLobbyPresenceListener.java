@@ -9,6 +9,7 @@ import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 import org.springframework.web.socket.messaging.SessionUnsubscribeEvent;
 import pl.mindrush.backend.lobby.LobbyService;
+import pl.mindrush.backend.lobby.events.LobbyEventPublisher;
 
 import java.security.Principal;
 import java.time.Duration;
@@ -21,16 +22,19 @@ public class WebSocketLobbyPresenceListener {
 
     private final LobbyService lobbyService;
     private final LobbyRealtimePresenceService realtimePresenceService;
+    private final LobbyEventPublisher lobbyEventPublisher;
     private final Duration reconnectGrace;
     private final ConcurrentHashMap<String, PendingDisconnectRemoval> pendingDisconnectRemovals = new ConcurrentHashMap<>();
 
     public WebSocketLobbyPresenceListener(
             LobbyService lobbyService,
             LobbyRealtimePresenceService realtimePresenceService,
+            LobbyEventPublisher lobbyEventPublisher,
             @Value("${lobby.presence.reconnect-grace:PT45S}") Duration reconnectGrace
     ) {
         this.lobbyService = lobbyService;
         this.realtimePresenceService = realtimePresenceService;
+        this.lobbyEventPublisher = lobbyEventPublisher;
         this.reconnectGrace = reconnectGrace;
     }
 
@@ -47,6 +51,9 @@ public class WebSocketLobbyPresenceListener {
                 .onSubscribe(sessionId, subscriptionId, user.getName(), destination);
         if (tracked == null) return;
         cancelPendingRemoval(user.getName(), tracked.lobbyCode());
+        if (tracked.lobbyViewTracked()) {
+            lobbyEventPublisher.lobbyUpdated(tracked.lobbyCode());
+        }
     }
 
     @EventListener
@@ -55,7 +62,11 @@ public class WebSocketLobbyPresenceListener {
         String sessionId = accessor.getSessionId();
         String subscriptionId = accessor.getSubscriptionId();
         if (sessionId == null || subscriptionId == null) return;
-        realtimePresenceService.onUnsubscribe(sessionId, subscriptionId);
+        LobbyRealtimePresenceService.TrackedSubscription removed =
+                realtimePresenceService.onUnsubscribe(sessionId, subscriptionId);
+        if (removed != null && removed.lobbyViewTracked()) {
+            lobbyEventPublisher.lobbyUpdated(removed.lobbyCode());
+        }
     }
 
     @EventListener
@@ -70,6 +81,7 @@ public class WebSocketLobbyPresenceListener {
 
         for (String lobbyCode : presence.lobbyCodes()) {
             schedulePendingRemoval(presence.guestSessionId(), lobbyCode);
+            lobbyEventPublisher.lobbyUpdated(lobbyCode);
         }
     }
 

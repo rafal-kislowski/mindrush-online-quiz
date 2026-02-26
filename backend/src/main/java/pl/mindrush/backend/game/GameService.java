@@ -7,10 +7,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import pl.mindrush.backend.AppUserRepository;
+import pl.mindrush.backend.casual.CasualThreeLivesRecordService;
 import pl.mindrush.backend.game.dto.GameOptionDto;
 import pl.mindrush.backend.game.dto.GamePlayerDto;
 import pl.mindrush.backend.game.dto.GameQuestionDto;
 import pl.mindrush.backend.game.dto.GameStateDto;
+import pl.mindrush.backend.game.dto.ActiveGameDto;
 import pl.mindrush.backend.game.events.GameEventPublisher;
 import pl.mindrush.backend.guest.GuestSession;
 import pl.mindrush.backend.guest.GuestSessionRepository;
@@ -30,11 +32,21 @@ import static org.springframework.http.HttpStatus.*;
 @Transactional
 public class GameService {
 
+    private static final int THREE_LIVES_MAX_WRONG = 3;
+    private static final String SOLO_SESSION_LOBBY_ID_PREFIX = "SOLO";
+    private static final List<LobbyStatus> ACTIVE_LOBBY_STATUSES = List.of(LobbyStatus.OPEN, LobbyStatus.IN_GAME);
+    // Training mode has no per-question timer, but DB schema may require non-null stage_ends_at.
+    // Keep a far-future placeholder in persistence and hide it in API responses.
+    private static final Duration NO_TIMER_STAGE_ENDS_AT_PLACEHOLDER = Duration.ofDays(365);
+    private static final Duration DEFAULT_TRAINING_INACTIVITY_TIMEOUT = Duration.ofHours(2);
+    private static final Duration TRAINING_ACTIVITY_TOUCH_DEBOUNCE = Duration.ofSeconds(10);
+
     private final Clock clock;
     private final Duration guestQuestionDuration;
     private final Duration revealDuration;
     private final Duration preCountdownDuration;
     private final Duration finalRevealDuration;
+    private final Duration trainingInactivityTimeout;
 
     private final GuestSessionService guestSessionService;
     private final LobbyRepository lobbyRepository;
@@ -49,6 +61,7 @@ public class GameService {
     private final GuestSessionRepository guestSessionRepository;
     private final AppUserRepository appUserRepository;
     private final LobbySystemMessageService lobbySystemMessageService;
+    private final CasualThreeLivesRecordService casualThreeLivesRecordService;
 
     public GameService(
             Clock clock,
@@ -56,6 +69,7 @@ public class GameService {
             @Value("${game.guest.reveal-duration:PT3S}") Duration revealDuration,
             @Value("${game.guest.pre-countdown-duration:PT4S}") Duration preCountdownDuration,
             @Value("${game.guest.final-reveal-duration:PT2S}") Duration finalRevealDuration,
+            @Value("${game.training.inactivity-timeout:PT2H}") Duration trainingInactivityTimeout,
             GuestSessionService guestSessionService,
             LobbyRepository lobbyRepository,
             LobbyParticipantRepository participantRepository,
@@ -68,13 +82,15 @@ public class GameService {
             GameEventPublisher gameEventPublisher,
             GuestSessionRepository guestSessionRepository,
             AppUserRepository appUserRepository,
-            LobbySystemMessageService lobbySystemMessageService
+            LobbySystemMessageService lobbySystemMessageService,
+            CasualThreeLivesRecordService casualThreeLivesRecordService
     ) {
         this.clock = clock;
         this.guestQuestionDuration = guestQuestionDuration;
         this.revealDuration = revealDuration;
         this.preCountdownDuration = preCountdownDuration;
         this.finalRevealDuration = finalRevealDuration;
+        this.trainingInactivityTimeout = normalizeTrainingInactivityTimeout(trainingInactivityTimeout);
         this.guestSessionService = guestSessionService;
         this.lobbyRepository = lobbyRepository;
         this.participantRepository = participantRepository;
@@ -88,6 +104,14 @@ public class GameService {
         this.guestSessionRepository = guestSessionRepository;
         this.appUserRepository = appUserRepository;
         this.lobbySystemMessageService = lobbySystemMessageService;
+        this.casualThreeLivesRecordService = casualThreeLivesRecordService;
+    }
+
+    private Duration normalizeTrainingInactivityTimeout(Duration raw) {
+        if (raw == null || raw.isNegative() || raw.isZero()) {
+            return DEFAULT_TRAINING_INACTIVITY_TIMEOUT;
+        }
+        return raw;
     }
 
     private long questionDurationMs() {
@@ -96,9 +120,26 @@ public class GameService {
     }
 
     private long questionDurationMs(GameSession session) {
+        if (!hasQuestionTimer(session)) return 0L;
         Integer ms = session.getQuestionDurationMs();
         if (ms == null) return questionDurationMs();
         return ms <= 0 ? questionDurationMs() : ms;
+    }
+
+    private GameSessionMode sessionMode(GameSession session) {
+        return session == null ? GameSessionMode.STANDARD : session.getMode();
+    }
+
+    private boolean isThreeLives(GameSession session) {
+        return sessionMode(session) == GameSessionMode.THREE_LIVES;
+    }
+
+    private boolean isTraining(GameSession session) {
+        return sessionMode(session) == GameSessionMode.TRAINING;
+    }
+
+    private boolean hasQuestionTimer(GameSession session) {
+        return !isTraining(session);
     }
 
     private int clampInt(long v, int min, int max) {
@@ -108,6 +149,8 @@ public class GameService {
     }
 
     private int computeAnswerTimeMs(GameSession session, Instant answeredAt) {
+        if (!hasQuestionTimer(session)) return 0;
+
         if (session.getStage() != GameStage.QUESTION || session.getStageEndsAt() == null) {
             return (int) questionDurationMs(session);
         }
@@ -155,10 +198,12 @@ public class GameService {
         return seed;
     }
 
-    public GameStateDto startGame(HttpServletRequest request, String lobbyCode, Long quizId) {
+    public GameStateDto startGame(HttpServletRequest request, String lobbyCode, Long quizId, GameSessionMode mode) {
         if (quizId == null) {
             throw new ResponseStatusException(CONFLICT, "quizId is required");
         }
+
+        GameSessionMode requestedMode = mode == null ? GameSessionMode.STANDARD : mode;
 
         GuestSession guestSession = guestSessionService.requireValidSession(request);
         Lobby lobby = requireLobbyByCode(lobbyCode);
@@ -181,12 +226,69 @@ public class GameService {
             throw new ResponseStatusException(CONFLICT, "Quiz has no questions");
         }
 
+        if (requestedMode != GameSessionMode.STANDARD) {
+            long playersCount = participantRepository.countByLobbyId(lobby.getId());
+            if (playersCount != 1) {
+                throw new ResponseStatusException(CONFLICT, "This mode is available only for solo lobbies");
+            }
+        }
+
+        if (requestedMode == GameSessionMode.THREE_LIVES && quiz.getCategory() == null) {
+            throw new ResponseStatusException(CONFLICT, "Selected quiz has no category");
+        }
+
+        Optional<GameSession> ownerActive = findActiveGameSessionForGuestSession(guestSession.getId());
+        if (ownerActive.isPresent() && !Objects.equals(ownerActive.get().getLobbyId(), lobby.getId())) {
+            throw new ResponseStatusException(CONFLICT, "You already have an active game in progress. Finish it before starting another one.");
+        }
+
         Optional<GameSession> existing = gameSessionRepository.findFirstByLobbyIdAndStatusOrderByStartedAtDesc(lobby.getId(), GameStatus.IN_PROGRESS);
         if (existing.isPresent()) {
             throw new ResponseStatusException(CONFLICT, "Game is already in progress");
         }
 
-        return startGameInternal(lobby, quiz, guestSession.getId());
+        return startGameInternal(lobby, quiz, requestedMode, guestSession.getId());
+    }
+
+    public GameStateDto startSoloGame(HttpServletRequest request, Long quizId, GameSessionMode mode) {
+        if (quizId == null) {
+            throw new ResponseStatusException(CONFLICT, "quizId is required");
+        }
+
+        GameSessionMode requestedMode = mode == null ? GameSessionMode.STANDARD : mode;
+        GuestSession guestSession = guestSessionService.requireValidSession(request);
+        Optional<Lobby> activeLobby = findActiveLobbyForGuestSession(guestSession.getId());
+        if (activeLobby.isPresent()) {
+            throw new ResponseStatusException(
+                    CONFLICT,
+                    "You are already in lobby " + activeLobby.get().getCode() + ". Leave the lobby before starting a solo game."
+            );
+        }
+
+        if (findActiveGameSessionForGuestSession(guestSession.getId()).isPresent()) {
+            throw new ResponseStatusException(CONFLICT, "You already have an active game in progress. Finish it before starting another one.");
+        }
+
+        Quiz quiz = quizRepository.findById(quizId).orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
+        if (quiz.getStatus() != QuizStatus.ACTIVE) {
+            throw new ResponseStatusException(CONFLICT, "Quiz is not active");
+        }
+
+        long questionCount = questionRepository.countByQuizId(quizId);
+        if (questionCount == 0) {
+            throw new ResponseStatusException(CONFLICT, "Quiz has no questions");
+        }
+
+        if (requestedMode == GameSessionMode.THREE_LIVES && quiz.getCategory() == null) {
+            throw new ResponseStatusException(CONFLICT, "Selected quiz has no category");
+        }
+
+        String displayName = Optional.ofNullable(guestSession.getDisplayName())
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .orElse("Player");
+
+        return startSoloGameInternal(quiz, requestedMode, guestSession.getId(), displayName);
     }
 
     public Optional<GameStateDto> tryStartGameFromReady(String lobbyCode) {
@@ -202,13 +304,17 @@ public class GameService {
 
         Optional<GameSession> existing = gameSessionRepository.findFirstByLobbyIdAndStatusOrderByStartedAtDesc(lobby.getId(), GameStatus.IN_PROGRESS);
         if (existing.isPresent()) return Optional.empty();
+        Optional<GameSession> ownerActive = findActiveGameSessionForGuestSession(lobby.getOwnerGuestSessionId());
+        if (ownerActive.isPresent() && !Objects.equals(ownerActive.get().getLobbyId(), lobby.getId())) {
+            return Optional.empty();
+        }
 
         Quiz quiz = quizRepository.findById(lobby.getSelectedQuizId()).orElse(null);
         if (quiz == null || quiz.getStatus() != QuizStatus.ACTIVE) return Optional.empty();
         long questionCount = questionRepository.countByQuizId(quiz.getId());
         if (questionCount == 0) return Optional.empty();
 
-        return Optional.of(startGameInternal(lobby, quiz, lobby.getOwnerGuestSessionId()));
+        return Optional.of(startGameInternal(lobby, quiz, GameSessionMode.STANDARD, lobby.getOwnerGuestSessionId()));
     }
 
     public GameStateDto getState(HttpServletRequest request, String lobbyCode) {
@@ -220,18 +326,55 @@ public class GameService {
         if (sessionOpt.isEmpty()) {
             Optional<GameSession> last = gameSessionRepository.findFirstByLobbyIdOrderByStartedAtDesc(lobby.getId());
             if (last.isEmpty() || last.get().getStatus() != GameStatus.FINISHED) {
-                return new GameStateDto(lobby.getCode(), lobby.getStatus().name(), "NONE", 0, 0, "NO_GAME", null, null, null, List.of(), null, null);
+                return new GameStateDto(
+                        lobby.getCode(),
+                        lobby.getStatus().name(),
+                        "NONE",
+                        "STANDARD",
+                        0,
+                        0,
+                        "NO_GAME",
+                        clock.instant().toString(),
+                        null,
+                        null,
+                        null,
+                        List.of(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                );
             }
             requireGamePlayer(last.get().getId(), guestSession.getId());
-            return buildState(lobby, last.get(), guestSession.getId());
+            return buildState(lobby.getCode(), lobby.getStatus().name(), last.get(), guestSession.getId());
         }
 
-        requireGamePlayer(sessionOpt.get().getId(), guestSession.getId());
-        boolean advanced = advanceIfNeeded(lobby, sessionOpt.get());
+        GameSession session = sessionOpt.get();
+        requireGamePlayer(session.getId(), guestSession.getId());
+        if (expireTrainingSessionIfIdle(session, clock.instant())) {
+            return buildState(lobby.getCode(), lobby.getStatus().name(), session, guestSession.getId());
+        }
+
+        touchTrainingActivity(session);
+        boolean advanced = advanceIfNeeded(lobby, session);
         if (advanced) {
             gameEventPublisher.gameUpdated(lobby.getCode());
         }
-        return buildState(lobby, sessionOpt.get(), guestSession.getId());
+        return buildState(lobby.getCode(), lobby.getStatus().name(), session, guestSession.getId());
+    }
+
+    public GameStateDto getSoloState(HttpServletRequest request, String gameSessionId) {
+        GuestSession guestSession = guestSessionService.requireValidSession(request);
+        GameSession session = requireSoloSession(gameSessionId);
+        requireGamePlayer(session.getId(), guestSession.getId());
+        if (expireTrainingSessionIfIdle(session, clock.instant())) {
+            return buildState("SOLO", soloLobbyStatus(session), session, guestSession.getId());
+        }
+
+        touchTrainingActivity(session);
+        advanceIfNeededSolo(session);
+        return buildState("SOLO", soloLobbyStatus(session), session, guestSession.getId());
     }
 
     public GameStateDto submitAnswer(HttpServletRequest request, String lobbyCode, Long questionId, Long optionId) {
@@ -241,6 +384,11 @@ public class GameService {
 
         GameSession session = gameSessionRepository.findFirstByLobbyIdAndStatusOrderByStartedAtDesc(lobby.getId(), GameStatus.IN_PROGRESS).orElseThrow(() -> new ResponseStatusException(CONFLICT, "No active game"));
         requireGamePlayer(session.getId(), guestSession.getId());
+        if (expireTrainingSessionIfIdle(session, clock.instant())) {
+            return buildState(lobby.getCode(), lobby.getStatus().name(), session, guestSession.getId());
+        }
+
+        touchTrainingActivity(session);
         advanceIfNeeded(lobby, session);
 
         if (lobby.getStatus() != LobbyStatus.IN_GAME) {
@@ -255,12 +403,16 @@ public class GameService {
         if (questionId == null || optionId == null) {
             throw new ResponseStatusException(CONFLICT, "questionId and optionId are required");
         }
-        if (!Objects.equals(questionId, current.question().getId())) {
+        if (!Objects.equals(questionId, current.sessionQuestionId())) {
             throw new ResponseStatusException(CONFLICT, "Not the current question");
         }
 
-        if (gameAnswerRepository.existsByGameSessionIdAndQuestionIdAndGuestSessionId(session.getId(), questionId, guestSession.getId())) {
-            return buildState(lobby, session, guestSession.getId());
+        if (gameAnswerRepository.existsByGameSessionIdAndQuestionIdAndGuestSessionId(
+                session.getId(),
+                current.sessionQuestionId(),
+                guestSession.getId()
+        )) {
+            return buildState(lobby.getCode(), lobby.getStatus().name(), session, guestSession.getId());
         }
 
         QuizAnswerOption selected = current.options().stream().filter(o -> Objects.equals(o.getId(), optionId)).findFirst().orElseThrow(() -> new ResponseStatusException(CONFLICT, "Invalid optionId"));
@@ -270,13 +422,89 @@ public class GameService {
         int answerTimeMs = computeAnswerTimeMs(session, now);
         int points = computePoints(correct, answerTimeMs, questionDurationMs(session));
         try {
-            gameAnswerRepository.save(GameAnswer.create(session, questionId, guestSession.getId(), optionId, correct, answerTimeMs, points, now));
+            gameAnswerRepository.save(GameAnswer.create(
+                    session,
+                    current.sessionQuestionId(),
+                    guestSession.getId(),
+                    optionId,
+                    correct,
+                    answerTimeMs,
+                    points,
+                    now
+            ));
         } catch (DataIntegrityViolationException ignored) {
         }
 
         advanceIfNeeded(lobby, session);
         gameEventPublisher.gameUpdated(lobby.getCode());
-        return buildState(lobby, session, guestSession.getId());
+        return buildState(lobby.getCode(), lobby.getStatus().name(), session, guestSession.getId());
+    }
+
+    public GameStateDto submitSoloAnswer(
+            HttpServletRequest request,
+            String gameSessionId,
+            Long questionId,
+            Long optionId
+    ) {
+        GuestSession guestSession = guestSessionService.requireValidSession(request);
+        GameSession session = requireSoloSession(gameSessionId);
+        requireGamePlayer(session.getId(), guestSession.getId());
+        if (expireTrainingSessionIfIdle(session, clock.instant())) {
+            return buildState("SOLO", soloLobbyStatus(session), session, guestSession.getId());
+        }
+
+        touchTrainingActivity(session);
+        advanceIfNeededSolo(session);
+
+        if (session.getStatus() != GameStatus.IN_PROGRESS) {
+            return buildState("SOLO", soloLobbyStatus(session), session, guestSession.getId());
+        }
+        if (session.getStage() != GameStage.QUESTION) {
+            throw new ResponseStatusException(CONFLICT, "Not accepting answers at this stage");
+        }
+
+        CurrentQuestion current = currentQuestion(session);
+
+        if (questionId == null || optionId == null) {
+            throw new ResponseStatusException(CONFLICT, "questionId and optionId are required");
+        }
+        if (!Objects.equals(questionId, current.sessionQuestionId())) {
+            throw new ResponseStatusException(CONFLICT, "Not the current question");
+        }
+
+        if (gameAnswerRepository.existsByGameSessionIdAndQuestionIdAndGuestSessionId(
+                session.getId(),
+                current.sessionQuestionId(),
+                guestSession.getId()
+        )) {
+            return buildState("SOLO", soloLobbyStatus(session), session, guestSession.getId());
+        }
+
+        QuizAnswerOption selected = current.options().stream()
+                .filter(o -> Objects.equals(o.getId(), optionId))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(CONFLICT, "Invalid optionId"));
+
+        boolean correct = selected.isCorrect();
+        Instant now = clock.instant();
+        int answerTimeMs = computeAnswerTimeMs(session, now);
+        int points = computePoints(correct, answerTimeMs, questionDurationMs(session));
+        try {
+            gameAnswerRepository.save(GameAnswer.create(
+                    session,
+                    current.sessionQuestionId(),
+                    guestSession.getId(),
+                    optionId,
+                    correct,
+                    answerTimeMs,
+                    points,
+                    now
+            ));
+        } catch (DataIntegrityViolationException ignored) {
+        }
+
+        advanceIfNeededSolo(session);
+        return buildState("SOLO", soloLobbyStatus(session), session, guestSession.getId());
     }
 
     public GameStateDto endGame(HttpServletRequest request, String lobbyCode) {
@@ -291,12 +519,25 @@ public class GameService {
                 .orElseThrow(() -> new ResponseStatusException(CONFLICT, "No active game"));
         requireGamePlayer(session.getId(), guestSession.getId());
 
-        finishGame(lobby, session);
+        finishGame(lobby, session, GameFinishReason.MANUAL_END);
         gameEventPublisher.gameUpdated(lobby.getCode());
-        return buildState(lobby, session, guestSession.getId());
+        return buildState(lobby.getCode(), lobby.getStatus().name(), session, guestSession.getId());
+    }
+
+    public GameStateDto endSoloGame(HttpServletRequest request, String gameSessionId) {
+        GuestSession guestSession = guestSessionService.requireValidSession(request);
+        GameSession session = requireSoloSession(gameSessionId);
+        requireGamePlayer(session.getId(), guestSession.getId());
+
+        finishSoloGame(session, GameFinishReason.MANUAL_END);
+        return buildState("SOLO", soloLobbyStatus(session), session, guestSession.getId());
     }
 
     private void finishGame(Lobby lobby, GameSession session) {
+        finishGame(lobby, session, GameFinishReason.COMPLETED);
+    }
+
+    private void finishGame(Lobby lobby, GameSession session, GameFinishReason finishReason) {
         Instant now = clock.instant();
         if (session.getStatus() == GameStatus.FINISHED) return;
 
@@ -307,16 +548,18 @@ public class GameService {
         if (session.getStage() == GameStage.QUESTION) {
             try {
                 CurrentQuestion current = currentQuestion(session);
-                ensureTimeoutAnswers(session, current.question().getId(), now);
+                ensureTimeoutAnswers(session, current.sessionQuestionId(), now);
             } catch (Exception ignored) {
             }
         }
 
         session.setStatus(GameStatus.FINISHED);
         session.setEndedAt(now);
+        session.setFinishReason(finishReason == null ? GameFinishReason.COMPLETED : finishReason);
         gameSessionRepository.save(session);
 
         applyRewardsIfNeeded(session, players, now);
+        updateThreeLivesRecordIfNeeded(session, players, now);
         publishFinalWinnerMessage(lobby, session, players);
 
         lobby.setStatus(LobbyStatus.OPEN);
@@ -325,6 +568,12 @@ public class GameService {
 
     private void applyRewardsIfNeeded(GameSession session, List<GamePlayer> players, Instant now) {
         if (session.isRewardsApplied()) return;
+        if (isThreeLives(session) || isTraining(session)) {
+            session.setRewardsApplied(true);
+            session.setRewardsAppliedAt(now);
+            gameSessionRepository.save(session);
+            return;
+        }
 
         Quiz quiz = quizRepository.findById(session.getQuizId()).orElse(null);
         boolean xpEnabled = quiz == null || quiz.isXpEnabled();
@@ -345,6 +594,27 @@ public class GameService {
         session.setRewardsApplied(true);
         session.setRewardsAppliedAt(now);
         gameSessionRepository.save(session);
+    }
+
+    private void updateThreeLivesRecordIfNeeded(GameSession session, List<GamePlayer> players, Instant now) {
+        if (!isThreeLives(session)) return;
+        if (players == null || players.isEmpty()) return;
+        GamePlayer soloPlayer = players.get(0);
+        if (soloPlayer == null || soloPlayer.getGuestSessionId() == null) return;
+
+        PlayerTotals totals = computeTotalsByGuest(session.getId())
+                .getOrDefault(soloPlayer.getGuestSessionId(), PlayerTotals.empty());
+        long answered = gameAnswerRepository.countByGameSessionIdAndGuestSessionId(session.getId(), soloPlayer.getGuestSessionId());
+        long durationMs = session.getStartedAt() == null
+                ? 0L
+                : Math.max(0L, Duration.between(session.getStartedAt(), now).toMillis());
+
+        casualThreeLivesRecordService.updateBestForGuestSession(
+                soloPlayer.getGuestSessionId(),
+                (int) Math.max(0L, totals.totalPoints()),
+                (int) Math.max(0L, answered),
+                durationMs
+        );
     }
 
     private void applyRewardsToPlayer(String guestSessionId, int xpDelta, int rankPointsDelta, int coinsDelta) {
@@ -369,8 +639,14 @@ public class GameService {
 
     public void tickDueSessions() {
         Instant now = clock.instant();
+        expireStaleTrainingSessions(now);
+
         List<GameSession> due = gameSessionRepository.findAllByStatusAndStageEndsAtBefore(GameStatus.IN_PROGRESS, now);
         for (GameSession session : due) {
+            if (isSoloSession(session)) {
+                advanceIfNeededSolo(session);
+                continue;
+            }
             Lobby lobby = lobbyRepository.findById(session.getLobbyId()).orElse(null);
             if (lobby == null) continue;
             boolean changed = advanceIfNeeded(lobby, session);
@@ -380,19 +656,105 @@ public class GameService {
         }
     }
 
-    private GameStateDto buildState(Lobby lobby, GameSession session, String viewerGuestSessionId) {
+    private void expireStaleTrainingSessions(Instant now) {
+        Instant cutoff = now.minus(trainingInactivityTimeout);
+        List<GameSession> staleTraining = gameSessionRepository.findStaleSessionsByModeAndStatus(
+                GameSessionMode.TRAINING,
+                GameStatus.IN_PROGRESS,
+                cutoff
+        );
+        for (GameSession session : staleTraining) {
+            expireTrainingSessionIfIdle(session, now);
+        }
+    }
+
+    private boolean expireTrainingSessionIfIdle(GameSession session, Instant now) {
+        if (!shouldExpireTrainingSession(session, now)) return false;
+
+        if (isSoloSession(session)) {
+            finishSoloGame(session, GameFinishReason.EXPIRED);
+            return true;
+        }
+
+        Lobby lobby = lobbyRepository.findById(session.getLobbyId()).orElse(null);
+        if (lobby == null) {
+            finishSessionWithoutLobby(session, now, GameFinishReason.EXPIRED);
+            return true;
+        }
+
+        finishGame(lobby, session, GameFinishReason.EXPIRED);
+        gameEventPublisher.gameUpdated(lobby.getCode());
+        return true;
+    }
+
+    private void finishSessionWithoutLobby(GameSession session, Instant now, GameFinishReason finishReason) {
+        if (session == null || session.getStatus() == GameStatus.FINISHED) return;
+        session.setStatus(GameStatus.FINISHED);
+        session.setEndedAt(now);
+        session.setFinishReason(finishReason == null ? GameFinishReason.EXPIRED : finishReason);
+        gameSessionRepository.save(session);
+    }
+
+    private boolean shouldExpireTrainingSession(GameSession session, Instant now) {
+        if (session == null) return false;
+        if (session.getStatus() != GameStatus.IN_PROGRESS) return false;
+        if (!isTraining(session)) return false;
+
+        Instant lastActivity = effectiveLastActivityAt(session);
+        if (lastActivity == null) return false;
+        return !now.isBefore(lastActivity.plus(trainingInactivityTimeout));
+    }
+
+    private Instant effectiveLastActivityAt(GameSession session) {
+        if (session == null) return null;
+        Instant lastActivity = session.getLastActivityAt();
+        return lastActivity != null ? lastActivity : session.getStartedAt();
+    }
+
+    private void touchTrainingActivity(GameSession session) {
+        if (session == null) return;
+        if (session.getStatus() != GameStatus.IN_PROGRESS) return;
+        if (!isTraining(session)) return;
+
+        Instant now = clock.instant();
+        Instant lastActivity = effectiveLastActivityAt(session);
+        if (lastActivity != null && now.isBefore(lastActivity.plus(TRAINING_ACTIVITY_TOUCH_DEBOUNCE))) {
+            return;
+        }
+
+        session.setLastActivityAt(now);
+        gameSessionRepository.save(session);
+    }
+
+    private GameStateDto buildState(
+            String lobbyCode,
+            String lobbyStatus,
+            GameSession session,
+            String viewerGuestSessionId
+    ) {
+        String serverTime = clock.instant().toString();
+        String responseStageEndsAt = stageEndsAtForResponse(session);
         List<GamePlayer> players = gamePlayerRepository.findAllByGameSessionIdOrderByOrderIndexAsc(session.getId());
         Map<String, PlayerTotals> totalsByGuest = computeTotalsByGuest(session.getId());
+        Map<String, Boolean> authenticatedByGuestSessionId = resolveAuthenticatedByGuestSessionId(players);
+        GameSessionMode mode = sessionMode(session);
+        boolean endless = mode == GameSessionMode.THREE_LIVES;
+        long totalQuestions = endless
+                ? countThreeLivesQuestionPool(session)
+                : questionRepository.countByQuizId(session.getQuizId());
+        int responseTotalQuestions = endless ? 0 : (int) totalQuestions;
+        Integer wrongAnswers = threeLivesWrongAnswers(session, players);
+        Integer livesRemaining = threeLivesLivesRemaining(wrongAnswers);
 
-        long totalQuestions = questionRepository.countByQuizId(session.getQuizId());
         int questionIndex = session.getCurrentQuestionIndex();
-        if (session.getStatus() == GameStatus.FINISHED || questionIndex >= totalQuestions) {
+        if (session.getStatus() == GameStatus.FINISHED || (!endless && questionIndex >= totalQuestions)) {
             List<PlayerStanding> standings = computeStandings(players, totalsByGuest);
             Map<String, PlayerRewards> rewards = computeRewards(standings);
 
             Quiz quiz = quizRepository.findById(session.getQuizId()).orElse(null);
-            boolean xpEnabled = quiz == null || quiz.isXpEnabled();
-            boolean includeInRanking = quiz != null && quiz.isIncludeInRanking();
+            boolean rewardsEnabled = mode == GameSessionMode.STANDARD;
+            boolean xpEnabled = rewardsEnabled && (quiz == null || quiz.isXpEnabled());
+            boolean includeInRanking = rewardsEnabled && quiz != null && quiz.isIncludeInRanking();
 
             List<GamePlayerDto> playersDto = players.stream()
                     .map(p -> {
@@ -400,6 +762,7 @@ public class GameService {
                         PlayerRewards r = rewards.get(p.getGuestSessionId());
                         return new GamePlayerDto(
                                 p.getDisplayName(),
+                                authenticatedByGuestSessionId.getOrDefault(p.getGuestSessionId(), false),
                                 false,
                                 null,
                                 t.totalPoints(),
@@ -414,18 +777,23 @@ public class GameService {
                     .toList();
 
             return new GameStateDto(
-                    lobby.getCode(),
-                    lobby.getStatus().name(),
+                    lobbyCode,
+                    lobbyStatus,
                     session.getStatus().name(),
-                    (int) Math.min(questionIndex + 1L, totalQuestions),
-                    (int) totalQuestions,
+                    mode.name(),
+                    endless ? Math.max(0, questionIndex + 1) : (int) Math.min(questionIndex + 1L, totalQuestions),
+                    responseTotalQuestions,
                     "FINISHED",
+                    serverTime,
                     null,
                     null,
                     null,
                     playersDto,
                     session.getId(),
-                    null
+                    null,
+                    livesRemaining,
+                    wrongAnswers,
+                    session.getFinishReason() == null ? null : session.getFinishReason().name()
             );
         }
 
@@ -435,6 +803,7 @@ public class GameService {
                         PlayerTotals t = totalsByGuest.getOrDefault(p.getGuestSessionId(), PlayerTotals.empty());
                         return new GamePlayerDto(
                                 p.getDisplayName(),
+                                authenticatedByGuestSessionId.getOrDefault(p.getGuestSessionId(), false),
                                 false,
                                 null,
                                 t.totalPoints(),
@@ -449,17 +818,22 @@ public class GameService {
                     .toList();
 
             return new GameStateDto(
-                    lobby.getCode(),
-                    lobby.getStatus().name(),
+                    lobbyCode,
+                    lobbyStatus,
                     session.getStatus().name(),
+                    mode.name(),
                     1,
-                    (int) totalQuestions,
+                    responseTotalQuestions,
                     session.getStage().name(),
-                    session.getStageEndsAt().toString(),
+                    serverTime,
+                    session.getStageEndsAt() == null ? null : session.getStageEndsAt().toString(),
                     preCountdownDuration.toMillis(),
                     null,
                     playersDto,
                     session.getId(),
+                    null,
+                    livesRemaining,
+                    wrongAnswers,
                     null
             );
         }
@@ -468,7 +842,10 @@ public class GameService {
 
         boolean reveal = session.getStage() == GameStage.REVEAL;
 
-        Map<String, GameAnswer> answersByGuestSessionId = gameAnswerRepository.findAllByGameSessionIdAndQuestionId(session.getId(), current.question().getId()).stream().collect(java.util.stream.Collectors.toMap(GameAnswer::getGuestSessionId, a -> a));
+        Map<String, GameAnswer> answersByGuestSessionId = gameAnswerRepository
+                .findAllByGameSessionIdAndQuestionId(session.getId(), current.sessionQuestionId())
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(GameAnswer::getGuestSessionId, a -> a));
 
         List<GamePlayerDto> playersDto = players.stream().map(p -> {
             GameAnswer answer = answersByGuestSessionId.get(p.getGuestSessionId());
@@ -477,6 +854,7 @@ public class GameService {
             PlayerTotals t = totalsByGuest.getOrDefault(p.getGuestSessionId(), PlayerTotals.empty());
             return new GamePlayerDto(
                     p.getDisplayName(),
+                    authenticatedByGuestSessionId.getOrDefault(p.getGuestSessionId(), false),
                     answered,
                     correct,
                     t.totalPoints(),
@@ -489,11 +867,22 @@ public class GameService {
             );
         }).toList();
 
-        List<GameOptionDto> orderedOptions = shuffledOptions(session.getId(), viewerGuestSessionId, current.question().getId(), current.options()).stream()
+        List<GameOptionDto> orderedOptions = shuffledOptions(
+                        session.getId(),
+                        viewerGuestSessionId,
+                        current.sessionQuestionId(),
+                        current.options()
+                )
+                .stream()
                 .map(o -> new GameOptionDto(o.getId(), o.getText(), o.getImageUrl()))
                 .toList();
 
-        GameQuestionDto questionDto = new GameQuestionDto(current.question().getId(), current.question().getPrompt(), current.question().getImageUrl(), orderedOptions);
+        GameQuestionDto questionDto = new GameQuestionDto(
+                current.sessionQuestionId(),
+                current.question().getPrompt(),
+                current.question().getImageUrl(),
+                orderedOptions
+        );
 
         Long correctOptionId = null;
         if (reveal) {
@@ -504,22 +893,66 @@ public class GameService {
                     .orElse(null);
         }
 
+        Long stageTotalMs;
+        if (session.getStage() == GameStage.QUESTION) {
+            stageTotalMs = hasQuestionTimer(session) ? questionDurationMs(session) : null;
+        } else if (!endless && current.indexOneBased() >= current.totalQuestions()) {
+            stageTotalMs = finalRevealDuration.toMillis();
+        } else {
+            stageTotalMs = revealDuration.toMillis();
+        }
+
         return new GameStateDto(
-                lobby.getCode(),
-                lobby.getStatus().name(),
+                lobbyCode,
+                lobbyStatus,
                 session.getStatus().name(),
+                mode.name(),
                 current.indexOneBased(),
-                current.totalQuestions(),
+                responseTotalQuestions,
                 session.getStage().name(),
-                session.getStageEndsAt().toString(),
-                session.getStage() == GameStage.QUESTION
-                        ? questionDurationMs(session)
-                        : (current.indexOneBased() >= current.totalQuestions() ? finalRevealDuration.toMillis() : revealDuration.toMillis()),
+                serverTime,
+                responseStageEndsAt,
+                stageTotalMs,
                 questionDto,
                 playersDto,
                 session.getId(),
-                correctOptionId
+                correctOptionId,
+                livesRemaining,
+                wrongAnswers,
+                null
         );
+    }
+
+    private Integer threeLivesWrongAnswers(GameSession session, List<GamePlayer> players) {
+        if (!isThreeLives(session)) return null;
+        if (players == null || players.isEmpty()) return 0;
+        String guestSessionId = players.get(0).getGuestSessionId();
+        if (guestSessionId == null || guestSessionId.isBlank()) return 0;
+        return (int) gameAnswerRepository.countWrongByGameSessionIdAndGuestSessionId(session.getId(), guestSessionId);
+    }
+
+    private Integer threeLivesLivesRemaining(Integer wrongAnswers) {
+        if (wrongAnswers == null) return null;
+        return Math.max(0, THREE_LIVES_MAX_WRONG - Math.max(0, wrongAnswers));
+    }
+
+    private Map<String, Boolean> resolveAuthenticatedByGuestSessionId(List<GamePlayer> players) {
+        if (players == null || players.isEmpty()) return Map.of();
+
+        List<String> ids = players.stream()
+                .map(GamePlayer::getGuestSessionId)
+                .filter(Objects::nonNull)
+                .filter(id -> !id.isBlank())
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) return Map.of();
+
+        Map<String, Boolean> out = new HashMap<>();
+        for (GuestSession session : guestSessionRepository.findAllById(ids)) {
+            if (session == null || session.getId() == null) continue;
+            out.put(session.getId(), session.getUserId() != null);
+        }
+        return out;
     }
 
     private record PlayerTotals(long totalPoints, long correctAnswers, long totalAnswerTimeMs,
@@ -618,7 +1051,9 @@ public class GameService {
             else if (drawForFirst && s.rank() == 1) xp += 20;
 
             int rp;
-            if (isTwoPlayer) {
+            if (n <= 1) {
+                rp = 0;
+            } else if (isTwoPlayer) {
                 if (drawForFirst) rp = 5;
                 else rp = winner ? 25 : -15;
             } else {
@@ -650,15 +1085,36 @@ public class GameService {
         }
     }
 
+    private Instant nextQuestionStageEndsAt(Instant now, GameSession session) {
+        if (!hasQuestionTimer(session)) return now.plus(NO_TIMER_STAGE_ENDS_AT_PLACEHOLDER);
+        return now.plus(Duration.ofMillis(questionDurationMs(session)));
+    }
+
+    private String stageEndsAtForResponse(GameSession session) {
+        if (session.getStage() == GameStage.QUESTION && !hasQuestionTimer(session)) {
+            return null;
+        }
+        Instant stageEndsAt = session.getStageEndsAt();
+        return stageEndsAt == null ? null : stageEndsAt.toString();
+    }
+
     private boolean advanceIfNeeded(Lobby lobby, GameSession session) {
+        return advanceIfNeeded(session, () -> finishGame(lobby, session));
+    }
+
+    private boolean advanceIfNeededSolo(GameSession session) {
+        return advanceIfNeeded(session, () -> finishSoloGame(session));
+    }
+
+    private boolean advanceIfNeeded(GameSession session, Runnable finishAction) {
         if (session.getStatus() != GameStatus.IN_PROGRESS) return false;
 
         Instant now = clock.instant();
 
         if (session.getStage() == GameStage.PRE_COUNTDOWN) {
-            if (now.isBefore(session.getStageEndsAt())) return false;
+            if (session.getStageEndsAt() != null && now.isBefore(session.getStageEndsAt())) return false;
             session.setStage(GameStage.QUESTION);
-            session.setStageEndsAt(now.plus(Duration.ofMillis(questionDurationMs(session))));
+            session.setStageEndsAt(nextQuestionStageEndsAt(now, session));
             gameSessionRepository.save(session);
             return true;
         }
@@ -666,19 +1122,30 @@ public class GameService {
         if (session.getStage() == GameStage.QUESTION) {
             CurrentQuestion current = currentQuestion(session);
             long playerCount = gamePlayerRepository.countByGameSessionId(session.getId());
-            long answered = gameAnswerRepository.countByGameSessionIdAndQuestionId(session.getId(), current.question().getId());
+            long answered = gameAnswerRepository.countByGameSessionIdAndQuestionId(session.getId(), current.sessionQuestionId());
 
-            boolean timeUp = !now.isBefore(session.getStageEndsAt());
+            boolean timeUp = hasQuestionTimer(session)
+                    && session.getStageEndsAt() != null
+                    && !now.isBefore(session.getStageEndsAt());
             boolean allAnswered = answered >= playerCount;
 
             if (timeUp) {
-                ensureTimeoutAnswers(session, current.question().getId(), now);
+                ensureTimeoutAnswers(session, current.sessionQuestionId(), now);
                 allAnswered = true;
             }
 
             if (allAnswered) {
+                boolean isLastQuestion = false;
+                if (isThreeLives(session)) {
+                    Integer wrongAnswers = threeLivesWrongAnswers(session, gamePlayerRepository.findAllByGameSessionIdOrderByOrderIndexAsc(session.getId()));
+                    Integer livesRemaining = threeLivesLivesRemaining(wrongAnswers);
+                    session.setLivesRemaining(livesRemaining);
+                    isLastQuestion = livesRemaining != null && livesRemaining <= 0;
+                } else {
+                    isLastQuestion = session.getCurrentQuestionIndex() + 1 >= current.totalQuestions();
+                }
+
                 session.setStage(GameStage.REVEAL);
-                boolean isLastQuestion = session.getCurrentQuestionIndex() + 1 >= current.totalQuestions();
                 session.setStageEndsAt(now.plus(isLastQuestion ? finalRevealDuration : revealDuration));
                 gameSessionRepository.save(session);
                 return true;
@@ -687,18 +1154,32 @@ public class GameService {
         }
 
         if (session.getStage() == GameStage.REVEAL) {
-            if (now.isBefore(session.getStageEndsAt())) return false;
+            if (session.getStageEndsAt() != null && now.isBefore(session.getStageEndsAt())) return false;
+
+            if (isThreeLives(session)) {
+                if (session.getLivesRemaining() != null && session.getLivesRemaining() <= 0) {
+                    finishAction.run();
+                    return true;
+                }
+
+                int nextIndex = session.getCurrentQuestionIndex() + 1;
+                session.setCurrentQuestionIndex(nextIndex);
+                session.setStage(GameStage.QUESTION);
+                session.setStageEndsAt(nextQuestionStageEndsAt(now, session));
+                gameSessionRepository.save(session);
+                return true;
+            }
 
             int nextIndex = session.getCurrentQuestionIndex() + 1;
             long totalQuestions = questionRepository.countByQuizId(session.getQuizId());
             if (nextIndex >= totalQuestions) {
-                finishGame(lobby, session);
+                finishAction.run();
                 return true;
             }
 
             session.setCurrentQuestionIndex(nextIndex);
             session.setStage(GameStage.QUESTION);
-            session.setStageEndsAt(now.plus(Duration.ofMillis(questionDurationMs(session))));
+            session.setStageEndsAt(nextQuestionStageEndsAt(now, session));
             gameSessionRepository.save(session);
             return true;
         }
@@ -753,32 +1234,111 @@ public class GameService {
         }
     }
 
+    private long countThreeLivesQuestionPool(GameSession session) {
+        if (!isThreeLives(session)) return 0L;
+        Long categoryId = session.getQuestionPoolCategoryId();
+        if (categoryId == null) {
+            Quiz quiz = quizRepository.findById(session.getQuizId()).orElse(null);
+            categoryId = quiz != null && quiz.getCategory() != null ? quiz.getCategory().getId() : null;
+        }
+        if (categoryId == null) return 0L;
+        return questionRepository.countByQuizCategoryIdAndQuizStatus(categoryId, QuizStatus.ACTIVE);
+    }
+
+    private List<QuizQuestion> threeLivesQuestionPool(GameSession session) {
+        Long categoryId = session.getQuestionPoolCategoryId();
+        if (categoryId == null) {
+            Quiz quiz = quizRepository.findById(session.getQuizId()).orElse(null);
+            categoryId = quiz != null && quiz.getCategory() != null ? quiz.getCategory().getId() : null;
+        }
+        if (categoryId == null) {
+            throw new ResponseStatusException(CONFLICT, "Selected quiz has no category");
+        }
+        return questionRepository.findAllByQuizCategoryIdAndQuizStatusOrderByQuizIdAscOrderIndexAsc(
+                categoryId,
+                QuizStatus.ACTIVE
+        );
+    }
+
+    private Long sessionQuestionId(GameSession session, QuizQuestion question) {
+        Long actualId = question.getId();
+        if (actualId == null) {
+            throw new ResponseStatusException(CONFLICT, "Question id is missing");
+        }
+        if (!isThreeLives(session)) return actualId;
+
+        long round = Math.max(0L, session.getCurrentQuestionIndex());
+        return -1L * ((round + 1L) * 1_000_000L + actualId);
+    }
+
     private CurrentQuestion currentQuestion(GameSession session) {
-        List<QuizQuestion> questions = questionRepository.findAllByQuizIdOrderByOrderIndexAsc(session.getQuizId());
+        List<QuizQuestion> questions = isThreeLives(session)
+                ? threeLivesQuestionPool(session)
+                : questionRepository.findAllByQuizIdOrderByOrderIndexAsc(session.getQuizId());
         int total = questions.size();
-        int idx = session.getCurrentQuestionIndex();
+        if (total <= 0) {
+            throw new ResponseStatusException(CONFLICT, "Quiz has no questions");
+        }
+
+        int rawIndex = session.getCurrentQuestionIndex();
+        int idx = isThreeLives(session) ? Math.floorMod(rawIndex, total) : rawIndex;
         if (idx < 0 || idx >= total) {
             throw new ResponseStatusException(CONFLICT, "Invalid question index");
         }
 
         QuizQuestion question = questions.get(idx);
         List<QuizAnswerOption> options = optionRepository.findAllByQuestionIdOrderByOrderIndexAsc(question.getId());
-        return new CurrentQuestion(question, options, idx + 1, total);
+        int indexOneBased = isThreeLives(session) ? (rawIndex + 1) : (idx + 1);
+        return new CurrentQuestion(
+                question,
+                sessionQuestionId(session, question),
+                options,
+                indexOneBased,
+                total
+        );
     }
 
-    private record CurrentQuestion(QuizQuestion question, List<QuizAnswerOption> options, int indexOneBased,
-                                   int totalQuestions) {
+    private record CurrentQuestion(
+            QuizQuestion question,
+            Long sessionQuestionId,
+            List<QuizAnswerOption> options,
+            int indexOneBased,
+            int totalQuestions
+    ) {
     }
 
-    private GameStateDto startGameInternal(Lobby lobby, Quiz quiz, String viewerGuestSessionId) {
+    private GameStateDto startGameInternal(
+            Lobby lobby,
+            Quiz quiz,
+            GameSessionMode mode,
+            String viewerGuestSessionId
+    ) {
         Instant now = clock.instant();
         Integer qDurationMs;
         Integer quizSeconds = quiz.getQuestionTimeLimitSeconds();
         int seconds = (quizSeconds == null || quizSeconds <= 0) ? pl.mindrush.backend.quiz.Quiz.DEFAULT_QUESTION_TIME_LIMIT_SECONDS : quizSeconds;
         long computed = Math.min(Integer.MAX_VALUE, seconds * 1000L);
-        qDurationMs = (int) computed;
+        qDurationMs = mode == GameSessionMode.TRAINING ? null : (int) computed;
 
-        GameSession session = GameSession.startNew(lobby.getId(), quiz.getId(), now, preCountdownDuration, qDurationMs);
+        GameSession session = GameSession.startNew(
+                lobby.getId(),
+                quiz.getId(),
+                mode,
+                now,
+                preCountdownDuration,
+                qDurationMs
+        );
+        if (mode == GameSessionMode.THREE_LIVES) {
+            Long categoryId = quiz.getCategory() == null ? null : quiz.getCategory().getId();
+            if (categoryId == null) {
+                throw new ResponseStatusException(CONFLICT, "Selected quiz has no category");
+            }
+            long poolCount = questionRepository.countByQuizCategoryIdAndQuizStatus(categoryId, QuizStatus.ACTIVE);
+            if (poolCount == 0) {
+                throw new ResponseStatusException(CONFLICT, "Selected category has no active questions");
+            }
+            session.setQuestionPoolCategoryId(categoryId);
+        }
         gameSessionRepository.save(session);
 
         List<LobbyParticipant> lobbyPlayers = participantRepository.findAllByLobbyIdOrderByJoinedAtAsc(lobby.getId());
@@ -792,6 +1352,143 @@ public class GameService {
         lobbyRepository.save(lobby);
 
         gameEventPublisher.gameUpdated(lobby.getCode());
-        return buildState(lobby, session, viewerGuestSessionId);
+        return buildState(lobby.getCode(), lobby.getStatus().name(), session, viewerGuestSessionId);
+    }
+
+    private GameStateDto startSoloGameInternal(
+            Quiz quiz,
+            GameSessionMode mode,
+            String viewerGuestSessionId,
+            String displayName
+    ) {
+        Instant now = clock.instant();
+        Integer qDurationMs;
+        Integer quizSeconds = quiz.getQuestionTimeLimitSeconds();
+        int seconds = (quizSeconds == null || quizSeconds <= 0)
+                ? pl.mindrush.backend.quiz.Quiz.DEFAULT_QUESTION_TIME_LIMIT_SECONDS
+                : quizSeconds;
+        long computed = Math.min(Integer.MAX_VALUE, seconds * 1000L);
+        qDurationMs = mode == GameSessionMode.TRAINING ? null : (int) computed;
+
+        GameSession session = GameSession.startNew(
+                createSoloSessionLobbyId(),
+                quiz.getId(),
+                mode,
+                now,
+                preCountdownDuration,
+                qDurationMs
+        );
+        if (mode == GameSessionMode.THREE_LIVES) {
+            Long categoryId = quiz.getCategory() == null ? null : quiz.getCategory().getId();
+            if (categoryId == null) {
+                throw new ResponseStatusException(CONFLICT, "Selected quiz has no category");
+            }
+            long poolCount = questionRepository.countByQuizCategoryIdAndQuizStatus(categoryId, QuizStatus.ACTIVE);
+            if (poolCount == 0) {
+                throw new ResponseStatusException(CONFLICT, "Selected category has no active questions");
+            }
+            session.setQuestionPoolCategoryId(categoryId);
+        }
+        gameSessionRepository.save(session);
+
+        gamePlayerRepository.save(GamePlayer.create(session, viewerGuestSessionId, displayName, 1));
+        return buildState("SOLO", "IN_GAME", session, viewerGuestSessionId);
+    }
+
+    private void finishSoloGame(GameSession session) {
+        finishSoloGame(session, GameFinishReason.COMPLETED);
+    }
+
+    private void finishSoloGame(GameSession session, GameFinishReason finishReason) {
+        Instant now = clock.instant();
+        if (session.getStatus() == GameStatus.FINISHED) return;
+
+        List<GamePlayer> players = gamePlayerRepository.findAllByGameSessionIdOrderByOrderIndexAsc(session.getId());
+
+        if (session.getStage() == GameStage.QUESTION) {
+            try {
+                CurrentQuestion current = currentQuestion(session);
+                ensureTimeoutAnswers(session, current.sessionQuestionId(), now);
+            } catch (Exception ignored) {
+            }
+        }
+
+        session.setStatus(GameStatus.FINISHED);
+        session.setEndedAt(now);
+        session.setFinishReason(finishReason == null ? GameFinishReason.COMPLETED : finishReason);
+        gameSessionRepository.save(session);
+
+        applyRewardsIfNeeded(session, players, now);
+        updateThreeLivesRecordIfNeeded(session, players, now);
+    }
+
+    private GameSession requireSoloSession(String gameSessionId) {
+        GameSession session = gameSessionRepository.findById(gameSessionId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Game session not found"));
+        if (!isSoloSession(session)) {
+            throw new ResponseStatusException(CONFLICT, "This is not a solo game session");
+        }
+        return session;
+    }
+
+    private String createSoloSessionLobbyId() {
+        return SOLO_SESSION_LOBBY_ID_PREFIX + UUID.randomUUID().toString().replace("-", "");
+    }
+
+    public Optional<GameSession> findActiveGameSessionForGuestSession(String guestSessionId) {
+        if (guestSessionId == null || guestSessionId.isBlank()) return Optional.empty();
+
+        Instant now = clock.instant();
+        List<GameSession> activeSessions = gamePlayerRepository.findActiveSessionsByGuestSessionId(
+                guestSessionId,
+                GameStatus.IN_PROGRESS
+        );
+        for (GameSession session : activeSessions) {
+            if (expireTrainingSessionIfIdle(session, now)) {
+                continue;
+            }
+            return Optional.of(session);
+        }
+        return Optional.empty();
+    }
+
+    public Optional<ActiveGameDto> findCurrentActiveGame(HttpServletRequest request) {
+        String guestSessionId = guestSessionService.findValidSession(request)
+                .map(GuestSession::getId)
+                .orElse(null);
+        if (guestSessionId == null || guestSessionId.isBlank()) return Optional.empty();
+
+        Optional<GameSession> active = findActiveGameSessionForGuestSession(guestSessionId);
+        if (active.isEmpty()) return Optional.empty();
+
+        GameSession session = active.get();
+        if (isSoloSession(session)) {
+            return Optional.of(new ActiveGameDto("SOLO", session.getId(), null));
+        }
+
+        return lobbyRepository.findById(session.getLobbyId())
+                .map(lobby -> new ActiveGameDto("LOBBY", session.getId(), lobby.getCode()));
+    }
+
+    private Optional<Lobby> findActiveLobbyForGuestSession(String guestSessionId) {
+        if (guestSessionId == null || guestSessionId.isBlank()) return Optional.empty();
+        return participantRepository
+                .findActiveParticipationsByGuestSessionId(guestSessionId, ACTIVE_LOBBY_STATUSES)
+                .stream()
+                .map(LobbyParticipant::getLobby)
+                .filter(Objects::nonNull)
+                .findFirst();
+    }
+
+    private boolean isSoloSession(GameSession session) {
+        return session != null && isSoloSessionLobbyId(session.getLobbyId());
+    }
+
+    private boolean isSoloSessionLobbyId(String lobbyId) {
+        return lobbyId != null && lobbyId.startsWith(SOLO_SESSION_LOBBY_ID_PREFIX);
+    }
+
+    private String soloLobbyStatus(GameSession session) {
+        return session != null && session.getStatus() == GameStatus.FINISHED ? "OPEN" : "IN_GAME";
     }
 }

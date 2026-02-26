@@ -53,6 +53,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/guest/session").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/api/quizzes/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/casual/three-lives/best").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/media/**").permitAll()
 
@@ -74,6 +75,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/lobbies/*/game/state").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/lobbies/*/game/answer").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/lobbies/*/game/end").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/games/current").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/solo-games/start").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/solo-games/*/state").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/solo-games/*/answer").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/solo-games/*/end").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/lobbies/*/chat").permitAll()
 
                         .requestMatchers("/ws/**").permitAll()

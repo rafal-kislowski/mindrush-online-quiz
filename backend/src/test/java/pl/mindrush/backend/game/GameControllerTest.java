@@ -93,6 +93,9 @@ class GameControllerTest {
     @Autowired
     private LobbyParticipantRepository lobbyParticipantRepository;
 
+    @Autowired
+    private GameService gameService;
+
     @BeforeEach
     void setUp() {
         lobbyParticipantRepository.deleteAll();
@@ -109,6 +112,7 @@ class GameControllerTest {
         joinLobby(lobbyCode, secondSessionId);
 
         Long quizId = firstQuizId();
+        int expectedTotalQuestions = firstQuizQuestionCount();
 
         mockMvc.perform(post("/api/lobbies/" + lobbyCode + "/game/start")
                         .cookie(new Cookie("guestSessionId", ownerSessionId))
@@ -117,7 +121,7 @@ class GameControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.stage").value("PRE_COUNTDOWN"))
                 .andExpect(jsonPath("$.questionIndex").value(1))
-                .andExpect(jsonPath("$.totalQuestions").value(2));
+                .andExpect(jsonPath("$.totalQuestions").value(expectedTotalQuestions));
 
         clock.advance(Duration.ofSeconds(4));
 
@@ -245,12 +249,322 @@ class GameControllerTest {
                 .andExpect(jsonPath("$.questionIndex").value(2));
     }
 
+    @Test
+    void threeLivesMode_endlessRunAndBestRecordSaved() throws Exception {
+        String ownerSessionId = createGuestSession();
+        String lobbyCode = createLobby(ownerSessionId);
+        Long quizId = firstQuizId();
+
+        mockMvc.perform(post("/api/lobbies/" + lobbyCode + "/game/start")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quizId\":" + quizId + ",\"mode\":\"THREE_LIVES\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.mode").value("THREE_LIVES"))
+                .andExpect(jsonPath("$.stage").value("PRE_COUNTDOWN"))
+                .andExpect(jsonPath("$.totalQuestions").value(0))
+                .andExpect(jsonPath("$.livesRemaining").value(3));
+
+        clock.advance(Duration.ofSeconds(4));
+
+        for (int round = 1; round <= 3; round++) {
+            mockMvc.perform(get("/api/lobbies/" + lobbyCode + "/game/state")
+                            .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.mode").value("THREE_LIVES"))
+                    .andExpect(jsonPath("$.stage").value("QUESTION"));
+
+            // Timeout answer -> wrong answer in 3-lives mode.
+            clock.advance(Duration.ofSeconds(16));
+
+            int expectedLives = 3 - round;
+            mockMvc.perform(get("/api/lobbies/" + lobbyCode + "/game/state")
+                            .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.stage").value("REVEAL"))
+                    .andExpect(jsonPath("$.livesRemaining").value(expectedLives))
+                    .andExpect(jsonPath("$.wrongAnswers").value(round));
+
+            if (round < 3) {
+                clock.advance(Duration.ofSeconds(4));
+            }
+        }
+
+        clock.advance(Duration.ofSeconds(3));
+
+        mockMvc.perform(get("/api/lobbies/" + lobbyCode + "/game/state")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("THREE_LIVES"))
+                .andExpect(jsonPath("$.stage").value("FINISHED"))
+                .andExpect(jsonPath("$.livesRemaining").value(0))
+                .andExpect(jsonPath("$.wrongAnswers").value(3));
+
+        mockMvc.perform(get("/api/casual/three-lives/best")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.points").isNumber())
+                .andExpect(jsonPath("$.answered").value(3))
+                .andExpect(jsonPath("$.durationMs").isNumber())
+                .andExpect(jsonPath("$.updatedAt").isString());
+    }
+
+    @Test
+    void trainingMode_questionHasNoTimer() throws Exception {
+        String ownerSessionId = createGuestSession();
+        String lobbyCode = createLobby(ownerSessionId);
+        Long quizId = firstQuizId();
+
+        mockMvc.perform(post("/api/lobbies/" + lobbyCode + "/game/start")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quizId\":" + quizId + ",\"mode\":\"TRAINING\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.mode").value("TRAINING"))
+                .andExpect(jsonPath("$.stage").value("PRE_COUNTDOWN"));
+
+        clock.advance(Duration.ofSeconds(4));
+        gameService.tickDueSessions();
+
+        MvcResult state = mockMvc.perform(get("/api/lobbies/" + lobbyCode + "/game/state")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("TRAINING"))
+                .andExpect(jsonPath("$.stage").value("QUESTION"))
+                .andExpect(jsonPath("$.stageEndsAt").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.stageTotalMs").value(org.hamcrest.Matchers.nullValue()))
+                .andReturn();
+
+        Number qIdNum = JsonPath.read(state.getResponse().getContentAsString(), "$.question.id");
+        long qId = qIdNum.longValue();
+        List<Integer> options = JsonPath.read(state.getResponse().getContentAsString(), "$.question.options[*].id");
+
+        mockMvc.perform(post("/api/lobbies/" + lobbyCode + "/game/answer")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"questionId\":" + qId + ",\"optionId\":" + options.get(0) + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("TRAINING"))
+                .andExpect(jsonPath("$.stage").value("REVEAL"));
+    }
+
+    @Test
+    void soloTrainingMode_expiresAfterInactivity_andAllowsStartingNewGame() throws Exception {
+        String ownerSessionId = createGuestSession();
+        Long quizId = firstQuizId();
+
+        MvcResult started = mockMvc.perform(post("/api/solo-games/start")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quizId\":" + quizId + ",\"mode\":\"TRAINING\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.mode").value("TRAINING"))
+                .andReturn();
+
+        String sessionId = JsonPath.read(started.getResponse().getContentAsString(), "$.gameSessionId");
+        assertThat(sessionId).isNotBlank();
+
+        clock.advance(Duration.ofHours(2).plusSeconds(1));
+        gameService.tickDueSessions();
+
+        mockMvc.perform(get("/api/solo-games/" + sessionId + "/state")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("TRAINING"))
+                .andExpect(jsonPath("$.stage").value("FINISHED"))
+                .andExpect(jsonPath("$.finishReason").value("EXPIRED"));
+
+        mockMvc.perform(get("/api/games/current")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/solo-games/start")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quizId\":" + quizId + ",\"mode\":\"STANDARD\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.mode").value("STANDARD"));
+    }
+
+    @Test
+    void soloThreeLivesMode_acceptsSessionQuestionIdAnswerPayload() throws Exception {
+        String ownerSessionId = createGuestSession();
+        Long quizId = firstQuizId();
+
+        MvcResult started = mockMvc.perform(post("/api/solo-games/start")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quizId\":" + quizId + ",\"mode\":\"THREE_LIVES\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.mode").value("THREE_LIVES"))
+                .andExpect(jsonPath("$.stage").value("PRE_COUNTDOWN"))
+                .andReturn();
+
+        String sessionId = JsonPath.read(started.getResponse().getContentAsString(), "$.gameSessionId");
+        assertThat(sessionId).isNotBlank();
+
+        clock.advance(Duration.ofSeconds(4));
+        gameService.tickDueSessions();
+
+        MvcResult state = mockMvc.perform(get("/api/solo-games/" + sessionId + "/state")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("THREE_LIVES"))
+                .andExpect(jsonPath("$.stage").value("QUESTION"))
+                .andReturn();
+
+        Number qIdNum = JsonPath.read(state.getResponse().getContentAsString(), "$.question.id");
+        long qId = qIdNum.longValue();
+        assertThat(qId).isNegative();
+        List<Integer> options = JsonPath.read(state.getResponse().getContentAsString(), "$.question.options[*].id");
+
+        mockMvc.perform(post("/api/solo-games/" + sessionId + "/answer")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"questionId\":" + qId + ",\"optionId\":" + options.get(0) + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("THREE_LIVES"))
+                .andExpect(jsonPath("$.stage").value("REVEAL"));
+    }
+
+    @Test
+    void threeLivesMode_requiresSoloLobby() throws Exception {
+        String ownerSessionId = createGuestSession();
+        String secondSessionId = createGuestSession();
+
+        String lobbyCode = createLobby(ownerSessionId);
+        joinLobby(lobbyCode, secondSessionId);
+
+        Long quizId = firstQuizId();
+
+        mockMvc.perform(post("/api/lobbies/" + lobbyCode + "/game/start")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quizId\":" + quizId + ",\"mode\":\"THREE_LIVES\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("This mode is available only for solo lobbies"));
+    }
+
+    @Test
+    void startSoloGame_whenAlreadyInLobby_returnsConflict() throws Exception {
+        String ownerSessionId = createGuestSession();
+        String lobbyCode = createLobby(ownerSessionId);
+        assertThat(lobbyCode).isNotBlank();
+        Long quizId = firstQuizId();
+
+        mockMvc.perform(post("/api/solo-games/start")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quizId\":" + quizId + ",\"mode\":\"STANDARD\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("You are already in lobby " + lobbyCode + ". Leave the lobby before starting a solo game."));
+    }
+
+    @Test
+    void startSoloGame_whenAnotherSoloIsInProgress_returnsConflict() throws Exception {
+        String ownerSessionId = createGuestSession();
+        Long quizId = firstQuizId();
+
+        mockMvc.perform(post("/api/solo-games/start")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quizId\":" + quizId + ",\"mode\":\"STANDARD\"}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/solo-games/start")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quizId\":" + quizId + ",\"mode\":\"STANDARD\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("You already have an active game in progress. Finish it before starting another one."));
+    }
+
+    @Test
+    void currentGame_returnsSoloSessionWhenSoloGameIsActive() throws Exception {
+        String ownerSessionId = createGuestSession();
+        Long quizId = firstQuizId();
+
+        MvcResult started = mockMvc.perform(post("/api/solo-games/start")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quizId\":" + quizId + ",\"mode\":\"STANDARD\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String gameSessionId = JsonPath.read(started.getResponse().getContentAsString(), "$.gameSessionId");
+
+        mockMvc.perform(get("/api/games/current")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type").value("SOLO"))
+                .andExpect(jsonPath("$.gameSessionId").value(gameSessionId))
+                .andExpect(jsonPath("$.lobbyCode").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    void currentGame_returnsLobbyGameWhenLobbyGameIsActive() throws Exception {
+        String ownerSessionId = createGuestSession();
+        String lobbyCode = createLobby(ownerSessionId);
+        Long quizId = firstQuizId();
+
+        MvcResult started = mockMvc.perform(post("/api/lobbies/" + lobbyCode + "/game/start")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quizId\":" + quizId + "}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String gameSessionId = JsonPath.read(started.getResponse().getContentAsString(), "$.gameSessionId");
+
+        mockMvc.perform(get("/api/games/current")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type").value("LOBBY"))
+                .andExpect(jsonPath("$.gameSessionId").value(gameSessionId))
+                .andExpect(jsonPath("$.lobbyCode").value(lobbyCode));
+    }
+
+    @Test
+    void endSoloGame_marksFinishReasonAsManualEnd() throws Exception {
+        String ownerSessionId = createGuestSession();
+        Long quizId = firstQuizId();
+
+        MvcResult started = mockMvc.perform(post("/api/solo-games/start")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quizId\":" + quizId + ",\"mode\":\"STANDARD\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String sessionId = JsonPath.read(started.getResponse().getContentAsString(), "$.gameSessionId");
+
+        mockMvc.perform(post("/api/solo-games/" + sessionId + "/end")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stage").value("FINISHED"))
+                .andExpect(jsonPath("$.finishReason").value("MANUAL_END"));
+    }
+
+    @Test
+    void currentGame_returnsNoContentWhenNoActiveGame() throws Exception {
+        String ownerSessionId = createGuestSession();
+
+        mockMvc.perform(get("/api/games/current")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isNoContent());
+    }
+
     private Long firstQuizId() throws Exception {
         MvcResult list = mockMvc.perform(get("/api/quizzes").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andReturn();
         Number id = JsonPath.read(list.getResponse().getContentAsString(), "$[0].id");
         return id.longValue();
+    }
+
+    private int firstQuizQuestionCount() throws Exception {
+        MvcResult list = mockMvc.perform(get("/api/quizzes").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andReturn();
+        Number questionCount = JsonPath.read(list.getResponse().getContentAsString(), "$[0].questionCount");
+        return questionCount.intValue();
     }
 
     private String createGuestSession() throws Exception {

@@ -50,19 +50,20 @@ public class LobbyRealtimePresenceService {
                 .add(subscriptionKey);
         incrementLobbyViewCounter(next);
 
-        return new TrackedSubscription(parsed.lobbyCode(), parsed.channel());
+        return new TrackedSubscription(next.lobbyCode(), next.channel(), next.lobbyViewTracked());
     }
 
-    public void onUnsubscribe(String sessionId, String subscriptionId) {
-        if (sessionId == null || sessionId.isBlank()) return;
-        if (subscriptionId == null || subscriptionId.isBlank()) return;
+    public TrackedSubscription onUnsubscribe(String sessionId, String subscriptionId) {
+        if (sessionId == null || sessionId.isBlank()) return null;
+        if (subscriptionId == null || subscriptionId.isBlank()) return null;
 
         String subscriptionKey = subscriptionKey(sessionId, subscriptionId);
         SubscriptionInfo removed = subscriptionsByKey.remove(subscriptionKey);
-        if (removed == null) return;
+        if (removed == null) return null;
 
         unregisterFromSession(sessionId, subscriptionKey);
         decrementLobbyViewCounter(removed);
+        return new TrackedSubscription(removed.lobbyCode(), removed.channel(), removed.lobbyViewTracked());
     }
 
     public DisconnectPresence onDisconnect(String sessionId) {
@@ -144,7 +145,7 @@ public class LobbyRealtimePresenceService {
         CHAT
     }
 
-    public record TrackedSubscription(String lobbyCode, Channel channel) {
+    public record TrackedSubscription(String lobbyCode, Channel channel, boolean lobbyViewTracked) {
     }
 
     public record DisconnectPresence(String guestSessionId, Set<String> lobbyCodes) {

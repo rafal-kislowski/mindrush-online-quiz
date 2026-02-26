@@ -12,6 +12,29 @@ public interface QuizQuestionRepository extends JpaRepository<QuizQuestion, Long
     List<QuizQuestion> findAllByQuizIdOrderByOrderIndexAsc(Long quizId);
     Optional<QuizQuestion> findByIdAndQuizId(Long id, Long quizId);
 
+    @Query("""
+            select qq
+            from QuizQuestion qq
+            join qq.quiz q
+            where q.category.id = :categoryId and q.status = :status
+            order by q.id asc, qq.orderIndex asc
+            """)
+    List<QuizQuestion> findAllByQuizCategoryIdAndQuizStatusOrderByQuizIdAscOrderIndexAsc(
+            @Param("categoryId") Long categoryId,
+            @Param("status") QuizStatus status
+    );
+
     @Query("select count(q.id) from QuizQuestion q where q.quiz.id = :quizId")
     long countByQuizId(@Param("quizId") Long quizId);
+
+    @Query("""
+            select count(qq.id)
+            from QuizQuestion qq
+            join qq.quiz q
+            where q.category.id = :categoryId and q.status = :status
+            """)
+    long countByQuizCategoryIdAndQuizStatus(
+            @Param("categoryId") Long categoryId,
+            @Param("status") QuizStatus status
+    );
 }

@@ -26,6 +26,10 @@ public class GameSession {
     private Long quizId;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "mode", length = 32, nullable = false)
+    private GameSessionMode mode;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 16, nullable = false)
     private GameStatus status;
 
@@ -33,11 +37,17 @@ public class GameSession {
     @Column(name = "stage", length = 16, nullable = false)
     private GameStage stage;
 
-    @Column(name = "stage_ends_at", nullable = false)
+    @Column(name = "stage_ends_at")
     private Instant stageEndsAt;
 
     @Column(name = "question_duration_ms")
     private Integer questionDurationMs;
+
+    @Column(name = "question_pool_category_id")
+    private Long questionPoolCategoryId;
+
+    @Column(name = "lives_remaining")
+    private Integer livesRemaining;
 
     @Column(name = "current_question_index", nullable = false)
     private int currentQuestionIndex;
@@ -51,6 +61,13 @@ public class GameSession {
     @Column(name = "ended_at")
     private Instant endedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "finish_reason", length = 24)
+    private GameFinishReason finishReason;
+
+    @Column(name = "last_activity_at")
+    private Instant lastActivityAt;
+
     @Column(name = "rewards_applied", nullable = false, columnDefinition = "boolean not null default false")
     private boolean rewardsApplied;
 
@@ -63,6 +80,7 @@ public class GameSession {
     public static GameSession startNew(
             String lobbyId,
             Long quizId,
+            GameSessionMode mode,
             Instant now,
             Duration preCountdownDuration,
             Integer questionDurationMs
@@ -71,14 +89,19 @@ public class GameSession {
         session.id = UUID.randomUUID().toString();
         session.lobbyId = lobbyId;
         session.quizId = quizId;
+        session.mode = mode == null ? GameSessionMode.STANDARD : mode;
         session.status = GameStatus.IN_PROGRESS;
         session.stage = GameStage.PRE_COUNTDOWN;
         session.stageEndsAt = now.plus(preCountdownDuration);
         session.questionDurationMs = questionDurationMs;
+        session.questionPoolCategoryId = null;
+        session.livesRemaining = session.mode == GameSessionMode.THREE_LIVES ? 3 : null;
         session.currentQuestionIndex = 0;
         session.createdAt = now;
         session.startedAt = now;
         session.endedAt = null;
+        session.finishReason = null;
+        session.lastActivityAt = now;
         session.rewardsApplied = false;
         session.rewardsAppliedAt = null;
         return session;
@@ -94,6 +117,14 @@ public class GameSession {
 
     public Long getQuizId() {
         return quizId;
+    }
+
+    public GameSessionMode getMode() {
+        return mode == null ? GameSessionMode.STANDARD : mode;
+    }
+
+    public void setMode(GameSessionMode mode) {
+        this.mode = mode == null ? GameSessionMode.STANDARD : mode;
     }
 
     public GameStatus getStatus() {
@@ -128,6 +159,22 @@ public class GameSession {
         this.questionDurationMs = questionDurationMs;
     }
 
+    public Long getQuestionPoolCategoryId() {
+        return questionPoolCategoryId;
+    }
+
+    public void setQuestionPoolCategoryId(Long questionPoolCategoryId) {
+        this.questionPoolCategoryId = questionPoolCategoryId;
+    }
+
+    public Integer getLivesRemaining() {
+        return livesRemaining;
+    }
+
+    public void setLivesRemaining(Integer livesRemaining) {
+        this.livesRemaining = livesRemaining;
+    }
+
     public int getCurrentQuestionIndex() {
         return currentQuestionIndex;
     }
@@ -150,6 +197,22 @@ public class GameSession {
 
     public void setEndedAt(Instant endedAt) {
         this.endedAt = endedAt;
+    }
+
+    public GameFinishReason getFinishReason() {
+        return finishReason;
+    }
+
+    public void setFinishReason(GameFinishReason finishReason) {
+        this.finishReason = finishReason;
+    }
+
+    public Instant getLastActivityAt() {
+        return lastActivityAt;
+    }
+
+    public void setLastActivityAt(Instant lastActivityAt) {
+        this.lastActivityAt = lastActivityAt;
     }
 
     public boolean isRewardsApplied() {

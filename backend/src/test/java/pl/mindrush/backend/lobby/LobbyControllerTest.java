@@ -194,6 +194,53 @@ class LobbyControllerTest {
     }
 
     @Test
+    void createLobby_whenSoloGameIsInProgress_returnsConflict() throws Exception {
+        String ownerSessionId = createGuestSession();
+        Long quizId = firstQuizId();
+
+        mockMvc.perform(post("/api/solo-games/start")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quizId\":" + quizId + ",\"mode\":\"STANDARD\"}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("You already have an active game in progress. Finish it before you create a lobby."));
+    }
+
+    @Test
+    void joinLobby_whenSoloGameIsInProgress_returnsConflict() throws Exception {
+        String ownerSessionId = createGuestSession();
+        String joiningSessionId = createGuestSession();
+        Long quizId = firstQuizId();
+
+        MvcResult created = mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String code = jsonValue(created.getResponse().getContentAsString(), "\"code\":\"", "\"").orElseThrow();
+
+        mockMvc.perform(post("/api/solo-games/start")
+                        .cookie(new Cookie("guestSessionId", joiningSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quizId\":" + quizId + ",\"mode\":\"STANDARD\"}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", joiningSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("You already have an active game in progress. Finish it before you join a lobby."));
+    }
+
+    @Test
     void setMaxPlayers_ownerCanChangeButNotBelowCurrentPlayers() throws Exception {
         Cookie access = registerAndGetAccessCookie();
 

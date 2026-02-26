@@ -200,17 +200,20 @@ Admin-only quiz endpoints (requires `ADMIN` role):
 Optional dev seed data:
 - Seed is enabled by default for local development (`app.seed.enabled=true`) and runs only when there are no quizzes in DB.
 - To disable: set `app.seed.enabled=false`.
+- Current seed creates `12` starter quizzes with `5` questions each (good for UI/pagination testing).
 
 ## Game (lobby)
 Real-time game flow on top of lobbies with REST commands and WebSocket notifications.
 
 Endpoints (requires a valid `guestSessionId` cookie and being in the lobby):
-- `POST /api/lobbies/{code}/game/start` -> starts a game (owner only), body: `{ "quizId": 1 }`
+- `POST /api/lobbies/{code}/game/start` -> starts a game (owner only), body: `{ "quizId": 1, "mode": "STANDARD|THREE_LIVES|TRAINING" }`
 - `GET /api/lobbies/{code}/game/state` -> current state (question/reveal/finished)
 - `POST /api/lobbies/{code}/game/answer` -> submit answer, body: `{ "questionId": 123, "optionId": 456 }`
 - `POST /api/lobbies/{code}/game/end` -> end game (owner only)
 
 Notes:
+- `mode` is optional on start; default is `STANDARD`.
+- `THREE_LIVES` and `TRAINING` are allowed only in solo lobbies (1 player).
 - Both players get the same question; answer options are shuffled per player.
 - The response includes per-player correctness only in `REVEAL` stage (after everyone answers).
 - Scoring uses a base score + a speed bonus for correct answers (faster answers give more points). Ties are broken by total points, then correct answers, then total correct answer time.
@@ -218,10 +221,44 @@ Notes:
   - `QUESTION` duration is taken from the quiz settings (`questionTimeLimitSeconds`), default `15s`.
   - `REVEAL` defaults to `3s` (configurable via `game.guest.reveal-duration`).
   - The response exposes `stageEndsAt` and `stageTotalMs` for countdowns.
+- In `TRAINING` mode, question stage has no timer (`stageEndsAt=null`, `stageTotalMs=null`).
 - Starting a game is blocked if the quiz is not `ACTIVE`.
 - If a player doesn't answer before `stageEndsAt`, the server records it as a wrong answer and the game continues normally.
 - Auto-advance can be driven by polling `GET /state`, or by the built-in scheduler (`game.scheduler.enabled=true`).
 - Lobby status becomes `IN_GAME` while a game is active, then returns to `OPEN` after the game ends.
+- `GameStateDto` additionally exposes:
+  - `mode` (`STANDARD`, `THREE_LIVES`, `TRAINING`)
+  - `gameSessionId`
+  - `finishReason` (`COMPLETED`, `MANUAL_END`, `EXPIRED`) when stage is finished
+  - `livesRemaining` / `wrongAnswers` for `THREE_LIVES`
+
+## Solo games
+Standalone solo sessions (no lobby code needed):
+
+- `POST /api/solo-games/start` -> starts solo game, body: `{ "quizId": 1, "mode": "STANDARD|THREE_LIVES|TRAINING" }`
+- `GET /api/solo-games/{gameSessionId}/state` -> current solo state
+- `POST /api/solo-games/{gameSessionId}/answer` -> submit answer, body: `{ "questionId": 123, "optionId": 456 }`
+- `POST /api/solo-games/{gameSessionId}/end` -> manually finish solo game
+
+Notes:
+- User/guest can have only one active game at a time (lobby or solo).
+- Starting solo game is blocked if user/guest is currently in a lobby.
+- Solo sessions can expire after inactivity (finished with `finishReason=EXPIRED`).
+- Always send `questionId` exactly as returned by `/state` (for some solo flows it can be a synthetic negative id).
+
+## Active game lookup
+Detect whether current guest has an active game:
+
+- `GET /api/games/current`
+  - `200 OK` with payload `{ "type":"SOLO|LOBBY", "gameSessionId":"...", "lobbyCode":"..." }`
+  - `204 No Content` if there is no active game
+
+## Casual best record (3 lives)
+- `GET /api/casual/three-lives/best` -> best stored result for current guest/user session
+
+Notes:
+- Requires valid guest session cookie (call `POST /api/guest/session` first if needed).
+- Returns either best record payload (`points`, `answered`, `durationMs`, `updatedAt`) or `null` when no record exists yet.
 
 ## WebSocket (STOMP)
 The backend exposes STOMP WebSocket channels for lobby/game/chat updates.
