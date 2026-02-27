@@ -1,5 +1,5 @@
 import { AsyncPipe, NgFor, NgIf } from '@angular/common';
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
 import {
   NavigationEnd,
   Router,
@@ -130,6 +130,10 @@ export class AppComponent implements OnInit, OnDestroy {
   currentGame: ActiveGameDto | null = null;
   private currentLobbyEventsSub: Subscription | null = null;
   private currentLobbyEventsCode: string | null = null;
+  private scrollResetRafId: number | null = null;
+
+  @ViewChild('contentHost')
+  private contentHostRef?: ElementRef<HTMLElement>;
 
   readonly menuItems: Array<{
     label: string;
@@ -144,6 +148,9 @@ export class AppComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.particlesService.initParticles();
+    if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+    }
 
     this.sessionService.ensure().subscribe();
     this.authService.ensureLoaded().subscribe((u) => {
@@ -158,12 +165,14 @@ export class AppComponent implements OnInit, OnDestroy {
         .subscribe(() => {
           this.sidebarOpen = false;
           this.updateContentFlags(this.router.url);
+          this.resetViewScrollToTop();
           this.refreshCurrentLobby();
           this.refreshCurrentGame();
         })
     );
 
     this.updateContentFlags(this.router.url);
+    this.resetViewScrollToTop();
     this.startCurrentLobbyTracking();
     this.startCurrentGameTracking();
 
@@ -176,6 +185,10 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.scrollResetRafId != null) {
+      cancelAnimationFrame(this.scrollResetRafId);
+      this.scrollResetRafId = null;
+    }
     this.currentLobbyEventsSub?.unsubscribe();
     this.currentLobbyEventsSub = null;
     this.currentLobbyEventsCode = null;
@@ -312,6 +325,29 @@ export class AppComponent implements OnInit, OnDestroy {
       .subscribe((game) => {
         this.currentGame = game;
       });
+  }
+
+  private resetViewScrollToTop(): void {
+    const doReset = () => {
+      const contentEl = this.contentHostRef?.nativeElement;
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      if (contentEl) {
+        contentEl.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+        contentEl.scrollTop = 0;
+      }
+    };
+
+    doReset();
+
+    if (this.scrollResetRafId != null) {
+      cancelAnimationFrame(this.scrollResetRafId);
+    }
+    this.scrollResetRafId = requestAnimationFrame(() => {
+      this.scrollResetRafId = null;
+      doReset();
+    });
   }
 
   private syncCurrentLobbyEventsSubscription(code: string | null | undefined): void {

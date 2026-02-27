@@ -614,7 +614,7 @@
                         class="row-item"
                         role="listitem"
                         *ngFor="let p of l.players"
-                        [class.is-me]="p.isYou"
+                        [class.is-me]="isLobbyPlayerMe(p)"
                         [class.is-ready]="p.ready"
                         [class.is-away]="p.away"
                         [class.has-actions]="canManagePlayer(p)"
@@ -624,11 +624,18 @@
                             class="player-avatar"
                             [displayName]="p.displayName"
                             [isAuthenticated]="isAuthenticatedLobbyPlayer(p)"
-                            [size]="30"
+                            [size]="33"
                             [decorative]="true"
                           ></app-player-avatar>
                           <span class="name" [class.name--away]="p.away" [class.name--owner]="p.isOwner">
                             {{ p.displayName }}<span class="name-away" *ngIf="p.away"> (Away)</span>
+                          </span>
+                          <span
+                            class="rank-pill"
+                            [style.--rank-color]="playerRankColor(p)"
+                            [attr.aria-label]="'Rank ' + playerRankName(p)"
+                          >
+                            {{ playerRankName(p) }}
                           </span>
                         </div>
                         <div class="right">

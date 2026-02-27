@@ -218,6 +218,7 @@
         <div
           class="row"
           *ngFor="let row of pagedRows; trackBy: trackByCode"
+          [class.is-own]="isOwnLobby(row)"
           [class.is-unjoinable]="!canJoin(row) && !isOwnLobby(row)"
           [class.is-joining]="joiningCode === row.code"
         >
@@ -227,14 +228,13 @@
           </div>
 
           <div class="cell cell--leader">
-            <span class="avatar" aria-hidden="true">{{ leaderInitials(row.leaderDisplayName) }}</span>
+            <app-player-avatar
+              class="avatar"
+              [displayName]="row.leaderDisplayName"
+              [isAuthenticated]="isAuthenticatedOwner(row)"
+              [size]="30"
+            />
             <span class="leader-name">{{ row.leaderDisplayName }}</span>
-            <span
-              class="owner-pill"
-              [class.owner-pill--auth]="row.ownerType === 'AUTHENTICATED'"
-            >
-              {{ ownerTypeLabel(row) }}
-            </span>
           </div>
 
           <div class="cell cell--privacy">

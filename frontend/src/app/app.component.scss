@@ -293,12 +293,21 @@
 }
 
 .face__overlayLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 9px;
   letter-spacing: 0.12em;
   font-weight: 900;
   color: rgba(255, 255, 255, 0.7);
   text-transform: uppercase;
   line-height: 1.1;
+}
+
+.face__overlayLabel i {
+  font-size: 8px;
+  color: rgba(255, 205, 77, 0.95);
+  text-shadow: 0 0 8px rgba(255, 205, 77, 0.3);
 }
 
 .face__overlayValue {
@@ -461,20 +470,14 @@
 .profile-card__coins {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
 }
 
-.coin {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 205, 77, 0.95),
-    rgba(255, 138, 43, 0.75)
-  );
-  box-shadow: 0 0 0 3px rgba(255, 138, 43, 0.12);
+.coin-icon {
+  font-size: 11px;
+  line-height: 1;
+  color: rgba(255, 188, 96, 0.95);
+  text-shadow: 0 0 10px rgba(255, 138, 43, 0.28);
 }
 
 @keyframes avatarAura {

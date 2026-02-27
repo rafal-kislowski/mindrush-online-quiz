@@ -55,7 +55,10 @@
               ></app-player-avatar>
 
               <div class="face__overlay">
-                <div class="face__overlayLabel">XP</div>
+                <div class="face__overlayLabel">
+                  <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                  <span>XP</span>
+                </div>
                 <div class="face__overlayValue" *ngIf="!p.maxLevel">
                   {{ formatInt(p.xpInLevel) }}/{{ formatInt(p.levelXpNeeded) }}
                 </div>
@@ -89,7 +92,7 @@
             <div class="profile-card__stat">
               <dt>Coins</dt>
               <dd class="profile-card__coins profile-card__value profile-card__value--rank">
-                {{ formatInt(p.coins) }} <span class="coin" aria-hidden="true"></span>
+                {{ formatInt(p.coins) }} <i class="fa-solid fa-coins coin-icon" aria-hidden="true"></i>
               </dd>
             </div>
           </dl>
@@ -352,6 +355,7 @@
     </header>
 
     <main
+      #contentHost
       class="content"
       [class.content--wide]="contentWide"
       [class.content--full]="contentFull"

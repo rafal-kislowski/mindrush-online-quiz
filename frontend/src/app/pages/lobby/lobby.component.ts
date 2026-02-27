@@ -20,6 +20,7 @@ import { LobbyApi } from '../../core/api/lobby.api';
 import { QuizApi } from '../../core/api/quiz.api';
 import { LobbyDto, LobbyPlayerDto } from '../../core/models/lobby.models';
 import { QuizListItemDto } from '../../core/models/quiz.models';
+import { rankForPoints } from '../../core/progression/progression';
 import { AuthService } from '../../core/auth/auth.service';
 import { SessionService } from '../../core/session/session.service';
 import { PlayerAvatarComponent } from '../../core/ui/player-avatar.component';
@@ -144,6 +145,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   chatMessages: LobbyChatMessageDto[] = [];
   private chatMessageKeys = new Set<string>();
   meDisplayName: string | null = null;
+  private meSessionRankPoints: number | null = null;
 
   codeCopied = false;
   private codeCopiedTimeout: number | null = null;
@@ -211,16 +213,15 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private get myLobbyPlayer() {
     const players = this.lobby?.players ?? [];
-    const explicit = players.find((p) => p.isYou);
+    const explicit = players.find((p) => this.isLobbyPlayerMe(p, players));
     if (explicit) return explicit;
-    const myName = (this.meDisplayName ?? '').trim();
-    if (!myName) return null;
-    return players.find((p) => p.displayName === myName) ?? null;
+    return null;
   }
 
   get showJoinCard(): boolean {
     const lobby = this.lobby;
     if (!lobby) return false;
+    if (this.redirectingToDashboard) return false;
     if (this.intentionalLeaveInProgress) return false;
     if (this.roomTransitionBusy) return false;
     if (this.joinState === 'joined') return false;
@@ -274,6 +275,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.subscriptions.add(
       this.session$.subscribe((s) => {
         this.meDisplayName = s?.displayName ?? null;
+        this.meSessionRankPoints = this.toNonNegativeInt(s?.rankPoints);
       })
     );
 
@@ -436,7 +438,9 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     const previousLobby = this.lobby;
+    lobby = this.normalizeLobbySnapshot(lobby, previousLobby);
     const prevSelectedQuizId = this.selectedQuizId ?? null;
+    const prevMatchType = this.matchType;
     this.lobby = lobby;
     if (this.playerMenuOpenForParticipantId != null) {
       const exists = (lobby.players ?? []).some(
@@ -464,8 +468,8 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       this.selectedQuizId = lobby.selectedQuizId ?? null;
     }
 
-    this.syncMatchTypeFromSelectedQuiz();
-    if (prevSelectedQuizId !== (this.selectedQuizId ?? null)) {
+    this.syncMatchTypeFromLobby(lobby);
+    if (prevSelectedQuizId !== (this.selectedQuizId ?? null) || prevMatchType !== this.matchType) {
       this.scheduleMarqueeMeasure();
     }
 
@@ -621,12 +625,8 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.autoJoinBlocked) return;
     if (this.joinState === 'joined') return;
     if (!this.canAutoJoinLobby(lobby)) {
-      if (
-        lobby.players &&
-        lobby.maxPlayers &&
-        lobby.players.length >= lobby.maxPlayers
-      ) {
-        this.joinState = 'viewOnly';
+      if (this.isLobbyJoinBlockedForVisitor(lobby)) {
+        this.redirectToDashboardForBlockedJoin(lobby);
       }
       return;
     }
@@ -719,6 +719,17 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     return status !== 'OPEN' && status !== 'IN_GAME';
   }
 
+  private isLobbyJoinBlockedForVisitor(lobby: LobbyDto | null): boolean {
+    if (!lobby) return false;
+    const status = String(lobby.status ?? '').toUpperCase();
+    if (status && status !== 'OPEN') return true;
+    return (
+      !!lobby.players &&
+      !!lobby.maxPlayers &&
+      lobby.players.length >= lobby.maxPlayers
+    );
+  }
+
   private redirectToDashboardForUnavailableLobby(
     message: string,
     startedAt?: number
@@ -734,6 +745,32 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       });
       void this.router.navigate(['/']);
     });
+  }
+
+  private redirectToDashboardForBlockedJoin(lobby: LobbyDto | null): void {
+    if (this.redirectingToDashboard || this.destroyed) return;
+    this.redirectingToDashboard = true;
+    this.autoJoinBlocked = true;
+    this.joinState = 'viewOnly';
+    this.joinRequestInFlight = false;
+    this.autoJoinInFlight = false;
+
+    const status = String(lobby?.status ?? '').toUpperCase();
+    const isFull =
+      !!lobby?.players &&
+      !!lobby?.maxPlayers &&
+      lobby.players.length >= lobby.maxPlayers;
+    const message = isFull
+      ? 'Lobby is full. Redirected to dashboard.'
+      : status === 'IN_GAME'
+        ? 'Lobby game is already in progress. Redirected to dashboard.'
+        : 'Lobby is not joinable. Redirected to dashboard.';
+
+    this.toast.warning(message, {
+      title: 'Lobby',
+      dedupeKey: `lobby:blocked-join:${this.code}:${status}:${isFull ? 'full' : 'status'}`,
+    });
+    void this.router.navigate(['/']);
   }
 
   private redirectToDashboardForForcedRemoval(reason: 'kick' | 'ban'): void {
@@ -911,7 +948,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       next: (quizzes) => {
         this.quizzes = quizzes;
         this.recomputeCategoryOptions();
-        this.syncMatchTypeFromSelectedQuiz();
+        this.syncMatchTypeFromLobby(this.lobby);
         this.quizzesReady = true;
       },
       error: () => {
@@ -1065,9 +1102,17 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   isAuthenticatedLobbyPlayer(player: LobbyPlayerDto): boolean {
+    if (this.isLoggedIn && this.isLobbyPlayerMe(player)) return true;
     if (player?.isAuthenticated != null) return player.isAuthenticated;
-    if (player?.isYou) return this.isLoggedIn;
     return false;
+  }
+
+  playerRankName(player: LobbyPlayerDto): string {
+    return rankForPoints(this.playerRankPoints(player)).name;
+  }
+
+  playerRankColor(player: LobbyPlayerDto): string {
+    return rankForPoints(this.playerRankPoints(player)).color;
   }
 
   canManagePlayer(player: LobbyPlayerDto): boolean {
@@ -1154,6 +1199,18 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     return value > 0 ? value : null;
   }
 
+  private playerRankPoints(player: LobbyPlayerDto): number {
+    const points = this.toNonNegativeInt(player?.rankPoints);
+    if (points != null && points > 0) return points;
+
+    if (this.isLobbyPlayerMe(player)) {
+      const fallback = this.resolveLoggedInRankPoints();
+      if (fallback != null && fallback > 0) return fallback;
+    }
+
+    return points ?? 0;
+  }
+
   setPickerScope(scope: 'official' | 'custom' | 'library'): void {
     if (this.matchType === 'RANKED' && scope !== 'official') return;
     this.pickerScope = scope;
@@ -1184,17 +1241,43 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
 
   setMatchType(next: 'CASUAL' | 'RANKED'): void {
     if (this.matchType === next) return;
-    this.matchType = next;
-
-    if (next === 'RANKED') {
-      this.pickerScope = 'official';
+    const lobby = this.lobby;
+    if (!lobby?.isOwner) {
+      this.matchType = next;
+      if (next === 'RANKED') this.pickerScope = 'official';
+      return;
     }
+    if (this.selectedQuizSaving) return;
 
-    const selected = this.selectedQuiz;
-    if (!this.lobby?.isOwner) return;
-    if (!selected) return;
-    if (this.quizMatchesMatchType(selected, next)) return;
-    this.clearSelectedQuiz();
+    const prevType = this.matchType;
+    const prevQuizId = this.selectedQuizId ?? null;
+    const rankingEnabled = next === 'RANKED';
+    const selectedQuiz = this.selectedQuiz;
+    const nextQuizId =
+      rankingEnabled && selectedQuiz && !this.quizSupportsRanking(selectedQuiz)
+        ? null
+        : prevQuizId;
+
+    this.error = null;
+    this.matchType = next;
+    this.selectedQuizId = nextQuizId;
+    if (rankingEnabled) this.pickerScope = 'official';
+
+    this.selectedQuizSaving = true;
+    this.lobbyApi
+      .setSelectedQuiz(this.code, nextQuizId, rankingEnabled)
+      .subscribe({
+        next: (updated) => {
+          this.selectedQuizSaving = false;
+          this.onLobbyUpdate(updated);
+        },
+        error: (err) => {
+          this.selectedQuizSaving = false;
+          this.matchType = prevType;
+          this.selectedQuizId = prevQuizId;
+          this.error = apiErrorMessage(err, 'Failed to update match type');
+        },
+      });
   }
 
   toggleCategoryMenu(): void {
@@ -1248,7 +1331,8 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const matchesScope = (q: QuizListItemDto): boolean => {
       const raw = (q as any)?.source ?? (q as any)?.scope ?? (q as any)?.type ?? null;
-      if (typeof raw !== 'string' || !raw.trim()) return true;
+      // Missing source metadata means system quiz -> treat as "official".
+      if (typeof raw !== 'string' || !raw.trim()) return scope === 'official';
       const v = raw.trim().toLowerCase();
       if (v === 'official') return scope === 'official';
       if (v === 'custom') return scope === 'custom';
@@ -1296,7 +1380,9 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     const previous = this.selectedQuizId;
     this.selectedQuizSaving = true;
     this.selectedQuizId = quizId;
-    this.lobbyApi.setSelectedQuiz(this.code, quizId).subscribe({
+    this.lobbyApi
+      .setSelectedQuiz(this.code, quizId, this.matchType === 'RANKED')
+      .subscribe({
       next: (updated) => {
         this.selectedQuizSaving = false;
         this.onLobbyUpdate(updated);
@@ -1309,7 +1395,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
         this.selectedQuizId = previous ?? null;
         this.error = apiErrorMessage(err, 'Failed to update selected quiz');
       },
-    });
+      });
   }
 
   clearSelectedQuiz(): void {
@@ -1320,7 +1406,9 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     const previous = this.selectedQuizId;
     this.selectedQuizSaving = true;
     this.selectedQuizId = null;
-    this.lobbyApi.setSelectedQuiz(this.code, null).subscribe({
+    this.lobbyApi
+      .setSelectedQuiz(this.code, null, this.matchType === 'RANKED')
+      .subscribe({
       next: (updated) => {
         this.selectedQuizSaving = false;
         this.onLobbyUpdate(updated);
@@ -1330,7 +1418,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
         this.selectedQuizId = previous ?? null;
         this.error = apiErrorMessage(err, 'Failed to clear selected quiz');
       },
-    });
+      });
   }
 
   sendChat(): void {
@@ -1415,14 +1503,24 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private quizMatchesMatchType(q: QuizListItemDto, type: 'CASUAL' | 'RANKED'): boolean {
-    const isRanked = q.gameMode === 'RANKED' || q.includeInRanking === true;
-    return type === 'RANKED' ? isRanked : !isRanked;
+    if (type === 'CASUAL') return true;
+    return this.quizSupportsRanking(q);
   }
 
-  private syncMatchTypeFromSelectedQuiz(): void {
-    const q = this.selectedQuiz;
-    if (!q) return;
-    const next: 'CASUAL' | 'RANKED' = this.quizMatchesMatchType(q, 'RANKED') ? 'RANKED' : 'CASUAL';
+  private quizSupportsRanking(q: QuizListItemDto | null | undefined): boolean {
+    return q?.includeInRanking === true;
+  }
+
+  private syncMatchTypeFromLobby(lobby: LobbyDto | null): void {
+    const explicitRanking = lobby?.rankingEnabled;
+    let next: 'CASUAL' | 'RANKED';
+    if (explicitRanking != null) {
+      next = explicitRanking ? 'RANKED' : 'CASUAL';
+    } else {
+      const q = this.selectedQuiz;
+      next = this.quizSupportsRanking(q) ? 'RANKED' : 'CASUAL';
+    }
+
     if (this.matchType === next) return;
     this.matchType = next;
     if (next === 'RANKED') this.pickerScope = 'official';
@@ -1656,8 +1754,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     fromAutoJoin: boolean
   ): void {
     if (this.shouldShowViewOnlyState(message)) {
-      this.joinState = 'viewOnly';
-      this.error = null;
+      this.redirectToDashboardForBlockedJoin(this.lobby);
       return;
     }
 
@@ -1819,7 +1916,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
 
       // New participant appeared in the lobby.
       if (!prevKeys.has(key)) {
-        if (player.isYou) continue;
+        if (this.isLobbyPlayerMe(player, nextPlayers)) continue;
         const text = `${displayName} joined the lobby.`;
         if (this.hasRecentSystemMessageText(text)) continue;
         this.appendChatMessage({
@@ -1861,6 +1958,103 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     const joinedAt = String(player.joinedAt ?? '').trim();
     const displayName = String(player.displayName ?? '').trim();
     return `${displayName}|${joinedAt}`;
+  }
+
+  isLobbyPlayerMe(
+    player: LobbyPlayerDto | null | undefined,
+    players: readonly LobbyPlayerDto[] = this.lobby?.players ?? []
+  ): boolean {
+    if (!player) return false;
+    if (player.isYou === true) return true;
+
+    const myName = this.normalizedDisplayName(this.meDisplayName);
+    if (!myName) return false;
+
+    const playerName = this.normalizedDisplayName(player.displayName);
+    if (!playerName || playerName !== myName) return false;
+
+    const sameNameCount = players.reduce((count, p) => {
+      return this.normalizedDisplayName(p.displayName) === myName ? count + 1 : count;
+    }, 0);
+    return sameNameCount === 1;
+  }
+
+  private normalizeLobbySnapshot(current: LobbyDto, previous: LobbyDto | null): LobbyDto {
+    const nextPlayers = current.players ?? [];
+    if (!nextPlayers.length) return current;
+
+    const prevPlayers = previous?.players ?? [];
+    const prevByIdentity = new Map<string, LobbyPlayerDto>();
+    for (const prev of prevPlayers) {
+      const key = this.playerIdentityKey(prev);
+      if (!key) continue;
+      prevByIdentity.set(key, prev);
+    }
+
+    const normalizedPlayers = nextPlayers.map((player) => {
+      const key = this.playerIdentityKey(player);
+      const prev = key ? prevByIdentity.get(key) : undefined;
+      return this.normalizeLobbyPlayer(player, prev, nextPlayers);
+    });
+    return { ...current, players: normalizedPlayers };
+  }
+
+  private normalizeLobbyPlayer(
+    player: LobbyPlayerDto,
+    previous: LobbyPlayerDto | undefined,
+    allPlayers: readonly LobbyPlayerDto[]
+  ): LobbyPlayerDto {
+    const out: LobbyPlayerDto = { ...player };
+
+    if (out.isYou == null && previous?.isYou != null) {
+      out.isYou = previous.isYou;
+    }
+    if (out.isAuthenticated == null && previous?.isAuthenticated != null) {
+      out.isAuthenticated = previous.isAuthenticated;
+    }
+
+    const currentRankPoints = this.toNonNegativeInt(out.rankPoints);
+    const previousRankPoints = this.toNonNegativeInt(previous?.rankPoints);
+    if (currentRankPoints == null && previousRankPoints != null) {
+      out.rankPoints = previousRankPoints;
+    }
+
+    if (this.isLoggedIn && this.isLobbyPlayerMe(out, allPlayers)) {
+      out.isYou = true;
+      out.isAuthenticated = true;
+      const fallbackRank = this.resolveLoggedInRankPoints();
+      const resolvedRank = this.toNonNegativeInt(out.rankPoints);
+      if (fallbackRank != null && (resolvedRank == null || (resolvedRank === 0 && fallbackRank > 0))) {
+        out.rankPoints = fallbackRank;
+      }
+    }
+
+    return out;
+  }
+
+  private resolveLoggedInRankPoints(): number | null {
+    if (!this.isLoggedIn) return null;
+
+    const authRankPoints = this.toNonNegativeInt(this.auth.snapshot?.rankPoints);
+    const sessionRankPoints = this.meSessionRankPoints;
+
+    if (authRankPoints == null) return sessionRankPoints;
+    if (sessionRankPoints == null) return authRankPoints;
+
+    if (authRankPoints === 0 && sessionRankPoints > 0) {
+      return sessionRankPoints;
+    }
+    return authRankPoints;
+  }
+
+  private normalizedDisplayName(value: string | null | undefined): string {
+    return String(value ?? '').trim().toLowerCase();
+  }
+
+  private toNonNegativeInt(value: unknown): number | null {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return null;
+    return Math.max(0, Math.floor(numeric));
   }
 
   setPrivacyMode(mode: 'public' | 'private'): void {

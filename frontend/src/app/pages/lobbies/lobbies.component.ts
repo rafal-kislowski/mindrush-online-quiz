@@ -2,9 +2,12 @@ import { CommonModule } from '@angular/common';
 import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { apiErrorMessage } from '../../core/api/api-error.util';
+import { AuthService } from '../../core/auth/auth.service';
 import { LobbyApi } from '../../core/api/lobby.api';
 import { ActiveLobbyDto, LobbyOwnerType } from '../../core/models/lobby.models';
+import { PlayerAvatarComponent } from '../../core/ui/player-avatar.component';
 import { ToastService } from '../../core/ui/toast.service';
 
 type LobbySort = 'newest' | 'oldest' | 'playersDesc' | 'playersAsc';
@@ -14,7 +17,7 @@ type LobbiesMenuId = 'roomFilter' | 'sort' | 'pageSize';
 @Component({
   selector: 'app-lobbies',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, PlayerAvatarComponent],
   templateUrl: './lobbies.component.html',
   styleUrl: './lobbies.component.scss',
 })
@@ -23,7 +26,10 @@ export class LobbiesComponent implements OnInit, OnDestroy {
   private readonly minJoinTransitionMs = 1500;
   private refreshTimerId: number | null = null;
   private readonly joinDelayTimers = new Set<number>();
+  private readonly subscriptions = new Subscription();
   private destroyed = false;
+  private isLoggedIn = false;
+  private ownerFilterTouched = false;
 
   loading = true;
   syncing = false;
@@ -61,6 +67,7 @@ export class LobbiesComponent implements OnInit, OnDestroy {
   readonly pageSizeOptions: ReadonlyArray<10 | 25 | 50> = [10, 25, 50];
 
   constructor(
+    private readonly auth: AuthService,
     private readonly lobbyApi: LobbyApi,
     private readonly router: Router,
     private readonly toast: ToastService
@@ -77,6 +84,14 @@ export class LobbiesComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.subscriptions.add(
+      this.auth.user$.subscribe((user) => {
+        this.isLoggedIn = !!user;
+        this.applyDefaultOwnerFilter();
+        this.rows = this.rows.map((row) => this.normalizeActiveRow(row));
+      })
+    );
+    this.auth.ensureLoaded().subscribe({ error: () => {} });
     this.refresh(false);
     this.refreshTimerId = window.setInterval(() => this.refresh(true), this.refreshMs);
   }
@@ -91,6 +106,7 @@ export class LobbiesComponent implements OnInit, OnDestroy {
       window.clearTimeout(timerId);
     }
     this.joinDelayTimers.clear();
+    this.subscriptions.unsubscribe();
   }
 
   goHome(): void {
@@ -111,8 +127,9 @@ export class LobbiesComponent implements OnInit, OnDestroy {
     this.closeMenus();
   }
 
-  setOwnerFilter(type: LobbyOwnerType): void {
+  setOwnerFilter(type: LobbyOwnerType, fromUser: boolean = true): void {
     if (this.ownerFilter === type) return;
+    if (fromUser) this.ownerFilterTouched = true;
     this.ownerFilter = type;
     this.page = 1;
   }
@@ -296,8 +313,8 @@ export class LobbiesComponent implements OnInit, OnDestroy {
     this.joinLobby(row.code, startedAt);
   }
 
-  ownerTypeLabel(row: ActiveLobbyDto): string {
-    return row.ownerType === 'AUTHENTICATED' ? 'User' : 'Guest';
+  isAuthenticatedOwner(row: ActiveLobbyDto): boolean {
+    return this.resolvedOwnerType(row) === 'AUTHENTICATED';
   }
 
   createdAgo(iso: string): string {
@@ -318,14 +335,6 @@ export class LobbiesComponent implements OnInit, OnDestroy {
     return `${diffDays}d ago`;
   }
 
-  leaderInitials(name: string): string {
-    const trimmed = (name ?? '').trim();
-    if (!trimmed) return '?';
-    const parts = trimmed.split(/\s+/).slice(0, 2);
-    const letters = parts.map((p) => p[0] ?? '').join('').toUpperCase();
-    return letters || trimmed.slice(0, 1).toUpperCase();
-  }
-
   private refresh(background: boolean): void {
     if (this.requestInFlight) return;
     this.requestInFlight = true;
@@ -339,7 +348,9 @@ export class LobbiesComponent implements OnInit, OnDestroy {
 
     this.lobbyApi.listActive().subscribe({
       next: (rows) => {
-        this.rows = rows ?? [];
+        this.rows = (rows ?? []).map((row) => this.normalizeActiveRow(row));
+        this.applyDefaultOwnerFilter();
+        this.maybeAutoSwitchToOwnedTab();
         this.clampPage();
         this.loading = false;
         this.syncing = false;
@@ -446,6 +457,32 @@ export class LobbiesComponent implements OnInit, OnDestroy {
       action();
     }, remaining);
     this.joinDelayTimers.add(timerId);
+  }
+
+  private maybeAutoSwitchToOwnedTab(): void {
+    if (this.ownerFilterTouched) return;
+    if (!this.isLoggedIn) return;
+    const hasOwnedLobby = this.rows.some((row) => row.isOwner);
+    if (hasOwnedLobby) {
+      this.setOwnerFilter('AUTHENTICATED', false);
+    }
+  }
+
+  private applyDefaultOwnerFilter(): void {
+    if (this.ownerFilterTouched) return;
+    this.ownerFilter = this.isLoggedIn ? 'AUTHENTICATED' : 'GUEST';
+  }
+
+  private normalizeActiveRow(row: ActiveLobbyDto): ActiveLobbyDto {
+    const ownerType = this.resolvedOwnerType(row);
+    if (row.ownerType === ownerType) return row;
+    return { ...row, ownerType };
+  }
+
+  private resolvedOwnerType(row: ActiveLobbyDto): LobbyOwnerType {
+    if (row.ownerType === 'AUTHENTICATED') return 'AUTHENTICATED';
+    if (this.isLoggedIn && row.isOwner) return 'AUTHENTICATED';
+    return 'GUEST';
   }
 
   private clampPage(): void {

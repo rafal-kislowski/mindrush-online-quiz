@@ -1,13 +1,14 @@
 :host {
   display: block;
   height: 100%;
+  --outer-gap: clamp(10px, 1.4vw, 18px);
 }
 
 .page {
   width: 100%;
   min-height: 100%;
   height: 100%;
-  padding: calc(clamp(12px, 1.6vw, 20px) + 6px);
+  padding: calc(var(--outer-gap) + 6px);
   display: grid;
   place-items: center;
 }
@@ -283,10 +284,8 @@
   height: 42px;
   padding: 0 36px 0 14px;
   border-radius: 12px;
-  border: 1px solid rgba(177, 202, 255, 0.24);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
-    linear-gradient(120deg, rgba(74, 140, 247, 0.16), rgba(172, 108, 255, 0.1));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
   color: rgba(255, 255, 255, 0.92);
   font-weight: 900;
   font-size: 13px;
@@ -440,35 +439,24 @@
 }
 
 .row {
-  --row-accent: rgba(56, 189, 248, 0.22);
-  --row-accent-strong: rgba(56, 189, 248, 0.32);
+  --row-accent: rgba(56, 189, 248, 0.16);
+  --row-accent-strong: rgba(56, 189, 248, 0.24);
   display: grid;
   grid-template-columns: 0.9fr 1.4fr 0.9fr 0.6fr 0.5fr;
   gap: 8px;
   align-items: center;
   padding: 11px 10px;
   border-radius: 16px;
-  border: 1px solid rgba(166, 178, 206, 0.24);
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.05) 0%,
-    rgba(0, 0, 0, 0.1) 72%,
-    rgba(0, 0, 0, 0.14) 100%
-  );
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  box-shadow:
-    0 10px 24px rgba(0, 0, 0, 0.2),
-    0 0 32px -22px var(--row-accent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
   position: relative;
   overflow: hidden;
   isolation: isolate;
   transition:
-    transform 200ms ease,
+    transform 180ms ease,
     border-color 200ms ease,
-    box-shadow 230ms ease,
-    filter 200ms ease;
+    box-shadow 220ms ease,
+    filter 180ms ease;
 }
 
 .row::before {
@@ -493,19 +481,37 @@
   z-index: 0;
 }
 
-.row:hover {
-  transform: translateY(-0.5px);
-  filter: brightness(1.05) contrast(1.03);
-  border-color: rgba(184, 198, 226, 0.36);
-  box-shadow:
-    0 14px 30px rgba(0, 0, 0, 0.24),
-    0 0 36px -18px var(--row-accent-strong),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+.row:hover::before {
+  opacity: 0.42;
+  transform: scale(1);
 }
 
-.row:hover::before {
-  opacity: 1;
+.row.is-own {
+  border-color: rgba(88, 170, 255, 0.46);
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.24),
+    0 0 34px -14px rgba(56, 189, 248, 0.28),
+    inset 0 1px 0 rgba(196, 232, 255, 0.14);
+}
+
+.row.is-own::before {
+  opacity: 0.38;
   transform: scale(1);
+  background:
+    radial-gradient(
+      128% 150% at 15% 50%,
+      color-mix(in srgb, #38bdf8 24%, transparent),
+      transparent 76%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(120, 191, 255, 0.06),
+      rgba(6, 12, 30, 0.08)
+    );
+}
+
+.row.is-own:hover::before {
+  opacity: 0.5;
 }
 
 .row.is-joining {
@@ -546,19 +552,8 @@
 }
 
 .avatar {
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  font-weight: 900;
-  font-size: 11px;
-  color: rgba(8, 12, 28, 0.9);
-  background: linear-gradient(135deg, rgba(47, 134, 255, 0.95), rgba(73, 226, 255, 0.85));
-  border: 1px solid rgba(167, 226, 255, 0.45);
-  box-shadow:
-    0 7px 15px rgba(0, 0, 0, 0.28),
-    0 0 18px rgba(56, 189, 248, 0.24);
+  flex: 0 0 auto;
+  line-height: 0;
 }
 
 .leader-name {
@@ -567,25 +562,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.owner-pill {
-  margin-left: auto;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 900;
-  color: rgba(255, 186, 95, 0.95);
-  border: 1px solid rgba(255, 186, 95, 0.56);
-  background: rgba(255, 186, 95, 0.09);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  white-space: nowrap;
-}
-
-.owner-pill.owner-pill--auth {
-  color: rgba(56, 189, 248, 0.95);
-  border-color: rgba(56, 189, 248, 0.56);
-  background: rgba(56, 189, 248, 0.09);
 }
 
 .cell--privacy {
@@ -617,15 +593,18 @@
   min-width: 92px;
   height: 36px;
   border-radius: 12px;
-  border: 1px solid rgba(160, 180, 214, 0.34);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.025));
+  border: 1px solid rgba(173, 193, 226, 0.34);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.09),
+    rgba(255, 255, 255, 0.03)
+  );
   color: rgba(255, 255, 255, 0.95);
   font-weight: 900;
   font-size: 13px;
   box-shadow:
-    0 6px 14px rgba(0, 0, 0, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    0 8px 18px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
   transition:
     filter 170ms ease,
     border-color 170ms ease,
@@ -636,13 +615,16 @@
 
 .join-btn:hover:not(:disabled) {
   filter: brightness(1.03);
-  border-color: rgba(255, 255, 255, 0.24);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.035));
+  border-color: rgba(198, 216, 245, 0.46);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.12),
+    rgba(255, 255, 255, 0.045)
+  );
   transform: translateY(-0.5px);
   box-shadow:
-    0 8px 17px rgba(0, 0, 0, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    0 10px 22px rgba(0, 0, 0, 0.24),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
 }
 
 .join-btn:active:not(:disabled) {
@@ -651,10 +633,13 @@
 }
 
 .join-btn:disabled {
-  opacity: 0.54;
-  border-color: rgba(175, 124, 124, 0.32);
-  background:
-    linear-gradient(180deg, rgba(255, 120, 120, 0.08), rgba(255, 255, 255, 0.025));
+  opacity: 0.52;
+  border-color: rgba(169, 183, 210, 0.28);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.02)
+  );
   cursor: not-allowed;
 }
 
@@ -734,7 +719,7 @@
   font-size: 12px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   .toolbar {
     grid-template-columns: 1fr 1fr;
   }
@@ -750,9 +735,9 @@
   .row {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      "room join"
-      "leader join"
-      "privacy players";
+      "room players"
+      "leader privacy"
+      "join join";
     gap: 6px 10px;
     padding: 9px 9px;
   }
@@ -767,38 +752,31 @@
 
   .cell--privacy {
     grid-area: privacy;
+    justify-self: end;
   }
 
   .cell--players {
     grid-area: players;
     justify-self: end;
+    align-self: start;
   }
 
   .cell--join {
     grid-area: join;
-    justify-content: flex-end;
-    align-self: center;
+    justify-content: stretch;
+    align-self: stretch;
+    margin-top: 2px;
   }
 
   .join-btn {
-    width: auto;
-    min-width: 82px;
-    height: 32px;
-    padding: 0 10px;
-  }
-
-  .avatar {
-    width: 26px;
-    height: 26px;
-    font-size: 10px;
+    width: 100%;
+    min-width: 0;
+    height: 34px;
+    padding: 0 12px;
   }
 
   .leader-name {
-    max-width: 140px;
-  }
-
-  .owner-pill {
-    display: none;
+    max-width: min(58vw, 300px);
   }
 
   .room-time {
@@ -845,10 +823,11 @@
   }
 
   .row {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      "room players join"
-      "leader privacy join";
+      "room players"
+      "leader privacy"
+      "join join";
     gap: 6px 8px;
     padding: 8px;
   }
@@ -868,12 +847,19 @@
   }
 
   .leader-name {
-    max-width: 120px;
+    max-width: min(56vw, 210px);
   }
 
   .join-btn {
-    min-width: 78px;
-    height: 30px;
+    width: 100%;
+    min-width: 0;
+    height: 32px;
     font-size: 12px;
+  }
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: calc(var(--outer-gap) + 2px);
   }
 }
