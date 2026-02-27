@@ -30,6 +30,9 @@ public class QuizAdminService {
     private static final int MIN_QUESTION_TIME_LIMIT_SECONDS = 5;
     private static final int MAX_QUESTION_TIME_LIMIT_SECONDS = 600;
     private static final int DEFAULT_QUESTION_TIME_LIMIT_SECONDS = Quiz.DEFAULT_QUESTION_TIME_LIMIT_SECONDS;
+    private static final int MIN_QUESTIONS_PER_GAME = 1;
+    private static final int MAX_QUESTIONS_PER_GAME = 10_000;
+    private static final int DEFAULT_QUESTIONS_PER_GAME = Quiz.DEFAULT_QUESTIONS_PER_GAME;
 
     public QuizAdminService(
             QuizRepository quizRepository,
@@ -56,7 +59,8 @@ public class QuizAdminService {
             GameMode gameMode,
             Boolean includeInRanking,
             Boolean xpEnabled,
-            Integer questionTimeLimitSeconds
+            Integer questionTimeLimitSeconds,
+            Integer questionsPerGame
     ) {
         String t = title == null ? "" : title.trim();
         if (t.isBlank()) throw new ResponseStatusException(BAD_REQUEST, "Title is required");
@@ -68,8 +72,9 @@ public class QuizAdminService {
         }
 
         Quiz quiz = new Quiz(t, description == null ? null : description.trim(), category);
+        quiz.setSource(QuizSource.OFFICIAL);
         applyAvatar(quiz, avatarImageUrl, avatarBgStart, avatarBgEnd, avatarTextColor);
-        applyGameRules(quiz, gameMode, includeInRanking, xpEnabled, questionTimeLimitSeconds);
+        applyGameRules(quiz, gameMode, includeInRanking, xpEnabled, questionTimeLimitSeconds, questionsPerGame);
         return quizRepository.save(quiz);
     }
 
@@ -89,6 +94,7 @@ public class QuizAdminService {
                         q.isIncludeInRanking(),
                         q.isXpEnabled(),
                         q.getQuestionTimeLimitSeconds(),
+                        q.getQuestionsPerGame(),
                         q.getStatus(),
                         questionRepository.countByQuizId(q.getId())
                 ))
@@ -134,6 +140,7 @@ public class QuizAdminService {
                 quiz.isIncludeInRanking(),
                 quiz.isXpEnabled(),
                 quiz.getQuestionTimeLimitSeconds(),
+                quiz.getQuestionsPerGame(),
                 quiz.getStatus(),
                 qDtos
         );
@@ -151,7 +158,8 @@ public class QuizAdminService {
             GameMode gameMode,
             Boolean includeInRanking,
             Boolean xpEnabled,
-            Integer questionTimeLimitSeconds
+            Integer questionTimeLimitSeconds,
+            Integer questionsPerGame
     ) {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
@@ -169,7 +177,7 @@ public class QuizAdminService {
         quiz.setDescription(description == null ? null : description.trim());
         quiz.setCategory(category);
         applyAvatar(quiz, avatarImageUrl, avatarBgStart, avatarBgEnd, avatarTextColor);
-        applyGameRules(quiz, gameMode, includeInRanking, xpEnabled, questionTimeLimitSeconds);
+        applyGameRules(quiz, gameMode, includeInRanking, xpEnabled, questionTimeLimitSeconds, questionsPerGame);
         return quizRepository.save(quiz);
     }
 
@@ -342,6 +350,7 @@ public class QuizAdminService {
             boolean includeInRanking,
             boolean xpEnabled,
             Integer questionTimeLimitSeconds,
+            Integer questionsPerGame,
             QuizStatus status,
             long questionCount
     ) {}
@@ -359,6 +368,7 @@ public class QuizAdminService {
             boolean includeInRanking,
             boolean xpEnabled,
             Integer questionTimeLimitSeconds,
+            Integer questionsPerGame,
             QuizStatus status,
             List<AdminQuestion> questions
     ) {}
@@ -412,11 +422,11 @@ public class QuizAdminService {
             GameMode gameMode,
             Boolean includeInRanking,
             Boolean xpEnabled,
-            Integer questionTimeLimitSeconds
+            Integer questionTimeLimitSeconds,
+            Integer questionsPerGame
     ) {
         GameMode mode = gameMode == null ? GameMode.CASUAL : gameMode;
         boolean ranking = Boolean.TRUE.equals(includeInRanking);
-        if (mode == GameMode.RANKED) ranking = true;
 
         boolean xp = xpEnabled == null || xpEnabled;
 
@@ -434,9 +444,23 @@ public class QuizAdminService {
             );
         }
 
+        int normalizedQuestionsPerGame = questionsPerGame == null || questionsPerGame <= 0
+                ? DEFAULT_QUESTIONS_PER_GAME
+                : questionsPerGame;
+        if (normalizedQuestionsPerGame < MIN_QUESTIONS_PER_GAME || normalizedQuestionsPerGame > MAX_QUESTIONS_PER_GAME) {
+            throw new ResponseStatusException(
+                    BAD_REQUEST,
+                    "Questions per game must be between "
+                            + MIN_QUESTIONS_PER_GAME
+                            + " and "
+                            + MAX_QUESTIONS_PER_GAME
+            );
+        }
+
         quiz.setGameMode(mode);
         quiz.setIncludeInRanking(ranking);
         quiz.setXpEnabled(xp);
         quiz.setQuestionTimeLimitSeconds(normalizedLimit);
+        quiz.setQuestionsPerGame(normalizedQuestionsPerGame);
     }
 }

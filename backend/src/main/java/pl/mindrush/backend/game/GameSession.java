@@ -46,6 +46,15 @@ public class GameSession {
     @Column(name = "question_pool_category_id")
     private Long questionPoolCategoryId;
 
+    @Column(name = "xp_rewards_enabled")
+    private Boolean xpRewardsEnabled;
+
+    @Column(name = "coins_rewards_enabled")
+    private Boolean coinsRewardsEnabled;
+
+    @Column(name = "rank_points_rewards_enabled")
+    private Boolean rankPointsRewardsEnabled;
+
     @Column(name = "lives_remaining")
     private Integer livesRemaining;
 
@@ -83,7 +92,10 @@ public class GameSession {
             GameSessionMode mode,
             Instant now,
             Duration preCountdownDuration,
-            Integer questionDurationMs
+            Integer questionDurationMs,
+            boolean xpRewardsEnabled,
+            boolean coinsRewardsEnabled,
+            boolean rankPointsRewardsEnabled
     ) {
         GameSession session = new GameSession();
         session.id = UUID.randomUUID().toString();
@@ -95,6 +107,9 @@ public class GameSession {
         session.stageEndsAt = now.plus(preCountdownDuration);
         session.questionDurationMs = questionDurationMs;
         session.questionPoolCategoryId = null;
+        session.xpRewardsEnabled = xpRewardsEnabled;
+        session.coinsRewardsEnabled = coinsRewardsEnabled;
+        session.rankPointsRewardsEnabled = rankPointsRewardsEnabled;
         session.livesRemaining = session.mode == GameSessionMode.THREE_LIVES ? 3 : null;
         session.currentQuestionIndex = 0;
         session.createdAt = now;
@@ -165,6 +180,42 @@ public class GameSession {
 
     public void setQuestionPoolCategoryId(Long questionPoolCategoryId) {
         this.questionPoolCategoryId = questionPoolCategoryId;
+    }
+
+    public Boolean getXpRewardsEnabledRaw() {
+        return xpRewardsEnabled;
+    }
+
+    public boolean isXpRewardsEnabled() {
+        return Boolean.TRUE.equals(xpRewardsEnabled);
+    }
+
+    public void setXpRewardsEnabled(Boolean xpRewardsEnabled) {
+        this.xpRewardsEnabled = xpRewardsEnabled;
+    }
+
+    public Boolean getCoinsRewardsEnabledRaw() {
+        return coinsRewardsEnabled;
+    }
+
+    public boolean isCoinsRewardsEnabled() {
+        return Boolean.TRUE.equals(coinsRewardsEnabled);
+    }
+
+    public void setCoinsRewardsEnabled(Boolean coinsRewardsEnabled) {
+        this.coinsRewardsEnabled = coinsRewardsEnabled;
+    }
+
+    public Boolean getRankPointsRewardsEnabledRaw() {
+        return rankPointsRewardsEnabled;
+    }
+
+    public boolean isRankPointsRewardsEnabled() {
+        return Boolean.TRUE.equals(rankPointsRewardsEnabled);
+    }
+
+    public void setRankPointsRewardsEnabled(Boolean rankPointsRewardsEnabled) {
+        this.rankPointsRewardsEnabled = rankPointsRewardsEnabled;
     }
 
     public Integer getLivesRemaining() {

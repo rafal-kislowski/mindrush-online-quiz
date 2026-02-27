@@ -13,6 +13,14 @@ public interface QuizQuestionRepository extends JpaRepository<QuizQuestion, Long
     Optional<QuizQuestion> findByIdAndQuizId(Long id, Long quizId);
 
     @Query("""
+            select qq.id
+            from QuizQuestion qq
+            where qq.quiz.id = :quizId
+            order by qq.orderIndex asc
+            """)
+    List<Long> findIdsByQuizIdOrderByOrderIndexAsc(@Param("quizId") Long quizId);
+
+    @Query("""
             select qq
             from QuizQuestion qq
             join qq.quiz q

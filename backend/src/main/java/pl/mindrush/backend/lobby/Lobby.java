@@ -42,6 +42,9 @@ public class Lobby {
     @Column(name = "selected_quiz_id")
     private Long selectedQuizId;
 
+    @Column(name = "ranking_enabled", nullable = false)
+    private boolean rankingEnabled;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 16, nullable = false)
     private LobbyStatus status;
@@ -67,6 +70,7 @@ public class Lobby {
         lobby.passwordHash = passwordHash;
         lobby.pinCode = pinCode;
         lobby.emptySince = null;
+        lobby.rankingEnabled = false;
         lobby.status = LobbyStatus.OPEN;
         lobby.createdAt = now;
         return lobby;
@@ -134,6 +138,14 @@ public class Lobby {
 
     public void setSelectedQuizId(Long selectedQuizId) {
         this.selectedQuizId = selectedQuizId;
+    }
+
+    public boolean isRankingEnabled() {
+        return rankingEnabled;
+    }
+
+    public void setRankingEnabled(boolean rankingEnabled) {
+        this.rankingEnabled = rankingEnabled;
     }
 
     public LobbyStatus getStatus() {

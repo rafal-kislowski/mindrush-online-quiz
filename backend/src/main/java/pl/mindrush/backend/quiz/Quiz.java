@@ -17,6 +17,7 @@ import jakarta.persistence.Enumerated;
 public class Quiz {
 
     public static final int DEFAULT_QUESTION_TIME_LIMIT_SECONDS = 15;
+    public static final int DEFAULT_QUESTIONS_PER_GAME = 7;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -53,9 +54,16 @@ public class Quiz {
     @Column(name = "question_time_limit_seconds")
     private Integer questionTimeLimitSeconds;
 
+    @Column(name = "questions_per_game")
+    private Integer questionsPerGame;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 16)
     private QuizStatus status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "quiz_source", length = 16)
+    private QuizSource source;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
@@ -72,7 +80,9 @@ public class Quiz {
         this.includeInRanking = false;
         this.xpEnabled = true;
         this.questionTimeLimitSeconds = DEFAULT_QUESTION_TIME_LIMIT_SECONDS;
+        this.questionsPerGame = DEFAULT_QUESTIONS_PER_GAME;
         this.status = QuizStatus.DRAFT;
+        this.source = QuizSource.OFFICIAL;
     }
 
     public Long getId() {
@@ -121,8 +131,18 @@ public class Quiz {
         return v;
     }
 
+    public Integer getQuestionsPerGame() {
+        Integer v = questionsPerGame;
+        if (v == null || v <= 0) return DEFAULT_QUESTIONS_PER_GAME;
+        return v;
+    }
+
     public QuizStatus getStatus() {
         return status == null ? QuizStatus.DRAFT : status;
+    }
+
+    public QuizSource getSource() {
+        return source == null ? QuizSource.OFFICIAL : source;
     }
 
     public QuizCategory getCategory() {
@@ -169,8 +189,16 @@ public class Quiz {
         this.questionTimeLimitSeconds = questionTimeLimitSeconds;
     }
 
+    public void setQuestionsPerGame(Integer questionsPerGame) {
+        this.questionsPerGame = questionsPerGame;
+    }
+
     public void setStatus(QuizStatus status) {
         this.status = status;
+    }
+
+    public void setSource(QuizSource source) {
+        this.source = source;
     }
 
     public void setCategory(QuizCategory category) {

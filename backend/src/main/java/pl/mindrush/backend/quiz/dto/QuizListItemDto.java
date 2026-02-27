@@ -7,6 +7,7 @@ public record QuizListItemDto(
         String title,
         String description,
         String categoryName,
+        String source,
         String avatarImageUrl,
         String avatarBgStart,
         String avatarBgEnd,
@@ -15,6 +16,7 @@ public record QuizListItemDto(
         boolean includeInRanking,
         boolean xpEnabled,
         Integer questionTimeLimitSeconds,
+        Integer questionsPerGame,
         long questionCount
 ) {
 }

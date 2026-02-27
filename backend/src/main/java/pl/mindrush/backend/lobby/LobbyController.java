@@ -56,8 +56,8 @@ public class LobbyController {
     }
 
     @GetMapping("/active")
-    public ResponseEntity<List<Map<String, Object>>> active(HttpServletRequest request) {
-        return ResponseEntity.ok(lobbyService.listActiveLobbies(request));
+    public ResponseEntity<List<Map<String, Object>>> active(HttpServletRequest request, Authentication authentication) {
+        return ResponseEntity.ok(lobbyService.listActiveLobbies(request, isAuthenticated(authentication)));
     }
 
     @GetMapping("/owned")
@@ -105,7 +105,8 @@ public class LobbyController {
             @Valid @RequestBody(required = false) SetSelectedQuizRequest body
     ) {
         Long quizId = body == null ? null : body.quizId();
-        return ResponseEntity.ok(lobbyService.setSelectedQuiz(request, code, quizId));
+        Boolean rankingEnabled = body == null ? null : body.rankingEnabled();
+        return ResponseEntity.ok(lobbyService.setSelectedQuiz(request, code, quizId, rankingEnabled));
     }
 
     @PostMapping("/{code}/ready")
@@ -187,7 +188,8 @@ public class LobbyController {
 
     public record SetSelectedQuizRequest(
             @Positive(message = "quizId must be a positive number")
-            Long quizId
+            Long quizId,
+            Boolean rankingEnabled
     ) {
     }
 

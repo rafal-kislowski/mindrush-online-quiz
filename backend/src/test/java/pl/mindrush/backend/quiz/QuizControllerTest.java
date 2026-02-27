@@ -29,6 +29,7 @@ class QuizControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").isNumber())
                 .andExpect(jsonPath("$[0].title").isString())
+                .andExpect(jsonPath("$[0].source").value("official"))
                 .andExpect(jsonPath("$[0].questionCount").isNumber());
     }
 
@@ -65,4 +66,3 @@ class QuizControllerTest {
         return java.util.Optional.of(Long.parseLong(text.substring(numStart, end)));
     }
 }
-

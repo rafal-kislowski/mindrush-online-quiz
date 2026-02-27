@@ -15,6 +15,7 @@ public record QuizDetailDto(
         boolean includeInRanking,
         boolean xpEnabled,
         Integer questionTimeLimitSeconds,
+        Integer questionsPerGame,
         long questionCount
 ) {
 }

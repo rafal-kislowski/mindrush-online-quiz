@@ -29,7 +29,7 @@ public class GameController {
             @PathVariable("code") String code,
             @Valid @RequestBody StartGameRequest body
     ) {
-        return ResponseEntity.status(201).body(gameService.startGame(request, code, body.quizId(), body.mode()));
+        return ResponseEntity.status(201).body(gameService.startGame(request, code, body.quizId(), body.mode(), body.ranked()));
     }
 
     @GetMapping("/state")

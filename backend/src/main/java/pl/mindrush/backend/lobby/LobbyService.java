@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Optional;
+import java.util.Objects;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.CONFLICT;
@@ -161,7 +162,7 @@ public class LobbyService {
     }
 
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> listActiveLobbies(HttpServletRequest request) {
+    public List<Map<String, Object>> listActiveLobbies(HttpServletRequest request, boolean viewerAuthenticated) {
         String viewerGuestSessionId = guestSessionService.findValidSession(request)
                 .map(GuestSession::getId)
                 .orElse(null);
@@ -205,6 +206,7 @@ public class LobbyService {
             GuestSession ownerSession = ownerSessionById.get(lobby.getOwnerGuestSessionId());
             String ownerType = lobby.isOwnerAuthenticated()
                     || (ownerSession != null && ownerSession.getUserId() != null)
+                    || (isOwner && viewerAuthenticated)
                     ? "AUTHENTICATED"
                     : "GUEST";
 
@@ -337,7 +339,12 @@ public class LobbyService {
         return lobbySummary(lobby, guestSession.getId());
     }
 
-    public Map<String, Object> setSelectedQuiz(HttpServletRequest request, String code, Long quizId) {
+    public Map<String, Object> setSelectedQuiz(
+            HttpServletRequest request,
+            String code,
+            Long quizId,
+            Boolean rankingEnabled
+    ) {
         GuestSession guestSession = guestSessionService.requireValidSession(request);
         Lobby lobby = lobbyRepository.findByCode(code).orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Lobby not found"));
 
@@ -349,6 +356,7 @@ public class LobbyService {
         }
 
         Long normalizedQuizId = quizId;
+        boolean nextRankingEnabled = rankingEnabled == null ? lobby.isRankingEnabled() : rankingEnabled;
         String selectedCategoryLabel = null;
         if (normalizedQuizId != null) {
             Quiz quiz = quizRepository.findById(normalizedQuizId)
@@ -356,24 +364,35 @@ public class LobbyService {
             if (quiz.getStatus() != QuizStatus.ACTIVE) {
                 throw new ResponseStatusException(NOT_FOUND, "Quiz not found");
             }
+            if (nextRankingEnabled && !quiz.isIncludeInRanking()) {
+                throw new ResponseStatusException(CONFLICT, "Selected quiz is not eligible for ranked games");
+            }
             selectedCategoryLabel = quiz.getCategory() == null || quiz.getCategory().getName() == null || quiz.getCategory().getName().isBlank()
                     ? "Uncategorized"
                     : quiz.getCategory().getName().trim();
         }
 
-        if (normalizedQuizId == null && lobby.getSelectedQuizId() == null) {
-            return lobbySummary(lobby, guestSession.getId());
-        }
-        if (normalizedQuizId != null && normalizedQuizId.equals(lobby.getSelectedQuizId())) {
+        boolean quizChanged = !Objects.equals(normalizedQuizId, lobby.getSelectedQuizId());
+        boolean rankingChanged = nextRankingEnabled != lobby.isRankingEnabled();
+        if (!quizChanged && !rankingChanged) {
             return lobbySummary(lobby, guestSession.getId());
         }
 
         lobby.setSelectedQuizId(normalizedQuizId);
+        lobby.setRankingEnabled(nextRankingEnabled);
         lobbyRepository.save(lobby);
         participantRepository.clearReadyByLobbyId(lobby.getId());
         String ownerName = resolveParticipantDisplayName(lobby.getId(), guestSession.getId(), "Owner");
-        String categoryText = normalizedQuizId == null ? "none" : selectedCategoryLabel;
-        lobbySystemMessageService.publish(lobby.getCode(), ownerName + " set quiz category to " + categoryText + ".");
+        if (quizChanged) {
+            String categoryText = normalizedQuizId == null ? "none" : selectedCategoryLabel;
+            lobbySystemMessageService.publish(lobby.getCode(), ownerName + " set quiz category to " + categoryText + ".");
+        }
+        if (rankingChanged) {
+            lobbySystemMessageService.publish(
+                    lobby.getCode(),
+                    ownerName + " set match type to " + (nextRankingEnabled ? "Ranked." : "Casual.")
+            );
+        }
         lobbyEventPublisher.lobbyUpdated(lobby.getCode());
         maybeStartGameWhenAllPlayersReady(lobby);
         return lobbySummary(lobby, guestSession.getId());

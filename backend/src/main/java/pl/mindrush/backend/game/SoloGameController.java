@@ -28,7 +28,7 @@ public class SoloGameController {
             HttpServletRequest request,
             @Valid @RequestBody StartGameRequest body
     ) {
-        return ResponseEntity.status(201).body(gameService.startSoloGame(request, body.quizId(), body.mode()));
+        return ResponseEntity.status(201).body(gameService.startSoloGame(request, body.quizId(), body.mode(), body.ranked()));
     }
 
     @GetMapping("/{gameSessionId}/state")

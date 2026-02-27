@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import pl.mindrush.backend.guest.GuestSessionRepository;
 import pl.mindrush.backend.lobby.LobbyParticipantRepository;
 import pl.mindrush.backend.lobby.LobbyRepository;
+import pl.mindrush.backend.quiz.QuizAnswerOptionRepository;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -95,6 +96,9 @@ class GameControllerTest {
 
     @Autowired
     private GameService gameService;
+
+    @Autowired
+    private QuizAnswerOptionRepository quizAnswerOptionRepository;
 
     @BeforeEach
     void setUp() {
@@ -192,7 +196,11 @@ class GameControllerTest {
                 .andExpect(jsonPath("$.stage").value("FINISHED"))
                 .andExpect(jsonPath("$.players.length()").value(2))
                 .andExpect(jsonPath("$.players[0].score").isNumber())
-                .andExpect(jsonPath("$.players[1].score").isNumber());
+                .andExpect(jsonPath("$.players[1].score").isNumber())
+                .andExpect(jsonPath("$.players[0].xpDelta").isNumber())
+                .andExpect(jsonPath("$.players[1].xpDelta").isNumber())
+                .andExpect(jsonPath("$.players[0].coinsDelta").isNumber())
+                .andExpect(jsonPath("$.players[1].coinsDelta").isNumber());
     }
 
     @Test
@@ -250,10 +258,11 @@ class GameControllerTest {
     }
 
     @Test
-    void threeLivesMode_endlessRunAndBestRecordSaved() throws Exception {
+    void threeLivesMode_runAndBestRecordSaved() throws Exception {
         String ownerSessionId = createGuestSession();
         String lobbyCode = createLobby(ownerSessionId);
         Long quizId = firstQuizId();
+        int expectedTotalQuestions = firstQuizQuestionCount();
 
         mockMvc.perform(post("/api/lobbies/" + lobbyCode + "/game/start")
                         .cookie(new Cookie("guestSessionId", ownerSessionId))
@@ -262,7 +271,7 @@ class GameControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.mode").value("THREE_LIVES"))
                 .andExpect(jsonPath("$.stage").value("PRE_COUNTDOWN"))
-                .andExpect(jsonPath("$.totalQuestions").value(0))
+                .andExpect(jsonPath("$.totalQuestions").value(expectedTotalQuestions))
                 .andExpect(jsonPath("$.livesRemaining").value(3));
 
         clock.advance(Duration.ofSeconds(4));
@@ -298,7 +307,15 @@ class GameControllerTest {
                 .andExpect(jsonPath("$.mode").value("THREE_LIVES"))
                 .andExpect(jsonPath("$.stage").value("FINISHED"))
                 .andExpect(jsonPath("$.livesRemaining").value(0))
-                .andExpect(jsonPath("$.wrongAnswers").value(3));
+                .andExpect(jsonPath("$.wrongAnswers").value(3))
+                .andExpect(jsonPath("$.players[0].xpDelta").isNumber())
+                .andExpect(jsonPath("$.players[0].coinsDelta").isNumber())
+                .andExpect(jsonPath("$.players[0].rankPointsDelta").value(org.hamcrest.Matchers.nullValue()));
+
+        var guest = guestSessionRepository.findById(ownerSessionId).orElseThrow();
+        assertThat(guest.getXp()).isGreaterThan(0);
+        assertThat(guest.getCoins()).isGreaterThan(0);
+        assertThat(guest.getRankPoints()).isEqualTo(0);
 
         mockMvc.perform(get("/api/casual/three-lives/best")
                         .cookie(new Cookie("guestSessionId", ownerSessionId)))
@@ -307,6 +324,73 @@ class GameControllerTest {
                 .andExpect(jsonPath("$.answered").value(3))
                 .andExpect(jsonPath("$.durationMs").isNumber())
                 .andExpect(jsonPath("$.updatedAt").isString());
+    }
+
+    @Test
+    void threeLivesMode_finishesAfterAllSelectedQuizQuestionsAnswered() throws Exception {
+        String ownerSessionId = createGuestSession();
+        String lobbyCode = createLobby(ownerSessionId);
+        Long quizId = firstQuizId();
+        int expectedTotalQuestions = firstQuizQuestionCount();
+
+        mockMvc.perform(post("/api/lobbies/" + lobbyCode + "/game/start")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quizId\":" + quizId + ",\"mode\":\"THREE_LIVES\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.mode").value("THREE_LIVES"))
+                .andExpect(jsonPath("$.stage").value("PRE_COUNTDOWN"))
+                .andExpect(jsonPath("$.totalQuestions").value(expectedTotalQuestions))
+                .andExpect(jsonPath("$.livesRemaining").value(3));
+
+        clock.advance(Duration.ofSeconds(4));
+        gameService.tickDueSessions();
+
+        for (int round = 1; round <= expectedTotalQuestions; round++) {
+            MvcResult state = mockMvc.perform(get("/api/lobbies/" + lobbyCode + "/game/state")
+                            .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.mode").value("THREE_LIVES"))
+                    .andExpect(jsonPath("$.stage").value("QUESTION"))
+                    .andExpect(jsonPath("$.questionIndex").value(round))
+                    .andExpect(jsonPath("$.totalQuestions").value(expectedTotalQuestions))
+                    .andReturn();
+
+            Number qIdNum = JsonPath.read(state.getResponse().getContentAsString(), "$.question.id");
+            long qId = qIdNum.longValue();
+            List<Integer> optionIds = JsonPath.read(state.getResponse().getContentAsString(), "$.question.options[*].id");
+            Integer correctOptionId = optionIds.stream()
+                    .filter(id -> quizAnswerOptionRepository.findById(id.longValue()).map(o -> o.isCorrect()).orElse(false))
+                    .findFirst()
+                    .orElseThrow();
+
+            mockMvc.perform(post("/api/lobbies/" + lobbyCode + "/game/answer")
+                            .cookie(new Cookie("guestSessionId", ownerSessionId))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"questionId\":" + qId + ",\"optionId\":" + correctOptionId + "}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.stage").value("REVEAL"))
+                    .andExpect(jsonPath("$.livesRemaining").value(3))
+                    .andExpect(jsonPath("$.wrongAnswers").value(0));
+
+            if (round < expectedTotalQuestions) {
+                clock.advance(Duration.ofSeconds(4));
+                gameService.tickDueSessions();
+            }
+        }
+
+        clock.advance(Duration.ofSeconds(3));
+        gameService.tickDueSessions();
+
+        mockMvc.perform(get("/api/lobbies/" + lobbyCode + "/game/state")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("THREE_LIVES"))
+                .andExpect(jsonPath("$.stage").value("FINISHED"))
+                .andExpect(jsonPath("$.totalQuestions").value(expectedTotalQuestions))
+                .andExpect(jsonPath("$.questionIndex").value(expectedTotalQuestions))
+                .andExpect(jsonPath("$.livesRemaining").value(3))
+                .andExpect(jsonPath("$.wrongAnswers").value(0));
     }
 
     @Test
@@ -346,6 +430,20 @@ class GameControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.mode").value("TRAINING"))
                 .andExpect(jsonPath("$.stage").value("REVEAL"));
+
+        mockMvc.perform(post("/api/lobbies/" + lobbyCode + "/game/end")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("TRAINING"))
+                .andExpect(jsonPath("$.stage").value("FINISHED"))
+                .andExpect(jsonPath("$.players[0].xpDelta").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.players[0].coinsDelta").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.players[0].rankPointsDelta").value(org.hamcrest.Matchers.nullValue()));
+
+        var guest = guestSessionRepository.findById(ownerSessionId).orElseThrow();
+        assertThat(guest.getXp()).isEqualTo(0);
+        assertThat(guest.getCoins()).isEqualTo(0);
+        assertThat(guest.getRankPoints()).isEqualTo(0);
     }
 
     @Test

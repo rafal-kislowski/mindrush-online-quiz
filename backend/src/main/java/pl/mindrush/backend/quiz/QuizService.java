@@ -39,6 +39,7 @@ public class QuizService {
                         q.getTitle(),
                         q.getDescription(),
                         q.getCategory() == null ? null : q.getCategory().getName(),
+                        q.getSource().name().toLowerCase(),
                         q.getAvatarImageUrl(),
                         q.getAvatarBgStart(),
                         q.getAvatarBgEnd(),
@@ -47,6 +48,7 @@ public class QuizService {
                         q.isIncludeInRanking(),
                         q.isXpEnabled(),
                         q.getQuestionTimeLimitSeconds(),
+                        q.getQuestionsPerGame(),
                         questionRepository.countByQuizId(q.getId())
                 ))
                 .toList();
@@ -73,6 +75,7 @@ public class QuizService {
                 quiz.isIncludeInRanking(),
                 quiz.isXpEnabled(),
                 quiz.getQuestionTimeLimitSeconds(),
+                quiz.getQuestionsPerGame(),
                 questionRepository.countByQuizId(quizId)
         );
     }

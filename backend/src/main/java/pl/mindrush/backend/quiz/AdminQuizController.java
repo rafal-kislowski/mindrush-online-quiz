@@ -44,6 +44,7 @@ public class AdminQuizController {
                                 q.includeInRanking(),
                                 q.xpEnabled(),
                                 q.questionTimeLimitSeconds(),
+                                q.questionsPerGame(),
                                 q.status(),
                                 q.questionCount()
                         ))
@@ -70,7 +71,8 @@ public class AdminQuizController {
                 req.gameMode(),
                 req.includeInRanking(),
                 req.xpEnabled(),
-                req.questionTimeLimitSeconds()
+                req.questionTimeLimitSeconds(),
+                req.questionsPerGame()
         );
         return ResponseEntity.status(CREATED).body(new QuizAdminDto(
                 quiz.getId(),
@@ -85,6 +87,7 @@ public class AdminQuizController {
                 quiz.isIncludeInRanking(),
                 quiz.isXpEnabled(),
                 quiz.getQuestionTimeLimitSeconds(),
+                quiz.getQuestionsPerGame(),
                 quiz.getStatus()
         ));
     }
@@ -103,7 +106,8 @@ public class AdminQuizController {
                 req.gameMode(),
                 req.includeInRanking(),
                 req.xpEnabled(),
-                req.questionTimeLimitSeconds()
+                req.questionTimeLimitSeconds(),
+                req.questionsPerGame()
         );
         return ResponseEntity.ok(new QuizAdminDto(
                 quiz.getId(),
@@ -118,6 +122,7 @@ public class AdminQuizController {
                 quiz.isIncludeInRanking(),
                 quiz.isXpEnabled(),
                 quiz.getQuestionTimeLimitSeconds(),
+                quiz.getQuestionsPerGame(),
                 quiz.getStatus()
         ));
     }
@@ -138,6 +143,7 @@ public class AdminQuizController {
                 quiz.isIncludeInRanking(),
                 quiz.isXpEnabled(),
                 quiz.getQuestionTimeLimitSeconds(),
+                quiz.getQuestionsPerGame(),
                 quiz.getStatus()
         ));
     }
@@ -203,7 +209,8 @@ public class AdminQuizController {
             GameMode gameMode,
             Boolean includeInRanking,
             Boolean xpEnabled,
-            Integer questionTimeLimitSeconds
+            Integer questionTimeLimitSeconds,
+            Integer questionsPerGame
     ) {}
 
     public record AddQuestionRequest(
@@ -244,6 +251,7 @@ public class AdminQuizController {
             boolean includeInRanking,
             boolean xpEnabled,
             Integer questionTimeLimitSeconds,
+            Integer questionsPerGame,
             QuizStatus status
     ) {}
 
@@ -264,6 +272,7 @@ public class AdminQuizController {
             boolean includeInRanking,
             boolean xpEnabled,
             Integer questionTimeLimitSeconds,
+            Integer questionsPerGame,
             QuizStatus status,
             long questionCount
     ) {}
@@ -281,6 +290,7 @@ public class AdminQuizController {
             boolean includeInRanking,
             boolean xpEnabled,
             Integer questionTimeLimitSeconds,
+            Integer questionsPerGame,
             QuizStatus status,
             List<AdminQuestionDto> questions
     ) {}
@@ -315,6 +325,7 @@ public class AdminQuizController {
                 quiz.includeInRanking(),
                 quiz.xpEnabled(),
                 quiz.questionTimeLimitSeconds(),
+                quiz.questionsPerGame(),
                 quiz.status(),
                 quiz.questions().stream()
                         .map(q -> new AdminQuestionDto(

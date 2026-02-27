@@ -7,6 +7,7 @@ import pl.mindrush.backend.game.GameSessionMode;
 public record StartGameRequest(
         @NotNull(message = "quizId is required")
         @Positive(message = "quizId must be a positive number") Long quizId,
-        GameSessionMode mode
+        GameSessionMode mode,
+        Boolean ranked
 ) {
 }

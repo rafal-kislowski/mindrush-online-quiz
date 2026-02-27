@@ -13,7 +13,9 @@ public record GamePlayerDto(
         long totalAnswerTimeMs,
         long totalCorrectAnswerTimeMs,
         Integer xpDelta,
+        Integer coinsDelta,
         Integer rankPointsDelta,
+        Integer rankPoints,
         Boolean winner
 ) {
 }
