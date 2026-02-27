@@ -215,60 +215,157 @@
     </div>
 
     <!-- Finished -->
-    <div class="quiz-outer" *ngIf="s.stage === 'FINISHED'">
-      <div class="results-panel">
-        <div class="results-top">
-          <div>
-            <div class="results-title">{{ finishedTitle }}</div>
-            <div class="muted">{{ finishedSubtitle }}</div>
-          </div>
-          <button class="btn primary" (click)="backToLobby()">
-            Back to lobby
-          </button>
-        </div>
+    <div class="quiz-outer quiz-outer--results" *ngIf="s.stage === 'FINISHED'">
+      <section class="mr-game-results-page">
+        <div class="mr-game-results-frame">
+          <div class="mr-game-results-card">
+            <svg class="mr-game-results-svg-defs" aria-hidden="true" focusable="false">
+              <defs>
+                <linearGradient
+                  id="mrGameResultsTitleGrad"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="20"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop offset="0" style="stop-color: rgba(255, 205, 77, 0.85)" />
+                  <stop offset="1" style="stop-color: rgba(56, 189, 248, 0.85)" />
+                </linearGradient>
+                <symbol id="mrGameResultsTitleMark" viewBox="0 0 10 20">
+                  <path
+                    d="M5 1c2.1 0 3.2 1.6 3.2 3.5v11C8.2 17.4 7.1 19 5 19S1.8 17.4 1.8 15.5v-11C1.8 2.6 2.9 1 5 1Z"
+                    fill="url(#mrGameResultsTitleGrad)"
+                  />
+                </symbol>
+              </defs>
+            </svg>
 
-        <div class="board">
-          <div class="board-head muted">
-            <span>#</span>
-            <span>Player</span>
-            <span class="right">Points</span>
-          </div>
+            <div class="mr-game-results-top">
+              <div class="mr-game-results-title">
+                <h1>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <path d="M8 21h8" />
+                    <path d="M12 17v4" />
+                    <path d="M7 4h10" />
+                    <path d="M17 4v6a5 5 0 0 1-10 0V4" />
+                    <path d="M5 5a2 2 0 0 0 2 2" />
+                    <path d="M19 5a2 2 0 0 1-2 2" />
+                  </svg>
+                  {{ finishedTitle }}
+                </h1>
+              </div>
 
-          <div
-            class="board-row"
-            *ngFor="let p of sortedPlayers; let i = index"
-            [class.me]="p.displayName === meDisplayName"
-          >
-            <span class="rank">{{ i + 1 }}</span>
-            <span class="name">
-              <span
-                class="badge"
-                [class.g]="i === 0"
-                [class.s]="i === 1"
-                [class.b]="i === 2"
-              ></span>
-              <span class="name-info">
-                <span class="name-main">
-                  {{ p.displayName }}
-                  <span class="tag" *ngIf="p.displayName === meDisplayName">You</span>
-                </span>
-                <span class="name-meta muted">
-                  Correct: <b>{{ p.correctAnswers ?? 0 }}</b>
-                  &nbsp;&middot;&nbsp; Time: <b>{{ formatMs(p.totalAnswerTimeMs) }}</b>
-                  <ng-container *ngIf="p.xpDelta != null || p.rankPointsDelta != null">
-                    &nbsp;&middot;&nbsp;
-                    <span *ngIf="p.xpDelta != null">+{{ p.xpDelta }} XP</span>
-                    <span *ngIf="p.rankPointsDelta != null" class="rp">
-                      &nbsp;({{ p.rankPointsDelta >= 0 ? '+' : '' }}{{ p.rankPointsDelta }} RP)
+              <button class="mr-game-results-back" type="button" (click)="backToLobby()">
+                <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                <span>Back</span>
+              </button>
+            </div>
+
+            <div class="mr-game-results-head">
+              <h2 class="mr-game-results-section-title">
+                <svg class="mr-game-results-section-title__mark" aria-hidden="true" focusable="false">
+                  <use href="#mrGameResultsTitleMark"></use>
+                </svg>
+                Match summary
+              </h2>
+              <div class="mr-game-results-section-hint">{{ finishedSubtitle }}</div>
+            </div>
+
+            <div class="mr-game-results-table-wrap">
+              <div class="mr-game-results-empty" *ngIf="!sortedPlayers.length">
+                No players in this match.
+              </div>
+
+              <div
+                class="mr-game-results-row"
+                *ngFor="let p of sortedPlayers; let i = index"
+                [class.is-me]="p.displayName === meDisplayName"
+              >
+                <div class="mr-game-results-row-main">
+                  <div class="mr-game-results-left">
+                    <span class="mr-game-results-pos" aria-hidden="true">
+                      <i
+                        *ngIf="resultIconForPlayer(p, i + 1) as icon; else gameNumberPos"
+                        [class]="
+                          'fa-solid ' +
+                          (icon.icon === 'star' ? 'fa-star ' : 'fa-trophy ') +
+                          icon.className
+                        "
+                      ></i>
+                      <ng-template #gameNumberPos>
+                        <span class="mr-game-results-pos__n">{{ i + 1 }}</span>
+                      </ng-template>
                     </span>
-                  </ng-container>
-                </span>
-              </span>
-            </span>
-            <span class="points right">{{ p.score }}</span>
+
+                    <app-player-avatar
+                      class="mr-game-results-avatar"
+                      [displayName]="p.displayName"
+                      [isAuthenticated]="isAuthenticatedGamePlayer(p)"
+                      [size]="33"
+                      [decorative]="true"
+                    ></app-player-avatar>
+
+                    <span class="mr-game-results-name-wrap">
+                      <span class="mr-game-results-name">
+                        <span class="mr-game-results-name-text">{{ p.displayName }}</span>
+                        <span
+                          class="mr-game-results-rank-pill"
+                          [style.--rank-color]="playerRankColor(p)"
+                        >
+                          {{ playerRankName(p) }}
+                        </span>
+                        <span
+                          *ngIf="showRankingPointsInSummary && p.rankPointsDelta != null"
+                          class="mr-game-results-rp-inline"
+                          [class]="rankPointsInlineClass(p)"
+                        >
+                          {{ rankPointsInline(p) }}
+                        </span>
+                      </span>
+
+                      <span class="mr-game-results-summary">
+                        <span class="mr-game-results-correct" aria-label="Correct answers">
+                          <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                          <b>{{ correctAnswersValue(p) }}</b>
+                        </span>
+                        <span class="mr-game-results-time" aria-label="Total answer time" *ngIf="p.totalAnswerTimeMs != null">
+                          <i class="fa-regular fa-clock" aria-hidden="true"></i>
+                          <b>{{ formatMs(p.totalAnswerTimeMs) }}</b>
+                        </span>
+                        <span class="mr-game-results-xp" aria-label="XP delta" *ngIf="!isTrainingMode && p.xpDelta != null">
+                          <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                          <b>{{ formatDelta(p.xpDelta, 'XP') }}</b>
+                        </span>
+                        <span class="mr-game-results-coins" aria-label="Coins delta" *ngIf="!isTrainingMode && coinsDeltaValue(p) != null">
+                          <i class="fa-solid fa-coins" aria-hidden="true"></i>
+                          <b>{{ formatSigned(coinsDeltaValue(p)) }}</b>
+                        </span>
+                      </span>
+                    </span>
+                  </div>
+
+                  <div class="mr-game-results-right" *ngIf="!isTrainingMode">
+                    <span class="mr-game-results-points">{{ p.score | number }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
     </div>
 
     <!-- No game -->
@@ -286,9 +383,19 @@
   <ng-template #loading>
     <div class="quiz-outer">
       <div class="results-panel">
-        <div class="muted">Loading&hellip;</div>
+        <ng-container *ngIf="error as loadError; else loadingText">
+          <div class="results-title">Game unavailable</div>
+          <div class="muted">{{ loadError }}</div>
+          <div class="results-actions">
+            <button class="btn" (click)="backToLobby()">
+              {{ isSoloFlow ? 'Back to casual' : 'Back to lobby' }}
+            </button>
+          </div>
+        </ng-container>
+        <ng-template #loadingText>
+          <div class="muted">Loading&hellip;</div>
+        </ng-template>
       </div>
     </div>
   </ng-template>
 </div>
-

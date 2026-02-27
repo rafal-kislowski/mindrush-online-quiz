@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Observable, Subscription } from 'rxjs';
@@ -13,7 +14,9 @@ import {
   GameQuestionDto,
   GameStateDto,
 } from '../../core/models/game.models';
+import { rankForPoints } from '../../core/progression/progression';
 import { SessionService } from '../../core/session/session.service';
+import { ConfettiService } from '../../core/ui/confetti.service';
 import { PlayerAvatarComponent } from '../../core/ui/player-avatar.component';
 import { ToastService } from '../../core/ui/toast.service';
 import { GameEventsService } from '../../core/ws/game-events.service';
@@ -71,6 +74,8 @@ export class GameComponent implements OnInit, OnDestroy {
   private soloPollIntervalId: number | null = null;
   private lastSoloBoundaryRefreshAtMs = 0;
   private silentRefreshInFlight = false;
+  private stateRecoveryInFlight = false;
+  private celebratedGameSessionId: string | null = null;
   heartLostSlot: number | null = null;
   readonly heartSlots: ReadonlyArray<number> = [1, 2, 3];
 
@@ -84,6 +89,7 @@ export class GameComponent implements OnInit, OnDestroy {
     private readonly sessionService: SessionService,
     private readonly stompClient: StompClientService,
     private readonly authService: AuthService,
+    private readonly confettiService: ConfettiService,
     private readonly toast: ToastService
   ) {}
 
@@ -171,8 +177,7 @@ export class GameComponent implements OnInit, OnDestroy {
         this.state = state;
         this.onStateUpdated(state);
       },
-      error: (err) =>
-        (this.error = apiErrorMessage(err, 'Failed to load game state')),
+      error: (err) => this.handleStateLoadError(err, false),
     });
   }
 
@@ -187,9 +192,9 @@ export class GameComponent implements OnInit, OnDestroy {
         this.state = state;
         this.onStateUpdated(state);
       },
-      error: () => {
+      error: (err) => {
         this.silentRefreshInFlight = false;
-        // ignore transient errors while reconnecting
+        this.handleStateLoadError(err, true);
       },
     });
   }
@@ -314,6 +319,22 @@ export class GameComponent implements OnInit, OnDestroy {
     if (this.state?.finishReason === 'EXPIRED' && this.isTrainingMode) {
       return 'Session expired because of inactivity.';
     }
+
+    const state = this.state;
+    const outcome = this.resolveMyFinishedOutcome(state);
+    if (outcome === 'WIN') {
+      return 'You won. Congratulations!';
+    }
+    if (outcome === 'DRAW') {
+      const place = this.resolveMyFinishedPlacement(state?.players ?? []);
+      if (place === 1) return "It's a draw for 1st place.";
+      return "It's a draw.";
+    }
+    if (outcome === 'LOSE') {
+      const place = this.resolveMyFinishedPlacement(state?.players ?? []);
+      if (place != null) return `Unfortunately, you lost. You placed #${place}.`;
+      return 'Unfortunately, you lost.';
+    }
     return 'Final scores';
   }
 
@@ -342,16 +363,7 @@ export class GameComponent implements OnInit, OnDestroy {
   }
 
   get sortedPlayers() {
-    const players = this.state?.players ?? [];
-    return [...players].sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      const bCorrect = b.correctAnswers ?? 0;
-      const aCorrect = a.correctAnswers ?? 0;
-      if (bCorrect !== aCorrect) return bCorrect - aCorrect;
-      const aTime = a.totalCorrectAnswerTimeMs ?? Number.MAX_SAFE_INTEGER;
-      const bTime = b.totalCorrectAnswerTimeMs ?? Number.MAX_SAFE_INTEGER;
-      return aTime - bTime;
-    });
+    return this.sortPlayersForResults(this.state?.players ?? []);
   }
 
   formatMs(ms: number | null | undefined): string {
@@ -362,6 +374,105 @@ export class GameComponent implements OnInit, OnDestroy {
     const seconds = totalSeconds - minutes * 60;
     const secStr = seconds.toFixed(2).padStart(5, '0');
     return `${minutes}:${secStr}`;
+  }
+
+  formatDelta(value: number | null | undefined, unit: string): string {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '-';
+    const rounded = Math.trunc(n);
+    const sign = rounded >= 0 ? '+' : '';
+    return `${sign}${rounded} ${unit}`;
+  }
+
+  formatSigned(value: number | null | undefined): string {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '0';
+    const rounded = Math.trunc(n);
+    const sign = rounded > 0 ? '+' : '';
+    return `${sign}${rounded}`;
+  }
+
+  coinsDeltaValue(player: GamePlayerDto): number | null {
+    const direct = Number(player.coinsDelta);
+    if (Number.isFinite(direct)) return Math.trunc(direct);
+
+    // Fallback: for STANDARD mode mirror backend formula
+    // so summary still shows coins if payload omitted this field.
+    const mode = (this.state?.mode ?? '').toUpperCase();
+    if (mode !== 'STANDARD') return null;
+
+    const score = Number(player.score);
+    if (!Number.isFinite(score)) return null;
+    const winnerBonus = player.winner === true ? 20 : 5;
+    return Math.max(0, Math.trunc(score / 20) + winnerBonus);
+  }
+
+  rankPointsInline(player: GamePlayerDto): string {
+    const value = this.rankPointsDeltaValue(player);
+    const sign = value > 0 ? '+' : '';
+    return `(${sign}${value} RP)`;
+  }
+
+  get showRankingPointsInSummary(): boolean {
+    if (this.isTrainingMode) return false;
+    const players = this.state?.players ?? [];
+    return players.some((p) => p.rankPointsDelta != null && Number.isFinite(Number(p.rankPointsDelta)));
+  }
+
+  rankPointsInlineClass(player: GamePlayerDto): 'is-positive' | 'is-negative' | 'is-zero' {
+    const value = this.rankPointsDeltaValue(player);
+    if (value > 0) return 'is-positive';
+    if (value < 0) return 'is-negative';
+    return 'is-zero';
+  }
+
+  correctAnswersValue(player: GamePlayerDto): number {
+    const n = Number(player.correctAnswers);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.trunc(n));
+  }
+
+  playerRankName(player: GamePlayerDto): string {
+    return rankForPoints(this.playerRankPoints(player)).name;
+  }
+
+  playerRankColor(player: GamePlayerDto): string {
+    return rankForPoints(this.playerRankPoints(player)).color;
+  }
+
+  trophyClassByPosition(position: number): string | null {
+    if (position === 1) return 'mr-game-results-trophy mr-game-results-trophy--gold';
+    if (position === 2) return 'mr-game-results-trophy mr-game-results-trophy--silver';
+    if (position === 3) return 'mr-game-results-trophy mr-game-results-trophy--bronze';
+    return null;
+  }
+
+  resultIconForPlayer(
+    player: GamePlayerDto,
+    position: number
+  ): { icon: 'trophy' | 'star'; className: string } | null {
+    if (this.isDrawTopPlayer(player)) {
+      return {
+        icon: 'star',
+        className: 'mr-game-results-trophy mr-game-results-trophy--draw',
+      };
+    }
+
+    const trophyClass = this.trophyClassByPosition(position);
+    if (!trophyClass) return null;
+    return { icon: 'trophy', className: trophyClass };
+  }
+
+  private rankPointsDeltaValue(player: GamePlayerDto): number {
+    const n = Number(player.rankPointsDelta);
+    if (!Number.isFinite(n)) return 0;
+    return Math.trunc(n);
+  }
+
+  private playerRankPoints(player: GamePlayerDto): number {
+    const n = Number(player.rankPoints);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.trunc(n));
   }
 
   get answeredCount(): number {
@@ -396,7 +507,19 @@ export class GameComponent implements OnInit, OnDestroy {
   }
 
   get showWaitingForPlayersLabel(): boolean {
-    return !this.isSoloFlow && this.hasAnsweredCurrentQuestion;
+    return (
+      !this.isSoloFlow &&
+      !this.submittingAnswer &&
+      this.hasAnsweredCurrentQuestion &&
+      !this.allPlayersAnsweredCurrentQuestion
+    );
+  }
+
+  private get allPlayersAnsweredCurrentQuestion(): boolean {
+    if (!this.state || this.state.stage !== 'QUESTION') return false;
+    const players = this.state.players ?? [];
+    if (!players.length) return false;
+    return players.every((p) => p.answered === true);
   }
 
   get showSoloAnsweredTimerDim(): boolean {
@@ -476,6 +599,7 @@ export class GameComponent implements OnInit, OnDestroy {
     const isSelected = selected === optionId;
 
     if (state.stage !== 'REVEAL') {
+      if (this.isSoloFlow) return 'idle';
       return isSelected ? 'selected' : 'idle';
     }
 
@@ -504,6 +628,8 @@ export class GameComponent implements OnInit, OnDestroy {
   private ensureLeaveOnUnload(): void {
     if (this.unloadHandler) return;
     this.unloadHandler = () => {
+      const stage = this.state?.stage ?? null;
+      if (stage === 'FINISHED' || stage === 'NO_GAME') return;
       try {
         navigator.sendBeacon(
           `/api/lobbies/${encodeURIComponent(this.code)}/leave`,
@@ -516,6 +642,46 @@ export class GameComponent implements OnInit, OnDestroy {
     window.addEventListener('beforeunload', this.unloadHandler);
   }
 
+  private handleStateLoadError(err: unknown, silent: boolean): void {
+    if (!this.isSoloFlow && this.shouldRecoverFromLobbyStateError(err)) {
+      this.recoverFromLobbyStateError(err);
+      return;
+    }
+    if (!silent) {
+      this.error = apiErrorMessage(err, 'Failed to load game state');
+    }
+  }
+
+  private shouldRecoverFromLobbyStateError(err: unknown): boolean {
+    if (!(err instanceof HttpErrorResponse)) return false;
+    if (err.status !== 403 && err.status !== 404) return false;
+
+    const message = apiErrorMessage(err, '').toLowerCase();
+    return (
+      message.includes('not a lobby participant') ||
+      message.includes('lobby not found')
+    );
+  }
+
+  private recoverFromLobbyStateError(err: unknown): void {
+    if (this.stateRecoveryInFlight) return;
+    this.stateRecoveryInFlight = true;
+
+    const rawMessage = apiErrorMessage(err, '').toLowerCase();
+    const alertMessage = rawMessage.includes('not a lobby participant')
+      ? 'You are not a participant of this lobby game. Redirected to dashboard.'
+      : 'This game is no longer available. Redirected to dashboard.';
+
+    this.toast.warning(alertMessage, {
+      title: 'Game',
+      dedupeKey: `game:invalid-access:${this.code}`,
+    });
+
+    void this.router.navigate(['/'], { replaceUrl: true }).finally(() => {
+      this.stateRecoveryInFlight = false;
+    });
+  }
+
   private onStateUpdated(state: GameStateDto): void {
     const stageChanged = this.lastStageSeen !== state.stage;
     const questionChanged = this.lastQuestionIndexSeen !== state.questionIndex;
@@ -525,11 +691,13 @@ export class GameComponent implements OnInit, OnDestroy {
     if (stageChanged && state.stage === 'FINISHED') {
       this.sessionService.refresh().subscribe({ error: () => {} });
       this.authService.reloadMe().subscribe({ error: () => {} });
+      this.playWinnerConfettiIfEligible(state);
     }
 
     const newGameSessionId = state.gameSessionId ?? null;
     if (newGameSessionId !== this.currentGameSessionId) {
       this.currentGameSessionId = newGameSessionId;
+      this.celebratedGameSessionId = null;
       this.questionResults = [];
       this.selectedOptionIdByQuestionIndex = new Map<number, number>();
       this.lastSecondsRendered = null;
@@ -774,5 +942,141 @@ export class GameComponent implements OnInit, OnDestroy {
 
   private hasImageUrl(value: string | null | undefined): boolean {
     return (value ?? '').trim().length > 0;
+  }
+
+  private playWinnerConfettiIfEligible(state: GameStateDto): void {
+    if (!this.shouldCelebrateCurrentPlayerWin(state)) return;
+
+    const sessionKey =
+      (state.gameSessionId ?? '').trim() ||
+      `${this.code}:${state.totalQuestions}:${state.questionIndex}`;
+    if (this.celebratedGameSessionId === sessionKey) return;
+    this.celebratedGameSessionId = sessionKey;
+
+    void this.confettiService.makeItRain(2000);
+  }
+
+  private shouldCelebrateCurrentPlayerWin(state: GameStateDto): boolean {
+    return this.resolveMyFinishedOutcome(state) === 'WIN';
+  }
+
+  private sortPlayersForResults(players: readonly GamePlayerDto[]): GamePlayerDto[] {
+    return [...players].sort((a, b) => {
+      const bScore = this.safeInt(b.score);
+      const aScore = this.safeInt(a.score);
+      if (bScore !== aScore) return bScore - aScore;
+
+      const bCorrect = this.safeInt(b.correctAnswers);
+      const aCorrect = this.safeInt(a.correctAnswers);
+      if (bCorrect !== aCorrect) return bCorrect - aCorrect;
+
+      const aTime = this.safeTime(a.totalCorrectAnswerTimeMs);
+      const bTime = this.safeTime(b.totalCorrectAnswerTimeMs);
+      return aTime - bTime;
+    });
+  }
+
+  private countPlayersWithSameResult(players: readonly GamePlayerDto[], ref: GamePlayerDto): number {
+    const signature = this.playerResultSignature(ref);
+    return players.reduce((count, player) => {
+      return this.playerResultSignature(player) === signature ? count + 1 : count;
+    }, 0);
+  }
+
+  private resolveMyFinishedOutcome(
+    state: GameStateDto | null | undefined
+  ): 'WIN' | 'LOSE' | 'DRAW' | null {
+    if (!state || state.stage !== 'FINISHED') return null;
+    const mode = String(state.mode ?? '').trim().toUpperCase();
+    if (mode === 'TRAINING') return null;
+
+    const players = state.players ?? [];
+    if (players.length < 2) return null;
+
+    const me = this.resolveCurrentPlayerFromResults(players);
+    if (!me) return null;
+
+    const winners = players.filter((p) => p?.winner === true);
+    if (winners.length > 1) return 'DRAW';
+    if (winners.length === 1) {
+      const winner = winners[0];
+      return this.playerResultSignature(winner) === this.playerResultSignature(me)
+        ? 'WIN'
+        : 'LOSE';
+    }
+
+    const sorted = this.sortPlayersForResults(players);
+    const top = sorted[0];
+    if (!top) return null;
+
+    const meIsTop = this.playerResultSignature(me) === this.playerResultSignature(top);
+    if (!meIsTop) return 'LOSE';
+    return this.countPlayersWithSameResult(sorted, top) > 1 ? 'DRAW' : 'WIN';
+  }
+
+  private resolveCurrentPlayerFromResults(players: readonly GamePlayerDto[]): GamePlayerDto | null {
+    const meName = this.normalizedName(this.resolveMeDisplayName());
+    if (!meName) return null;
+    return players.find((p) => this.normalizedName(p.displayName) === meName) ?? null;
+  }
+
+  private isDrawTopPlayer(player: GamePlayerDto): boolean {
+    const players = this.state?.players ?? [];
+    if (players.length < 2) return false;
+
+    // For result icon UX treat equal top score as a draw group,
+    // even if sort tiebreakers (correct/time) still determine row order.
+    let topScore = Number.NEGATIVE_INFINITY;
+    for (const p of players) {
+      const score = this.safeInt(p.score);
+      if (score > topScore) topScore = score;
+    }
+    if (!Number.isFinite(topScore)) return false;
+
+    const topScorePlayers = players.filter((p) => this.safeInt(p.score) === topScore);
+    if (topScorePlayers.length < 2) return false;
+
+    return this.safeInt(player.score) === topScore;
+  }
+
+  private resolveMyFinishedPlacement(players: readonly GamePlayerDto[]): number | null {
+    const me = this.resolveCurrentPlayerFromResults(players);
+    if (!me) return null;
+
+    const meSignature = this.playerResultSignature(me);
+    const sorted = this.sortPlayersForResults(players);
+    const idx = sorted.findIndex((p) => this.playerResultSignature(p) === meSignature);
+    if (idx < 0) return null;
+    return idx + 1;
+  }
+
+  private playerResultSignature(player: GamePlayerDto): string {
+    const score = this.safeInt(player.score);
+    const correct = this.safeInt(player.correctAnswers);
+    const time = this.safeTime(player.totalCorrectAnswerTimeMs);
+    return `${score}|${correct}|${time}`;
+  }
+
+  private safeInt(value: unknown): number {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    return Math.trunc(n);
+  }
+
+  private safeTime(value: unknown): number {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return Number.MAX_SAFE_INTEGER;
+    return Math.max(0, Math.trunc(n));
+  }
+
+  private resolveMeDisplayName(): string | null {
+    const fromSession = String(this.meDisplayName ?? '').trim();
+    if (fromSession) return fromSession;
+    const fromAuth = String(this.authService.snapshot?.displayName ?? '').trim();
+    return fromAuth || null;
+  }
+
+  private normalizedName(value: string | null | undefined): string {
+    return String(value ?? '').trim().toLowerCase();
   }
 }

@@ -52,16 +52,16 @@ export class CasualComponent implements OnInit, AfterViewInit, OnDestroy {
       title: 'Standard Solo',
       description: 'Pick category and start a normal solo run.',
       details:
-        'Uses casual non-ranked quizzes. Rewards depend on quiz settings (XP and coins, no rank).',
+        'Uses casual non-ranked quizzes. Awards XP and coins.',
       backendMode: 'STANDARD',
       icon: 'standard',
     },
     {
       id: 'threeLives',
       title: '3 Lives Challenge',
-      description: 'Endless question run.',
+      description: 'Finish selected quiz with 3 lives.',
       details:
-        'Questions are rotated from the selected category pool. Best result is stored on backend per guest/user session.',
+        'Questions come only from selected quiz. Run ends when you lose all lives or answer all selected questions.',
       backendMode: 'THREE_LIVES',
       icon: 'threeLives',
     },
@@ -70,7 +70,7 @@ export class CasualComponent implements OnInit, AfterViewInit, OnDestroy {
       title: 'Training',
       description: 'Practice mode without question timer.',
       details:
-        'No XP, no coins, no rank points. Great for stress-free drilling in selected category.',
+        'No XP, no coins, no rank points. Great for stress-free drilling in selected quiz.',
       backendMode: 'TRAINING',
       icon: 'training',
     },
@@ -177,7 +177,8 @@ export class CasualComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const matchesScope = (q: QuizListItemDto): boolean => {
       const raw = (q as any)?.source ?? (q as any)?.scope ?? (q as any)?.type ?? null;
-      if (typeof raw !== 'string' || !raw.trim()) return true;
+      // Missing source metadata means system quiz -> treat as "official".
+      if (typeof raw !== 'string' || !raw.trim()) return scope === 'official';
       const v = raw.trim().toLowerCase();
       if (v === 'official') return scope === 'official';
       if (v === 'custom') return scope === 'custom';

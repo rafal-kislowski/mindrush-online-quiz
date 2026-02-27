@@ -2,13 +2,14 @@
   display: block;
   height: 100%;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --outer-gap: clamp(10px, 1.4vw, 18px);
 }
 
 .page.casual-page.lobby-page {
   width: 100%;
   min-height: 100%;
   height: 100%;
-  padding: calc(clamp(12px, 1.6vw, 20px) + 6px);
+  padding: calc(var(--outer-gap) + 6px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -620,6 +621,10 @@
 }
 
 @media (max-width: 720px) {
+  .page.casual-page.lobby-page {
+    padding: calc(var(--outer-gap) + 2px);
+  }
+
   .frame {
     width: 100%;
     padding: 18px;

@@ -1295,6 +1295,630 @@
 }
 
 /* ===== Results ===== */
+.quiz-outer--results {
+  align-items: center;
+}
+
+.mr-game-results-page {
+  width: 100%;
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.mr-game-results-frame {
+  width: min(780px, calc(100% - 24px));
+  height: auto;
+  min-height: 0;
+  padding: clamp(22px, 2.8vw, 44px);
+  border-radius: clamp(16px, 2.2vw, 30px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    radial-gradient(130% 110% at 0% 0%, rgba(56, 189, 248, 0.12), transparent 58%),
+    radial-gradient(120% 120% at 100% 100%, rgba(255, 183, 72, 0.1), transparent 62%),
+    linear-gradient(170deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.2));
+  box-shadow:
+    0 26px 60px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(12px, 1.4vw, 18px);
+  opacity: 0;
+  transform: translateY(18px) scale(0.985);
+  filter: saturate(0.92) brightness(0.92);
+  animation: gameLbFrameIn 560ms cubic-bezier(0.16, 1, 0.3, 1) 90ms both;
+}
+
+.mr-game-results-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+}
+
+.mr-game-results-svg-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.mr-game-results-top {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  min-width: 0;
+  padding-bottom: 17px;
+  opacity: 0;
+  transform: translateY(12px);
+  animation: gameLbPanelIn 520ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both;
+}
+
+.mr-game-results-top::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 999px;
+  opacity: 0.28;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 205, 77, 0.85),
+    rgba(56, 189, 248, 0.85),
+    rgba(185, 107, 255, 0.8),
+    transparent
+  );
+  pointer-events: none;
+}
+
+.mr-game-results-title h1 {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: clamp(22px, 2.2vw, 30px);
+  font-weight: 950;
+  letter-spacing: 0.2px;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.mr-game-results-title h1 svg {
+  width: 26px;
+  height: 26px;
+  opacity: 0.9;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.mr-game-results-back {
+  margin-left: auto;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.055),
+    rgba(255, 255, 255, 0.018)
+  );
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  transition: filter 170ms ease, box-shadow 200ms ease, background 200ms ease;
+}
+
+.mr-game-results-back:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.07),
+    rgba(255, 255, 255, 0.024)
+  );
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  filter: brightness(1.03);
+}
+
+.mr-game-results-head {
+  padding-top: 14px;
+  opacity: 0;
+  transform: translateY(12px);
+  animation: gameLbPanelIn 520ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both;
+}
+
+.mr-game-results-section-title {
+  margin: 0;
+  font-weight: 950;
+  letter-spacing: 0.2px;
+  font-size: 18px;
+  line-height: 1.1;
+  color: rgba(255, 255, 255, 0.96);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mr-game-results-section-title__mark {
+  width: 10px;
+  height: 20px;
+  flex: 0 0 auto;
+  display: inline-block;
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.22));
+  opacity: 0.92;
+}
+
+.mr-game-results-section-hint {
+  margin: 4px 0 0;
+  font-weight: 750;
+  font-size: 14px;
+  line-height: 1.25;
+  padding-bottom: 12px;
+  color: rgba(234, 244, 255, 0.88);
+}
+
+.mr-game-results-table-wrap {
+  padding: 12px 0 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: gameLbPanelIn 520ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both;
+}
+
+.mr-game-results-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 9px 12px;
+  min-height: 72px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.mr-game-results-row-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 54px;
+  min-width: 0;
+}
+
+.mr-game-results-row::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background:
+    radial-gradient(120% 140% at 14% 50%, rgba(255, 255, 255, 0.07), transparent 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.08));
+  opacity: 0;
+  transform: scale(0.985);
+  transform-origin: 50% 50%;
+  transition: opacity 220ms ease, transform 260ms ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.mr-game-results-row:hover::before {
+  opacity: 0.4;
+  transform: scale(1);
+}
+
+.mr-game-results-row.is-me::before {
+  opacity: 1;
+  transform: scale(1);
+  background: linear-gradient(
+    90deg,
+    rgba(31, 74, 142, 0.5),
+    rgba(29, 57, 98, 0.22) 68%,
+    rgba(29, 57, 98, 0.05)
+  );
+}
+
+.mr-game-results-row.is-me {
+  box-shadow: none;
+}
+
+.mr-game-results-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 54px;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.mr-game-results-pos {
+  width: 22px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.mr-game-results-pos__n {
+  width: 22px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 900;
+  font-size: 12px;
+}
+
+.mr-game-results-trophy {
+  font-size: 15px;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.45));
+}
+
+.mr-game-results-avatar {
+  flex: 0 0 auto;
+}
+
+.mr-game-results-trophy--gold {
+  color: rgba(255, 210, 74, 0.95);
+}
+
+.mr-game-results-trophy--silver {
+  color: rgba(210, 220, 235, 0.9);
+}
+
+.mr-game-results-trophy--bronze {
+  color: rgba(255, 155, 42, 0.9);
+}
+
+.mr-game-results-trophy--draw {
+  color: rgba(134, 205, 255, 0.94);
+}
+
+.mr-game-results-name-wrap {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  gap: 5px;
+}
+
+.mr-game-results-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: 640px;
+}
+
+.mr-game-results-name-text {
+  font-weight: 950;
+  font-size: 15px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  color: rgba(249, 252, 255, 0.98);
+}
+
+.mr-game-results-rp-inline {
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.mr-game-results-rp-inline.is-positive {
+  color: rgba(110, 231, 183, 0.98);
+}
+
+.mr-game-results-rp-inline.is-negative {
+  color: rgba(251, 113, 133, 0.98);
+}
+
+.mr-game-results-rp-inline.is-zero {
+  color: rgba(183, 202, 234, 0.9);
+}
+
+.mr-game-results-rank-pill {
+  --rank-color: rgba(255, 255, 255, 0.7);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 19px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-weight: 900;
+  font-size: 11px;
+  line-height: 1;
+  text-align: center;
+  color: var(--rank-color);
+  border: 1px solid var(--rank-color);
+  background: color-mix(in srgb, var(--rank-color) 10%, transparent);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 8px 18px rgba(0, 0, 0, 0.24);
+  flex: 0 0 auto;
+}
+
+.mr-game-results-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.mr-game-results-correct {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 850;
+  font-size: 13px;
+  color: rgba(234, 246, 255, 0.92);
+}
+
+.mr-game-results-correct i {
+  color: rgba(116, 223, 180, 0.95);
+}
+
+.mr-game-results-time,
+.mr-game-results-xp,
+.mr-game-results-coins {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 850;
+  font-size: 13px;
+}
+
+.mr-game-results-time {
+  color: rgba(223, 237, 255, 0.9);
+}
+
+.mr-game-results-time i {
+  color: rgba(157, 206, 255, 0.95);
+}
+
+.mr-game-results-xp {
+  color: rgba(243, 247, 255, 0.96);
+}
+
+.mr-game-results-xp i {
+  color: rgba(255, 205, 77, 0.95);
+}
+
+.mr-game-results-coins {
+  color: rgba(243, 247, 255, 0.96);
+}
+
+.mr-game-results-coins i {
+  color: rgba(255, 188, 96, 0.95);
+}
+
+.mr-game-results-right {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  align-self: center;
+  gap: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.mr-game-results-points {
+  font-weight: 900;
+  color: rgba(255, 154, 53, 0.95);
+}
+
+.mr-game-results-empty {
+  padding: 18px 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 700;
+}
+
+@keyframes gameLbFrameIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+    filter: saturate(0.92) brightness(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: none;
+  }
+}
+
+@keyframes gameLbPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 720px) {
+  .mr-game-results-frame {
+    width: 100%;
+    padding: 18px;
+  }
+
+  .mr-game-results-top {
+    padding-bottom: 17px;
+    align-items: center;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 12px;
+  }
+
+  .mr-game-results-title {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .mr-game-results-title h1 {
+    font-size: clamp(20px, 5.4vw, 24px);
+  }
+
+  .mr-game-results-back {
+    margin-left: auto;
+    flex: 0 0 auto;
+    height: 38px;
+    padding: 0 14px;
+    gap: 10px;
+    font-size: 13px;
+  }
+
+  .mr-game-results-name {
+    max-width: 100%;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .mr-game-results-name-text {
+    max-width: clamp(96px, 36vw, 180px);
+  }
+
+  .mr-game-results-row {
+    padding: 10px 10px;
+    min-height: 78px;
+  }
+
+  .mr-game-results-row-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 8px;
+    min-height: 62px;
+  }
+
+  .mr-game-results-left {
+    gap: 8px;
+    min-height: 62px;
+  }
+
+  .mr-game-results-pos {
+    width: 18px;
+  }
+
+  .mr-game-results-pos__n {
+    width: 18px;
+    font-size: 11px;
+  }
+
+  .mr-game-results-trophy {
+    font-size: 13px;
+  }
+
+  .mr-game-results-rank-pill {
+    height: 19px;
+    padding: 0 9px;
+    font-size: 11px;
+  }
+
+  .mr-game-results-rp-inline {
+    font-size: 12px;
+  }
+
+  .mr-game-results-summary {
+    gap: 9px;
+    flex-wrap: wrap;
+  }
+
+  .mr-game-results-correct,
+  .mr-game-results-time,
+  .mr-game-results-xp,
+  .mr-game-results-coins {
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .mr-game-results-right {
+    justify-self: end;
+  }
+
+  .mr-game-results-points {
+    font-size: 22px;
+    line-height: 1;
+  }
+}
+
+@media (max-width: 520px) {
+  .mr-game-results-frame {
+    padding: 14px;
+  }
+
+  .mr-game-results-back {
+    height: 36px;
+    padding: 0 12px;
+    font-size: 12px;
+    gap: 8px;
+  }
+
+  .mr-game-results-row {
+    padding: 10px 10px;
+    min-height: 84px;
+  }
+
+  .mr-game-results-row-main {
+    min-height: 66px;
+  }
+
+  .mr-game-results-left {
+    min-height: 66px;
+  }
+
+  .mr-game-results-name-text {
+    max-width: clamp(84px, 34vw, 150px);
+  }
+
+  .mr-game-results-summary {
+    gap: 7px;
+  }
+
+  .mr-game-results-correct,
+  .mr-game-results-time,
+  .mr-game-results-xp,
+  .mr-game-results-coins {
+    font-size: 11px;
+  }
+
+  .mr-game-results-points {
+    font-size: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mr-game-results-frame,
+  .mr-game-results-top,
+  .mr-game-results-head,
+  .mr-game-results-table-wrap {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+}
+
 .results-panel {
   width: min(860px, 100%);
   border-radius: 28px;
