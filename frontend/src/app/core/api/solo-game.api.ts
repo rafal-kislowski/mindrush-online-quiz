@@ -7,10 +7,16 @@ import { GameStartMode, GameStateDto } from '../models/game.models';
 export class SoloGameApi {
   constructor(private readonly http: HttpClient) {}
 
-  start(quizId: number, mode: GameStartMode = 'STANDARD'): Observable<GameStateDto> {
+  start(
+    quizId: number,
+    mode: GameStartMode = 'STANDARD',
+    ranked?: boolean | null
+  ): Observable<GameStateDto> {
+    const body: Record<string, unknown> = { quizId, mode };
+    if (ranked != null) body['ranked'] = !!ranked;
     return this.http.post<GameStateDto>(
       '/api/solo-games/start',
-      { quizId, mode },
+      body,
       { withCredentials: true }
     );
   }

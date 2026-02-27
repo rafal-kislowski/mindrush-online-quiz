@@ -10,11 +10,14 @@ export class GameApi {
   start(
     lobbyCode: string,
     quizId: number,
-    mode: GameStartMode = 'STANDARD'
+    mode: GameStartMode = 'STANDARD',
+    ranked?: boolean | null
   ): Observable<GameStateDto> {
+    const body: Record<string, unknown> = { quizId, mode };
+    if (ranked != null) body['ranked'] = !!ranked;
     return this.http.post<GameStateDto>(
       `/api/lobbies/${encodeURIComponent(lobbyCode)}/game/start`,
-      { quizId, mode },
+      body,
       { withCredentials: true }
     );
   }

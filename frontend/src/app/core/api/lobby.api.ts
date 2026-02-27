@@ -62,10 +62,18 @@ export class LobbyApi {
     );
   }
 
-  setSelectedQuiz(code: string, quizId: number | null): Observable<LobbyDto> {
+  setSelectedQuiz(
+    code: string,
+    quizId: number | null,
+    rankingEnabled?: boolean | null
+  ): Observable<LobbyDto> {
+    const body: Record<string, unknown> = { quizId };
+    if (rankingEnabled != null) {
+      body['rankingEnabled'] = !!rankingEnabled;
+    }
     return this.http.post<LobbyDto>(
       `/api/lobbies/${encodeURIComponent(code)}/selected-quiz`,
-      { quizId },
+      body,
       { withCredentials: true }
     );
   }

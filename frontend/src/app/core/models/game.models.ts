@@ -23,7 +23,9 @@ export interface GamePlayerDto {
   totalAnswerTimeMs?: number;
   totalCorrectAnswerTimeMs?: number;
   xpDelta?: number | null;
+  coinsDelta?: number | null;
   rankPointsDelta?: number | null;
+  rankPoints?: number | null;
   winner?: boolean | null;
 }
 

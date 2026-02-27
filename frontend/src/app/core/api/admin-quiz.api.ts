@@ -18,6 +18,7 @@ export interface AdminQuizDto {
   includeInRanking: boolean;
   xpEnabled: boolean;
   questionTimeLimitSeconds: number | null;
+  questionsPerGame: number | null;
   status: QuizStatus;
 }
 
@@ -34,6 +35,7 @@ export interface AdminQuizListItemDto {
   includeInRanking: boolean;
   xpEnabled: boolean;
   questionTimeLimitSeconds: number | null;
+  questionsPerGame: number | null;
   status: QuizStatus;
   questionCount: number;
 }
@@ -74,6 +76,7 @@ export interface AdminQuizDetailDto {
   includeInRanking: boolean;
   xpEnabled: boolean;
   questionTimeLimitSeconds: number | null;
+  questionsPerGame: number | null;
   status: QuizStatus;
   questions: AdminQuestionDto[];
 }
@@ -116,6 +119,7 @@ export class AdminQuizApi {
     includeInRanking?: boolean | null;
     xpEnabled?: boolean | null;
     questionTimeLimitSeconds?: number | null;
+    questionsPerGame?: number | null;
   }): Observable<AdminQuizDto> {
     return this.http.post<AdminQuizDto>('/api/admin/quizzes', input, {
       withCredentials: true,
@@ -136,6 +140,7 @@ export class AdminQuizApi {
       includeInRanking?: boolean | null;
       xpEnabled?: boolean | null;
       questionTimeLimitSeconds?: number | null;
+      questionsPerGame?: number | null;
     }
   ): Observable<AdminQuizDto> {
     return this.http.put<AdminQuizDto>(

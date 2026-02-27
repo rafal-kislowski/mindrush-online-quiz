@@ -5,6 +5,7 @@ export interface LobbyPlayerDto {
   joinedAt: string;
   ready?: boolean;
   away?: boolean;
+  rankPoints?: number;
   isOwner?: boolean;
   isYou?: boolean;
 }
@@ -20,6 +21,7 @@ export interface LobbyDto {
   isOwner?: boolean;
   isParticipant?: boolean;
   selectedQuizId?: number | null;
+  rankingEnabled?: boolean;
 }
 
 export type LobbyOwnerType = 'GUEST' | 'AUTHENTICATED';

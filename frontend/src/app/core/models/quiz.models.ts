@@ -9,8 +9,10 @@ export interface QuizListItemDto {
   avatarTextColor?: string | null;
   gameMode?: 'CASUAL' | 'RANKED';
   includeInRanking?: boolean;
+  source?: 'official' | 'custom' | 'library' | 'user';
   xpEnabled?: boolean;
   questionTimeLimitSeconds?: number | null;
+  questionsPerGame?: number | null;
   questionCount: number;
 }
 
