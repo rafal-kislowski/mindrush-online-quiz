@@ -184,7 +184,12 @@
         </div>
 
         <div class="table-wrap" *ngIf="quizzes.length; else emptyList">
-          <div class="qtable" role="table" aria-label="Quizzes table">
+          <div
+            class="qtable"
+            role="table"
+            aria-label="Quizzes table"
+            (scroll)="closeQuizActions()"
+          >
             <div class="qtable__head" role="rowgroup" aria-hidden="true">
               <div class="qrow" role="row">
                 <div class="cell">Name</div>
@@ -233,18 +238,9 @@
                       </span>
 
                       <span class="mr-meta-row mr-meta-row--bottom">
-                        <span class="mr-meta-sep" aria-hidden="true"
-                          >&middot;</span
-                        >
-                        <span class="mr-meta--mode">{{
-                          q.gameMode === "RANKED" ? "Ranked" : "Casual"
-                        }}</span>
-                        <span class="mr-meta-sep" aria-hidden="true"
-                          >&middot;</span
-                        >
-                        <span class="mr-meta--questions"
-                          >{{ q.questionCount }} questions</span
-                        >
+                        <span class="mr-meta--questions">{{
+                          q.questionCount
+                        }} questions</span>
                       </span>
                     </div>
                   </div>
@@ -289,84 +285,74 @@
                         aria-hidden="true"
                       ></i>
                     </button>
-
-                    <div
-                      class="mr-select__menu"
-                      role="menu"
-                      *ngIf="openQuizActionsId === q.id"
-                      [ngStyle]="quizActionsMenuStyle"
-                      (click)="$event.stopPropagation()"
-                    >
-                      <button
-                        class="mr-select__item"
-                        type="button"
-                        role="menuitem"
-                        (click)="
-                          selectQuiz(q.id, 'details'); closeQuizActions()
-                        "
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        class="mr-select__item"
-                        type="button"
-                        role="menuitem"
-                        *ngIf="q.status === 'DRAFT'"
-                        [disabled]="q.questionCount === 0"
-                        (click)="
-                          setQuizStatus(q.id, 'ACTIVE'); closeQuizActions()
-                        "
-                      >
-                        Publish
-                      </button>
-                      <button
-                        class="mr-select__item"
-                        type="button"
-                        role="menuitem"
-                        *ngIf="q.status === 'ACTIVE'"
-                        (click)="
-                          setQuizStatus(q.id, 'DRAFT'); closeQuizActions()
-                        "
-                      >
-                        Disable
-                      </button>
-                      <button
-                        class="mr-select__item"
-                        type="button"
-                        role="menuitem"
-                        *ngIf="q.status !== 'TRASHED'"
-                        (click)="
-                          setQuizStatus(q.id, 'TRASHED'); closeQuizActions()
-                        "
-                      >
-                        Move to trash
-                      </button>
-                      <button
-                        class="mr-select__item"
-                        type="button"
-                        role="menuitem"
-                        *ngIf="q.status === 'TRASHED'"
-                        (click)="
-                          setQuizStatus(q.id, 'DRAFT'); closeQuizActions()
-                        "
-                      >
-                        Restore
-                      </button>
-                      <button
-                        class="mr-select__item"
-                        type="button"
-                        role="menuitem"
-                        *ngIf="q.status === 'TRASHED'"
-                        (click)="purgeQuiz(q.id); closeQuizActions()"
-                      >
-                        Delete permanently
-                      </button>
-                    </div>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
+
+          <div
+            class="mr-select__menu mr-select__menu--actions-floating"
+            role="menu"
+            *ngIf="openQuizActionsQuiz as q"
+            [ngStyle]="quizActionsMenuStyle"
+            (click)="$event.stopPropagation()"
+          >
+            <button
+              class="mr-select__item"
+              type="button"
+              role="menuitem"
+              (click)="selectQuiz(q.id, 'details'); closeQuizActions()"
+            >
+              Edit
+            </button>
+
+            <button
+              class="mr-select__item"
+              type="button"
+              role="menuitem"
+              *ngIf="q.status === 'DRAFT'"
+              [disabled]="q.questionCount === 0"
+              (click)="setQuizStatus(q.id, 'ACTIVE'); closeQuizActions()"
+            >
+              Publish
+            </button>
+            <button
+              class="mr-select__item"
+              type="button"
+              role="menuitem"
+              *ngIf="q.status === 'ACTIVE'"
+              (click)="setQuizStatus(q.id, 'DRAFT'); closeQuizActions()"
+            >
+              Disable
+            </button>
+            <button
+              class="mr-select__item"
+              type="button"
+              role="menuitem"
+              *ngIf="q.status !== 'TRASHED'"
+              (click)="setQuizStatus(q.id, 'TRASHED'); closeQuizActions()"
+            >
+              Move to trash
+            </button>
+            <button
+              class="mr-select__item"
+              type="button"
+              role="menuitem"
+              *ngIf="q.status === 'TRASHED'"
+              (click)="setQuizStatus(q.id, 'DRAFT'); closeQuizActions()"
+            >
+              Restore
+            </button>
+            <button
+              class="mr-select__item"
+              type="button"
+              role="menuitem"
+              *ngIf="q.status === 'TRASHED'"
+              (click)="purgeQuiz(q.id); closeQuizActions()"
+            >
+              Delete permanently
+            </button>
           </div>
 
           <div class="table-footer" *ngIf="filteredQuizzes.length">
@@ -566,91 +552,70 @@
               <h2>Game rules</h2>
 
               <div class="rules-stack">
-                <div class="field field--inline">
-                  <span class="field__label">Game mode</span>
-                  <div
-                    class="mr-select-wrap mr-select-wrap--full"
-                    [class.menu-open]="openMenu === 'gameModeEdit'"
-                  >
-                    <button
-                      class="mr-select"
-                      type="button"
-                      (click)="toggleMenu('gameModeEdit', $event)"
-                      [attr.aria-expanded]="openMenu === 'gameModeEdit'"
-                      aria-haspopup="listbox"
-                      aria-label="Game mode"
-                    >
-                      <span class="mr-select__label">{{
-                        editQuizForm.controls.gameMode.value === "RANKED"
-                          ? "Ranked"
-                          : "Casual"
+                <div class="rules-top">
+                  <label class="toggle toggle--pill" title="Include results in global ranking">
+                    <input type="checkbox" formControlName="includeInRanking" />
+                    <span class="toggle--pill__btn">
+                      <span class="toggle--pill__text">Include in ranking</span>
+                      <span class="toggle--pill__state">{{
+                        editQuizForm.controls.includeInRanking.value ? "ON" : "OFF"
                       }}</span>
-                      <span class="mr-select__caret" aria-hidden="true"></span>
-                    </button>
-                    <div
-                      class="mr-select__menu"
-                      role="listbox"
-                      *ngIf="openMenu === 'gameModeEdit'"
-                      (click)="$event.stopPropagation()"
-                    >
-                      <button
-                        class="mr-select__item"
-                        type="button"
-                        role="option"
-                        [class.active]="
-                          editQuizForm.controls.gameMode.value === 'CASUAL'
-                        "
-                        (click)="setGameMode('edit', 'CASUAL', $event)"
-                      >
-                        Casual
-                      </button>
-                      <button
-                        class="mr-select__item"
-                        type="button"
-                        role="option"
-                        [class.active]="
-                          editQuizForm.controls.gameMode.value === 'RANKED'
-                        "
-                        (click)="setGameMode('edit', 'RANKED', $event)"
-                      >
-                        Ranked
-                      </button>
-                    </div>
-                  </div>
+                    </span>
+                  </label>
+
+                  <label class="toggle toggle--pill" title="Award XP for playing this quiz">
+                    <input type="checkbox" formControlName="xpEnabled" />
+                    <span class="toggle--pill__btn">
+                      <span class="toggle--pill__text">Award XP</span>
+                      <span class="toggle--pill__state">{{
+                        editQuizForm.controls.xpEnabled.value ? "ON" : "OFF"
+                      }}</span>
+                    </span>
+                  </label>
                 </div>
-
-                <label class="toggle" title="Include results in global ranking">
-                  <input type="checkbox" formControlName="includeInRanking" />
-                  <span>Include in ranking</span>
-                </label>
-
-                <div
-                  class="muted rules-hint"
-                  *ngIf="editQuizForm.controls.gameMode.value === 'RANKED'"
-                >
-                  Ranked quizzes always count toward ranking.
-                </div>
-
-                <label class="toggle" title="Award XP for playing this quiz">
-                  <input type="checkbox" formControlName="xpEnabled" />
-                  <span>Award XP</span>
-                </label>
-
-                <label class="field field--inline">
-                  <span class="field__label">Time limit per question (s)</span>
-                  <input
-                    type="number"
-                    min="5"
-                    max="600"
-                    step="1"
-                    inputmode="numeric"
-                    formControlName="questionTimeLimitSeconds"
-                    (blur)="onTimeLimitBlur('edit')"
-                  />
-                </label>
 
                 <div class="muted rules-hint">
-                  Allowed range: 5–600 seconds. Default: 15 seconds.
+                  Allow this quiz to be used in ranked games.
+                </div>
+
+                <div class="rules-grid">
+                  <div class="rules-grid__item">
+                    <label class="field field--inline">
+                      <span class="field__label">Time limit per question (s)</span>
+                      <input
+                        type="number"
+                        min="5"
+                        max="600"
+                        step="1"
+                        inputmode="numeric"
+                        formControlName="questionTimeLimitSeconds"
+                        (blur)="onTimeLimitBlur('edit')"
+                      />
+                    </label>
+
+                    <div class="muted rules-hint">
+                      Allowed range: 5-600 seconds. Default: 15 seconds.
+                    </div>
+                  </div>
+
+                  <div class="rules-grid__item">
+                    <label class="field field--inline">
+                      <span class="field__label">Questions per game</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="10000"
+                        step="1"
+                        inputmode="numeric"
+                        formControlName="questionsPerGame"
+                        (blur)="onQuestionsPerGameBlur('edit')"
+                      />
+                    </label>
+
+                    <div class="muted rules-hint">
+                      Allowed range: 1-10000. Default: 7 questions.
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1197,91 +1162,70 @@
             <h2>Game rules</h2>
 
             <div class="rules-stack">
-              <div class="field field--inline">
-                <span class="field__label">Game mode</span>
-                <div
-                  class="mr-select-wrap mr-select-wrap--full"
-                  [class.menu-open]="openMenu === 'gameModeCreate'"
-                >
-                  <button
-                    class="mr-select"
-                    type="button"
-                    (click)="toggleMenu('gameModeCreate', $event)"
-                    [attr.aria-expanded]="openMenu === 'gameModeCreate'"
-                    aria-haspopup="listbox"
-                    aria-label="Game mode"
-                  >
-                    <span class="mr-select__label">{{
-                      quizForm.controls.gameMode.value === "RANKED"
-                        ? "Ranked"
-                        : "Casual"
+              <div class="rules-top">
+                <label class="toggle toggle--pill" title="Include results in global ranking">
+                  <input type="checkbox" formControlName="includeInRanking" />
+                  <span class="toggle--pill__btn">
+                    <span class="toggle--pill__text">Include in ranking</span>
+                    <span class="toggle--pill__state">{{
+                      quizForm.controls.includeInRanking.value ? "ON" : "OFF"
                     }}</span>
-                    <span class="mr-select__caret" aria-hidden="true"></span>
-                  </button>
-                  <div
-                    class="mr-select__menu"
-                    role="listbox"
-                    *ngIf="openMenu === 'gameModeCreate'"
-                    (click)="$event.stopPropagation()"
-                  >
-                    <button
-                      class="mr-select__item"
-                      type="button"
-                      role="option"
-                      [class.active]="
-                        quizForm.controls.gameMode.value === 'CASUAL'
-                      "
-                      (click)="setGameMode('create', 'CASUAL', $event)"
-                    >
-                      Casual
-                    </button>
-                    <button
-                      class="mr-select__item"
-                      type="button"
-                      role="option"
-                      [class.active]="
-                        quizForm.controls.gameMode.value === 'RANKED'
-                      "
-                      (click)="setGameMode('create', 'RANKED', $event)"
-                    >
-                      Ranked
-                    </button>
-                  </div>
-                </div>
+                  </span>
+                </label>
+
+                <label class="toggle toggle--pill" title="Award XP for playing this quiz">
+                  <input type="checkbox" formControlName="xpEnabled" />
+                  <span class="toggle--pill__btn">
+                    <span class="toggle--pill__text">Award XP</span>
+                    <span class="toggle--pill__state">{{
+                      quizForm.controls.xpEnabled.value ? "ON" : "OFF"
+                    }}</span>
+                  </span>
+                </label>
               </div>
-
-              <label class="toggle" title="Include results in global ranking">
-                <input type="checkbox" formControlName="includeInRanking" />
-                <span>Include in ranking</span>
-              </label>
-
-              <div
-                class="muted rules-hint"
-                *ngIf="quizForm.controls.gameMode.value === 'RANKED'"
-              >
-                Ranked quizzes always count toward ranking.
-              </div>
-
-              <label class="toggle" title="Award XP for playing this quiz">
-                <input type="checkbox" formControlName="xpEnabled" />
-                <span>Award XP</span>
-              </label>
-
-              <label class="field field--inline">
-                <span class="field__label">Time limit per question (s)</span>
-                <input
-                  type="number"
-                  min="5"
-                  max="600"
-                  step="1"
-                  inputmode="numeric"
-                  formControlName="questionTimeLimitSeconds"
-                  (blur)="onTimeLimitBlur('create')"
-                />
-              </label>
 
               <div class="muted rules-hint">
-                Allowed range: 5–600 seconds. Default: 15 seconds.
+                Allow this quiz to be used in ranked games.
+              </div>
+
+              <div class="rules-grid">
+                <div class="rules-grid__item">
+                  <label class="field field--inline">
+                    <span class="field__label">Time limit per question (s)</span>
+                    <input
+                      type="number"
+                      min="5"
+                      max="600"
+                      step="1"
+                      inputmode="numeric"
+                      formControlName="questionTimeLimitSeconds"
+                      (blur)="onTimeLimitBlur('create')"
+                    />
+                  </label>
+
+                  <div class="muted rules-hint">
+                    Allowed range: 5-600 seconds. Default: 15 seconds.
+                  </div>
+                </div>
+
+                <div class="rules-grid__item">
+                  <label class="field field--inline">
+                    <span class="field__label">Questions per game</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10000"
+                      step="1"
+                      inputmode="numeric"
+                      formControlName="questionsPerGame"
+                      (blur)="onQuestionsPerGameBlur('create')"
+                    />
+                  </label>
+
+                  <div class="muted rules-hint">
+                    Allowed range: 1-10000. Default: 7 questions.
+                  </div>
+                </div>
               </div>
             </div>
           </div>
