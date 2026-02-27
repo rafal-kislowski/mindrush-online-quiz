@@ -183,6 +183,10 @@ Public, read-only quiz endpoints (no auth required):
 
 Notes:
 - Only quizzes with status `ACTIVE` are exposed publicly. Non-active quizzes return `404`.
+- Each quiz item includes `source`:
+  - `official` -> system/admin quiz (stored in DB as `quiz_source=OFFICIAL`)
+  - `custom` -> user-created and shared quiz (stored in DB as `quiz_source=CUSTOM`)
+  - `library` is a frontend view/filter concept (user's own quizzes), not a separate DB enum value.
 
 ## Admin (quiz management)
 Admin-only quiz endpoints (requires `ADMIN` role):
