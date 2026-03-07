@@ -11,7 +11,7 @@
   <aside class="sidebar">
     <div class="sidebar__top">
       <div class="sidebar__head">
-        <!-- BRAND -->
+        
         <div class="brand" routerLink="/">
           <div class="brand__name">MindRush</div>
         </div>
@@ -27,7 +27,7 @@
         </button>
       </div>
 
-      <!-- USER -->
+      
       <div class="user" *ngIf="profileVm$ | async as p">
         <article
           class="profile-card"
@@ -99,7 +99,7 @@
         </article>
       </div>
 
-      <!-- MAIN MENU -->
+      
     </div>
 
     <div class="sidebar__scroll">
@@ -174,6 +174,26 @@
             </svg>
 
             <svg
+              *ngIf="item.icon === 'library'"
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-book-open-text"
+            >
+              <path d="M12 7v14" />
+              <path d="M3 18a4 4 0 0 1 4-4h13" />
+              <path d="M3 6a4 4 0 0 1 4-4h13v16" />
+              <path d="M7 10h4" />
+              <path d="M7 14h4" />
+            </svg>
+
+            <svg
               *ngIf="item.icon === 'settings'"
               xmlns="http://www.w3.org/2000/svg"
               width="24"
@@ -197,23 +217,43 @@
         </a>
       </nav>
 
-      <!-- SECOND SECTION -->
+      
       <ng-container *ngIf="isAdmin$ | async">
-        <div class="nav-divider"><span>Quick Actions</span></div>
+        <div class="nav-divider"><span>Admin Panel</span></div>
 
-        <div class="section" aria-label="Quick actions">
+        <div class="section" aria-label="Admin panel links">
           <a class="app-item" routerLink="/create-quiz" routerLinkActive="active">
             <span class="app-ico app-ico--orange" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none">
                 <path
-                  d="M12 5v14M5 12h14"
+                  d="M9 9h6M9 13h6"
                   stroke="currentColor"
-                  stroke-width="2.2"
+                  stroke-width="2"
                   stroke-linecap="round"
+                />
+                <rect
+                  x="3"
+                  y="5"
+                  width="18"
+                  height="14"
+                  rx="2"
+                  stroke="currentColor"
+                  stroke-width="2"
                 />
               </svg>
             </span>
-            <span>Create Quiz</span>
+            <span>Quiz Management</span>
+          </a>
+          <a class="app-item" routerLink="/admin/quiz-submissions" routerLinkActive="active">
+            <span class="app-ico app-ico--orange" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M9 12h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                <path d="M9 16h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                <path d="M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                <path d="M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="2" />
+              </svg>
+            </span>
+            <span>Moderation Queue</span>
           </a>
         </div>
       </ng-container>
@@ -344,6 +384,73 @@
           </button>
         </ng-container>
         <ng-container *ngIf="authUser$ | async as user; else guestActions">
+          <div class="app-notifications" #notificationsMenu>
+            <button
+              class="btn app-notifications__trigger"
+              type="button"
+              (click)="toggleNotifications($event)"
+              [attr.aria-expanded]="notificationsOpen"
+              aria-haspopup="menu"
+              aria-label="Notifications"
+            >
+              <i class="fa-regular fa-bell" aria-hidden="true"></i>
+              <span class="app-notifications__badge" *ngIf="notificationCount">
+                {{ notificationCount }}
+              </span>
+            </button>
+
+            <div class="app-notifications__menu" *ngIf="notificationsOpen" role="menu" aria-label="Notifications">
+              <div class="app-notifications__head">
+                <div class="app-notifications__titlebar">Notifications</div>
+              </div>
+
+              <div class="app-notifications__empty" *ngIf="!visibleNotifications.length">
+                <span class="app-notifications__empty-icon" aria-hidden="true">
+                  <i class="fa-regular fa-bell-slash"></i>
+                </span>
+                <span class="app-notifications__empty-content">
+                  <strong>No notifications yet</strong>
+                  <span>You don't have any notifications.</span>
+                </span>
+              </div>
+
+              <div class="app-notifications__list" role="none" *ngIf="visibleNotifications.length">
+                <div
+                  class="app-notifications__item"
+                  role="none"
+                  *ngFor="let item of visibleNotifications"
+                >
+                  <button class="app-notifications__item-main" type="button" role="menuitem" (click)="openNotification(item)">
+                    <span
+                      class="app-notifications__avatar"
+                      [ngStyle]="notificationQuizAvatarStyle(item)"
+                      aria-hidden="true"
+                    >
+                      <span class="app-notifications__avatar-initials" *ngIf="!item.avatarImageUrl">
+                        {{ notificationInitials(item.subtitle || item.title) }}
+                      </span>
+                    </span>
+
+                    <span class="app-notifications__item-content">
+                      <span class="app-notifications__item-top">
+                        <span class="app-notifications__item-title">{{ item.title }}</span>
+                        <span
+                          class="app-notifications__item-status"
+                          *ngIf="item.decision"
+                          [class.is-approved]="item.decision === 'approved'"
+                          [class.is-rejected]="item.decision === 'rejected'"
+                        >
+                          {{ item.decision === 'approved' ? 'Passed' : 'Failed' }}
+                        </span>
+                      </span>
+                      <span class="app-notifications__item-meta">{{ item.subtitle || item.title }}</span>
+                      <span class="app-notifications__item-time">{{ notificationTimeLabel(item.createdAt) }}</span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
           <span class="topbar__user">{{ user.displayName }}</span>
           <button class="btn" type="button" (click)="logout()">Logout</button>
         </ng-container>
@@ -366,3 +473,4 @@
 </div>
 
 <app-toast-viewport></app-toast-viewport>
+

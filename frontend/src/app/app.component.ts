@@ -1,5 +1,5 @@
-import { AsyncPipe, NgFor, NgIf } from '@angular/common';
-import { Component, ElementRef, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
+import { AsyncPipe, NgClass, NgFor, NgIf, NgStyle } from '@angular/common';
+import { Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
 import {
   NavigationEnd,
   Router,
@@ -10,6 +10,7 @@ import {
 import { Subscription, catchError, combineLatest, filter, interval, map, of, startWith, switchMap } from 'rxjs';
 import { AuthService } from './core/auth/auth.service';
 import { GameApi } from './core/api/game.api';
+import { LibraryQuizApi, LibraryQuizListItemDto } from './core/api/library-quiz.api';
 import { LobbyApi } from './core/api/lobby.api';
 import { ActiveGameDto } from './core/models/game.models';
 import { LobbyDto } from './core/models/lobby.models';
@@ -58,10 +59,32 @@ function tintHex(hex: string, amount: number): string {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
+type AppNotificationCategory = 'moderation' | 'reward' | 'news' | 'system';
+type AppNotificationSeverity = 'neutral' | 'success' | 'warning' | 'danger';
+
+interface AppNotification {
+  id: string;
+  category: AppNotificationCategory;
+  severity: AppNotificationSeverity;
+  title: string;
+  subtitle: string | null;
+  text: string;
+  meta: string | null;
+  createdAt: string | null;
+  actionLabel: string | null;
+  decision: 'approved' | 'rejected' | null;
+  avatarImageUrl: string | null;
+  avatarBgStart: string | null;
+  avatarBgEnd: string | null;
+  avatarTextColor: string | null;
+  routeCommands: any[] | null;
+  routeQueryParams: Record<string, string | number> | null;
+}
+
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, AsyncPipe, NgIf, NgFor, RouterLink, RouterLinkActive, ToastViewportComponent, PlayerAvatarComponent],
+  imports: [RouterOutlet, AsyncPipe, NgIf, NgFor, NgClass, NgStyle, RouterLink, RouterLinkActive, ToastViewportComponent, PlayerAvatarComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
 })
@@ -70,11 +93,13 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly sessionService = inject(SessionService);
   private readonly authService = inject(AuthService);
   private readonly gameApi = inject(GameApi);
+  private readonly libraryQuizApi = inject(LibraryQuizApi);
   private readonly lobbyApi = inject(LobbyApi);
   private readonly lobbyEvents = inject(LobbyEventsService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
   private readonly subscriptions = new Subscription();
+  private readonly intFormatter = new Intl.NumberFormat('en-US');
   readonly session$ = this.sessionService.session$;
   readonly authUser$ = this.authService.user$;
   readonly isAdmin$ = this.authService.user$.pipe(map(u => !!u?.roles?.includes('ADMIN')));
@@ -128,6 +153,10 @@ export class AppComponent implements OnInit, OnDestroy {
   contentFull = false;
   currentLobby: LobbyDto | null = null;
   currentGame: ActiveGameDto | null = null;
+  notifications: AppNotification[] = [];
+  notificationFilter: 'all' | 'unread' = 'all';
+  notificationsOpen = false;
+  private readonly readNotificationIds = new Set<string>();
   private currentLobbyEventsSub: Subscription | null = null;
   private currentLobbyEventsCode: string | null = null;
   private scrollResetRafId: number | null = null;
@@ -135,12 +164,16 @@ export class AppComponent implements OnInit, OnDestroy {
   @ViewChild('contentHost')
   private contentHostRef?: ElementRef<HTMLElement>;
 
+  @ViewChild('notificationsMenu')
+  private notificationsMenuRef?: ElementRef<HTMLElement>;
+
   readonly menuItems: Array<{
     label: string;
     route: string;
-    icon: 'home' | 'shop' | 'news' | 'settings';
+    icon: 'home' | 'library' | 'shop' | 'news' | 'settings';
   }> = [
     { label: 'Dashboard', route: '/', icon: 'home' },
+    { label: 'Library', route: '/library', icon: 'library' },
     { label: 'Shop', route: '/shop', icon: 'shop' },
     { label: 'News', route: '/news', icon: 'news' },
     { label: 'Settings', route: '/settings', icon: 'settings' },
@@ -164,6 +197,7 @@ export class AppComponent implements OnInit, OnDestroy {
         .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
         .subscribe(() => {
           this.sidebarOpen = false;
+          this.notificationsOpen = false;
           this.updateContentFlags(this.router.url);
           this.resetViewScrollToTop();
           this.refreshCurrentLobby();
@@ -175,6 +209,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.resetViewScrollToTop();
     this.startCurrentLobbyTracking();
     this.startCurrentGameTracking();
+    this.startNotificationTracking();
 
     // Prevent sidebar collapse animation flash on initial page load.
     requestAnimationFrame(() => {
@@ -197,13 +232,14 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private updateContentFlags(url: string): void {
     const path = (url ?? '').split('?')[0]?.split('#')[0] ?? '';
-    this.contentWide = path.startsWith('/create-quiz');
+    this.contentWide = path.startsWith('/create-quiz') || path.startsWith('/admin/quiz-submissions');
     this.contentFull =
       path === '/' ||
       path.startsWith('/play-solo') ||
       path.startsWith('/solo-game') ||
       path.startsWith('/leaderboards') ||
       path.startsWith('/lobbies') ||
+      path.startsWith('/library') ||
       path.startsWith('/lobby') ||
       path.startsWith('/login') ||
       path.startsWith('/register');
@@ -231,8 +267,118 @@ export class AppComponent implements OnInit, OnDestroy {
     this.authService.logout().subscribe(() => {
       this.currentLobby = null;
       this.currentGame = null;
+      this.notificationsOpen = false;
+      this.notifications = [];
+      this.notificationFilter = 'all';
+      this.readNotificationIds.clear();
       this.router.navigate(['/']);
     });
+  }
+
+  get notificationCount(): number {
+    return this.unreadNotificationCount;
+  }
+
+  get unreadNotificationCount(): number {
+    let count = 0;
+    for (const item of this.notifications) {
+      if (this.isNotificationUnread(item)) count += 1;
+    }
+    return count;
+  }
+
+  get visibleNotifications(): AppNotification[] {
+    if (this.notificationFilter !== 'unread') return this.notifications;
+    return this.notifications.filter((item) => this.isNotificationUnread(item));
+  }
+
+  toggleNotifications(event?: Event): void {
+    event?.stopPropagation();
+    this.notificationsOpen = !this.notificationsOpen;
+  }
+
+  setNotificationFilter(filter: 'all' | 'unread', event?: Event): void {
+    event?.stopPropagation();
+    this.notificationFilter = filter;
+  }
+
+  isNotificationUnread(item: Pick<AppNotification, 'id'>): boolean {
+    return !this.readNotificationIds.has(item.id);
+  }
+
+  openNotification(item: AppNotification): void {
+    this.readNotificationIds.add(item.id);
+    this.notificationsOpen = false;
+    if (!item.routeCommands?.length) return;
+    void this.router.navigate(item.routeCommands, {
+      queryParams: item.routeQueryParams ?? undefined,
+    });
+  }
+
+  notificationCategoryLabel(category: AppNotificationCategory): string {
+    if (category === 'moderation') return 'Moderation';
+    if (category === 'reward') return 'Rewards';
+    if (category === 'news') return 'News';
+    return 'System';
+  }
+
+  notificationIcon(item: Pick<AppNotification, 'category' | 'severity'>): string {
+    if (item.category === 'moderation') return 'fa-solid fa-layer-group';
+    if (item.category === 'reward') return 'fa-solid fa-trophy';
+    if (item.category === 'news') return 'fa-regular fa-newspaper';
+    if (item.severity === 'success') return 'fa-regular fa-circle-check';
+    if (item.severity === 'warning') return 'fa-solid fa-circle-exclamation';
+    if (item.severity === 'danger') return 'fa-solid fa-triangle-exclamation';
+    return 'fa-regular fa-bell';
+  }
+
+  notificationInitials(title: string | null | undefined): string {
+    const raw = String(title ?? '').trim();
+    if (!raw) return 'NT';
+    const words = raw.split(/\s+/).filter(Boolean);
+    const first = words[0]?.[0] ?? '';
+    const second = words[1]?.[0] ?? words[0]?.[1] ?? '';
+    return `${first}${second}`.toUpperCase() || 'NT';
+  }
+
+  notificationQuizAvatarStyle(item: Pick<AppNotification, 'avatarImageUrl' | 'avatarBgStart' | 'avatarBgEnd' | 'avatarTextColor'>): Record<string, string> {
+    const image = (item.avatarImageUrl ?? '').trim();
+    const start = (item.avatarBgStart ?? '').trim() || '#30D0FF';
+    const end = (item.avatarBgEnd ?? '').trim();
+    const text = (item.avatarTextColor ?? '').trim() || '#0A0E1C';
+    if (image) {
+      return {
+        'background-image': `url(${image})`,
+        'background-size': 'cover',
+        'background-position': 'center',
+        color: text,
+      };
+    }
+    if (end) {
+      return {
+        'background-image': `linear-gradient(180deg, ${start}, ${end})`,
+        color: text,
+      };
+    }
+    return {
+      background: start,
+      color: text,
+    };
+  }
+
+  notificationTimeLabel(value: string | null | undefined): string {
+    const raw = String(value ?? '').trim();
+    if (!raw) return 'just now';
+    const timestamp = Date.parse(raw);
+    if (!Number.isFinite(timestamp)) return 'just now';
+    const diffMs = Math.max(0, Date.now() - timestamp);
+    const diffMinutes = Math.floor(diffMs / 60000);
+    if (diffMinutes < 1) return 'just now';
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
   }
 
   openCurrentLobby(): void {
@@ -274,7 +420,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   formatInt(n: number | null | undefined): string {
     const v = Math.max(0, Math.floor(n ?? 0));
-    return new Intl.NumberFormat('en-US').format(v);
+    return this.intFormatter.format(v);
   }
 
   private startCurrentLobbyTracking(): void {
@@ -304,6 +450,37 @@ export class AppComponent implements OnInit, OnDestroy {
         )
         .subscribe((game) => {
           this.currentGame = game;
+        })
+    );
+  }
+
+  private startNotificationTracking(): void {
+    this.subscriptions.add(
+      this.authService.user$
+        .pipe(
+          switchMap((user) => {
+            if (!user) return of<LibraryQuizListItemDto[]>([]);
+            return interval(15000).pipe(
+              startWith(0),
+              switchMap(() => this.libraryQuizApi.listMy().pipe(catchError(() => of<LibraryQuizListItemDto[]>([]))))
+            );
+          })
+        )
+        .subscribe((items) => {
+          const moderationNotifications = this.toModerationNotifications(items ?? []);
+          const rewardNotifications = this.toRewardNotifications();
+          const newsNotifications = this.toNewsNotifications();
+          const systemNotifications = this.toSystemNotifications();
+          this.notifications = this.sortNotifications([
+            ...moderationNotifications,
+            ...rewardNotifications,
+            ...newsNotifications,
+            ...systemNotifications,
+          ]);
+          this.pruneReadNotificationIds(this.notifications);
+          if (!this.notifications.length) {
+            this.notificationsOpen = false;
+          }
         })
     );
   }
@@ -414,5 +591,100 @@ export class AppComponent implements OnInit, OnDestroy {
     const routeCode = String(match[1] ?? '').trim().toUpperCase();
     if (!routeCode) return false;
     return !code || routeCode === code;
+  }
+
+  private toModerationNotifications(items: LibraryQuizListItemDto[]): AppNotification[] {
+    return (items ?? [])
+      .filter((item) => item.moderationStatus === 'APPROVED' || item.moderationStatus === 'REJECTED')
+      .map((item) => ({
+        id: `moderation:${item.id}:${item.moderationUpdatedAt ?? ''}`,
+        category: 'moderation' as const,
+        severity: item.moderationStatus === 'APPROVED' ? ('success' as const) : ('danger' as const),
+        title: 'Quiz verification',
+        subtitle: item.title,
+        text: this.buildModerationText(item),
+        meta: this.buildModerationMeta(item),
+        createdAt: item.moderationUpdatedAt,
+        actionLabel: null,
+        decision: item.moderationStatus === 'APPROVED' ? ('approved' as const) : ('rejected' as const),
+        avatarImageUrl: item.avatarImageUrl ?? null,
+        avatarBgStart: item.avatarBgStart ?? null,
+        avatarBgEnd: item.avatarBgEnd ?? null,
+        avatarTextColor: item.avatarTextColor ?? null,
+        routeCommands: ['/library'],
+        routeQueryParams: {
+          openQuiz: item.id,
+          moderationTab: (item.moderationQuestionIssueCount ?? 0) > 0 ? 'questions' : 'details',
+          ...(item.moderationStatus === 'REJECTED' ? { reopenModeration: '1' } : {}),
+        },
+      }))
+      .sort((a, b) => this.notificationTimestamp(b.createdAt) - this.notificationTimestamp(a.createdAt));
+  }
+
+  private toRewardNotifications(): AppNotification[] {
+    return [];
+  }
+
+  private toNewsNotifications(): AppNotification[] {
+    return [];
+  }
+
+  private toSystemNotifications(): AppNotification[] {
+    return [];
+  }
+
+  private buildModerationMeta(
+    item: Pick<LibraryQuizListItemDto, 'moderationStatus' | 'moderationQuestionIssueCount'>
+  ): string {
+    if (item.moderationStatus === 'APPROVED') return 'Approved';
+    const issueCount = Math.max(0, item.moderationQuestionIssueCount ?? 0);
+    if (issueCount <= 0) return 'Rejected';
+    return `Rejected - ${issueCount} question issue${issueCount === 1 ? '' : 's'}`;
+  }
+
+  private buildModerationText(
+    item: Pick<LibraryQuizListItemDto, 'moderationStatus' | 'moderationReason'>
+  ): string {
+    if (item.moderationStatus === 'APPROVED') return '';
+    return '';
+  }
+
+  private notificationTimestamp(value: string | null | undefined): number {
+    const timestamp = Date.parse(String(value ?? ''));
+    if (!Number.isFinite(timestamp)) return 0;
+    return timestamp;
+  }
+
+  private sortNotifications(items: AppNotification[]): AppNotification[] {
+    return [...items].sort((a, b) => this.notificationTimestamp(b.createdAt) - this.notificationTimestamp(a.createdAt));
+  }
+
+  private pruneReadNotificationIds(items: AppNotification[]): void {
+    const active = new Set(items.map((item) => item.id));
+    const toDelete: string[] = [];
+    this.readNotificationIds.forEach((id) => {
+      if (!active.has(id)) toDelete.push(id);
+    });
+    for (const id of toDelete) {
+      this.readNotificationIds.delete(id);
+    }
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (!this.notificationsOpen) return;
+    const host = this.notificationsMenuRef?.nativeElement;
+    if (!host) {
+      this.notificationsOpen = false;
+      return;
+    }
+    const target = event.target;
+    if (target instanceof Node && host.contains(target)) return;
+    this.notificationsOpen = false;
+  }
+
+  @HostListener('document:keydown.escape')
+  onDocumentEscape(): void {
+    this.notificationsOpen = false;
   }
 }
