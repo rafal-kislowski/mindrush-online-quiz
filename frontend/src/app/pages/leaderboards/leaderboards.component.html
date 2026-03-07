@@ -107,7 +107,7 @@
         </div>
 
         <ng-container *ngIf="me as meVm">
-          <div class="row row--my is-me" *ngIf="showMeRow" [style.--accent]="meVm.rankColor">
+          <div class="row is-me" *ngIf="showMeRow" [style.--accent]="meVm.rankColor">
             <div class="left">
               <span class="pos" aria-hidden="true">
                 <i
@@ -143,27 +143,22 @@
       </div>
 
       <div class="pager">
-        <button class="pager__btn" type="button" (click)="prev()" [disabled]="!canPrev()">
-          <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
-          Prev
-        </button>
-
-        <div class="pager__mid">
-          <div class="pager__meta">
-            Page <b>{{ page }}</b> / <b>{{ totalPages }}</b>
-          </div>
-          <div class="pager__meta soft" *ngIf="totalPlayers">
-            {{ totalPlayers | number }} players
-          </div>
+        <div class="pager__nav">
+          <button class="pager__btn" type="button" (click)="prev()" [disabled]="!canPrev()" aria-label="Previous page">
+            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+          </button>
+          <div class="pager__text">Page {{ page }} / {{ totalPages }}</div>
+          <button class="pager__btn" type="button" (click)="next()" [disabled]="!canNext()" aria-label="Next page">
+            <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+          </button>
         </div>
 
-        <button class="pager__btn" type="button" (click)="next()" [disabled]="!canNext()">
-          Next
-          <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
-        </button>
-
-        <div class="pager__size">
-          <span class="pager__label">Show</span>
+        <div class="footer-right">
+          <div class="muted pager__entries">
+            Showing {{ totalPlayers ? ((page - 1) * pageSize + 1) : 0 }} to
+            {{ totalPlayers ? ((page * pageSize) < totalPlayers ? (page * pageSize) : totalPlayers) : 0 }}
+            of {{ totalPlayers }} entries
+          </div>
           <div class="mr-select-wrap mr-select-wrap--up pager__select-wrap" [class.menu-open]="pageSizeMenuOpen">
             <button
               class="mr-select pager__select-btn"
@@ -173,7 +168,7 @@
               (click)="togglePageSizeMenu($event)"
               aria-label="Rows per page"
             >
-              <span class="mr-select__value">{{ pageSize }}</span>
+              <span class="mr-select__value">Show {{ pageSize }}</span>
               <span class="mr-select__caret" aria-hidden="true"></span>
             </button>
 
@@ -185,7 +180,7 @@
                 [class.active]="pageSize === option"
                 (click)="setPageSize(option)"
               >
-                {{ option }}
+                Show {{ option }}
               </button>
             </div>
           </div>

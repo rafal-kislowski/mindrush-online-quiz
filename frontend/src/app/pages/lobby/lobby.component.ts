@@ -67,6 +67,10 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   quizzes: QuizListItemDto[] = [];
   selectedQuizId: number | null = null;
   selectedQuizSaving = false;
+  private matchTypeRequestInFlight = false;
+  private pendingMatchType: 'CASUAL' | 'RANKED' | null = null;
+  private matchTypeDebounceTimer: number | null = null;
+  private readonly matchTypeDebounceMs = 180;
 
   quizSearch = '';
   categoryOptions: ReadonlyArray<{ name: string | null; label: string; count: number }> = [];
@@ -205,6 +209,10 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     );
   }
 
+  get matchTypeControlsBusy(): boolean {
+    return this.selectedQuizSaving || this.matchTypeRequestInFlight;
+  }
+
   get readyActionLabel(): string {
     if (!this.hasSelectedQuiz) return 'Select quiz first';
     if (!this.hasRequiredPlayers) return 'Waiting for players';
@@ -336,6 +344,10 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.destroyed = true;
+    if (this.matchTypeDebounceTimer != null) {
+      window.clearTimeout(this.matchTypeDebounceTimer);
+      this.matchTypeDebounceTimer = null;
+    }
     this.updateBodyScrollLock(false);
     for (const timerId of this.joinDelayTimers) {
       window.clearTimeout(timerId);
@@ -1240,14 +1252,59 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   setMatchType(next: 'CASUAL' | 'RANKED'): void {
-    if (this.matchType === next) return;
     const lobby = this.lobby;
-    if (!lobby?.isOwner) {
-      this.matchType = next;
-      if (next === 'RANKED') this.pickerScope = 'official';
+    if (!lobby?.isOwner) return;
+    if (
+      this.matchType === next &&
+      this.pendingMatchType == null &&
+      !this.matchTypeRequestInFlight
+    ) {
       return;
     }
-    if (this.selectedQuizSaving) return;
+
+    this.pendingMatchType = next;
+    this.matchType = next;
+    if (next === 'RANKED') this.pickerScope = 'official';
+    this.scheduleMatchTypeCommit();
+  }
+
+  private scheduleMatchTypeCommit(): void {
+    if (this.matchTypeDebounceTimer != null) {
+      window.clearTimeout(this.matchTypeDebounceTimer);
+    }
+    this.matchTypeDebounceTimer = window.setTimeout(() => {
+      this.matchTypeDebounceTimer = null;
+      this.flushPendingMatchTypeCommit();
+    }, this.matchTypeDebounceMs);
+  }
+
+  private flushPendingMatchTypeCommit(): void {
+    const next = this.pendingMatchType;
+    if (!next) return;
+
+    // Another settings request is in progress (quiz select/clear or match-type switch).
+    if (this.selectedQuizSaving || this.matchTypeRequestInFlight) {
+      this.scheduleMatchTypeCommit();
+      return;
+    }
+
+    const lobbyMode: 'CASUAL' | 'RANKED' =
+      this.lobby?.rankingEnabled === true ? 'RANKED' : 'CASUAL';
+    if (lobbyMode === next) {
+      this.pendingMatchType = null;
+      this.syncMatchTypeFromLobby(this.lobby);
+      return;
+    }
+
+    this.commitMatchType(next);
+  }
+
+  private commitMatchType(next: 'CASUAL' | 'RANKED'): void {
+    const lobby = this.lobby;
+    if (!lobby?.isOwner) {
+      this.pendingMatchType = null;
+      return;
+    }
 
     const prevType = this.matchType;
     const prevQuizId = this.selectedQuizId ?? null;
@@ -1259,25 +1316,29 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
         : prevQuizId;
 
     this.error = null;
+    this.pendingMatchType = null;
     this.matchType = next;
     this.selectedQuizId = nextQuizId;
     if (rankingEnabled) this.pickerScope = 'official';
 
+    this.matchTypeRequestInFlight = true;
     this.selectedQuizSaving = true;
-    this.lobbyApi
-      .setSelectedQuiz(this.code, nextQuizId, rankingEnabled)
-      .subscribe({
-        next: (updated) => {
-          this.selectedQuizSaving = false;
-          this.onLobbyUpdate(updated);
-        },
-        error: (err) => {
-          this.selectedQuizSaving = false;
-          this.matchType = prevType;
-          this.selectedQuizId = prevQuizId;
-          this.error = apiErrorMessage(err, 'Failed to update match type');
-        },
-      });
+    this.lobbyApi.setSelectedQuiz(this.code, nextQuizId, rankingEnabled).subscribe({
+      next: (updated) => {
+        this.matchTypeRequestInFlight = false;
+        this.selectedQuizSaving = false;
+        this.onLobbyUpdate(updated);
+        this.flushPendingMatchTypeCommit();
+      },
+      error: (err) => {
+        this.matchTypeRequestInFlight = false;
+        this.selectedQuizSaving = false;
+        this.matchType = prevType;
+        this.selectedQuizId = prevQuizId;
+        this.error = apiErrorMessage(err, 'Failed to update match type');
+        this.flushPendingMatchTypeCommit();
+      },
+    });
   }
 
   toggleCategoryMenu(): void {
@@ -1331,14 +1392,17 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const matchesScope = (q: QuizListItemDto): boolean => {
       const raw = (q as any)?.source ?? (q as any)?.scope ?? (q as any)?.type ?? null;
-      // Missing source metadata means system quiz -> treat as "official".
-      if (typeof raw !== 'string' || !raw.trim()) return scope === 'official';
-      const v = raw.trim().toLowerCase();
-      if (v === 'official') return scope === 'official';
-      if (v === 'custom') return scope === 'custom';
-      if (v === 'library') return scope === 'library';
-      if (v === 'user') return scope !== 'official';
-      return true;
+      const source = typeof raw === 'string' && raw.trim()
+        ? raw.trim().toLowerCase()
+        : 'official';
+      const normalizedSource = source === 'user' ? 'custom' : source;
+      const inLibrary = q.inLibrary === true || normalizedSource === 'library';
+      const publicAvailable = q.publicAvailable !== false;
+
+      if (scope === 'library') return inLibrary;
+      if (scope === 'official') return normalizedSource === 'official' && publicAvailable;
+      if (scope === 'custom') return normalizedSource === 'custom' && publicAvailable;
+      return false;
     };
 
     const filtered = (this.quizzes ?? []).filter((q) => {
@@ -1386,6 +1450,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       next: (updated) => {
         this.selectedQuizSaving = false;
         this.onLobbyUpdate(updated);
+        this.flushPendingMatchTypeCommit();
         if (this.view === 'picker') {
           this.closeQuizSelection();
         }
@@ -1394,6 +1459,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
         this.selectedQuizSaving = false;
         this.selectedQuizId = previous ?? null;
         this.error = apiErrorMessage(err, 'Failed to update selected quiz');
+        this.flushPendingMatchTypeCommit();
       },
       });
   }
@@ -1412,11 +1478,13 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       next: (updated) => {
         this.selectedQuizSaving = false;
         this.onLobbyUpdate(updated);
+        this.flushPendingMatchTypeCommit();
       },
       error: (err) => {
         this.selectedQuizSaving = false;
         this.selectedQuizId = previous ?? null;
         this.error = apiErrorMessage(err, 'Failed to clear selected quiz');
+        this.flushPendingMatchTypeCommit();
       },
       });
   }
@@ -1674,6 +1742,12 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.categoryOptions = [];
     this.selectedQuizId = null;
     this.selectedQuizSaving = false;
+    this.matchTypeRequestInFlight = false;
+    this.pendingMatchType = null;
+    if (this.matchTypeDebounceTimer != null) {
+      window.clearTimeout(this.matchTypeDebounceTimer);
+      this.matchTypeDebounceTimer = null;
+    }
     this.readySaving = false;
   }
 

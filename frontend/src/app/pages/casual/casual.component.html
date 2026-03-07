@@ -87,7 +87,7 @@
             Resume
           </button>
           <button
-            class="btn warning"
+            class="btn"
             type="button"
             [disabled]="activeSoloActionInProgress"
             (click)="endActiveSoloGame()"
@@ -102,7 +102,7 @@
           class="view-screen"
           [ngClass]="selectionTransition === 'backward' ? 'view-screen--enter-back' : 'view-screen--enter-forward'"
         >
-        <section class="top-info" aria-label="Casual info">
+        <section aria-label="Casual info">
           <h2 class="section-title">
             <svg class="section-title__mark" aria-hidden="true" focusable="false">
               <use href="#mrTitleMarkCasual"></use>
@@ -234,12 +234,17 @@
                 </div>
 
                 <div class="quiz-card__body">
-                  <div class="quiz-card__title" [attr.title]="categoryCalloutTitle">
-                    {{ categoryCalloutTitle }}
+                  <div class="quiz-card__title" [attr.title]="selectedQuiz?.title ?? null">
+                    <ng-container *ngIf="selectedQuiz as q; else noQuizTitleInSummary">
+                      {{ q.title }}
+                    </ng-container>
+                    <ng-template #noQuizTitleInSummary>
+                      No quiz selected
+                    </ng-template>
                   </div>
                   <div class="quiz-card__meta muted">
-                    <ng-container *ngIf="selectedQuiz as q; else noQuizInSummary">
-                      {{ q.title }}
+                    <ng-container *ngIf="selectedQuiz; else noQuizInSummary">
+                      {{ categoryCalloutTitle }}
                     </ng-container>
                     <ng-template #noQuizInSummary>
                       Click to open casual game selection.
@@ -299,7 +304,7 @@
           class="view-screen"
           [ngClass]="selectionTransition === 'backward' ? 'view-screen--enter-back' : 'view-screen--enter-forward'"
         >
-        <section class="top-info" aria-label="Casual game selection info">
+        <section aria-label="Casual game selection info">
           <h2 class="section-title">
             <svg class="section-title__mark" aria-hidden="true" focusable="false">
               <use href="#mrTitleMarkCasual"></use>
@@ -424,7 +429,7 @@
                     aria-label="Search quizzes"
                   />
 
-                  <div class="mr-select-wrap mr-multi" aria-label="Category filter">
+                  <div class="mr-select-wrap" aria-label="Category filter">
                     <button
                       class="mr-select"
                       type="button"
@@ -550,7 +555,7 @@
                   </div>
                 </div>
 
-                <div class="picker-list" role="region" aria-label="Quiz list">
+                <div class="picker-list" [ngClass]="pickerScopeAnimClass" role="region" aria-label="Quiz list">
                   <div class="quiz-grid quiz-grid--picker">
                     <button
                       class="quiz-card"

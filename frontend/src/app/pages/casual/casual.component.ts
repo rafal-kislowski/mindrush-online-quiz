@@ -28,6 +28,7 @@ import { ToastService } from '../../core/ui/toast.service';
 type CasualModeId = 'standard' | 'threeLives' | 'training';
 type CasualSelectionView = 'summary' | 'picker';
 type CasualSelectionTransition = 'forward' | 'backward';
+type CasualScopeTransition = 'forward' | 'backward';
 
 type CasualModeOption = {
   id: CasualModeId;
@@ -87,6 +88,8 @@ export class CasualComponent implements OnInit, AfterViewInit, OnDestroy {
   activeSoloGame: ActiveGameDto | null = null;
   activeSoloState: GameStateDto | null = null;
   pickerScope: 'official' | 'custom' | 'library' = 'official';
+  pickerScopeTransition: CasualScopeTransition = 'forward';
+  private pickerScopeAnimFlip = false;
   pickerSort: 'az' | 'za' = 'az';
   selectionView: CasualSelectionView = 'summary';
   selectionTransition: CasualSelectionTransition = 'forward';
@@ -177,14 +180,17 @@ export class CasualComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const matchesScope = (q: QuizListItemDto): boolean => {
       const raw = (q as any)?.source ?? (q as any)?.scope ?? (q as any)?.type ?? null;
-      // Missing source metadata means system quiz -> treat as "official".
-      if (typeof raw !== 'string' || !raw.trim()) return scope === 'official';
-      const v = raw.trim().toLowerCase();
-      if (v === 'official') return scope === 'official';
-      if (v === 'custom') return scope === 'custom';
-      if (v === 'library') return scope === 'library';
-      if (v === 'user') return scope !== 'official';
-      return true;
+      const source = typeof raw === 'string' && raw.trim()
+        ? raw.trim().toLowerCase()
+        : 'official';
+      const normalizedSource = source === 'user' ? 'custom' : source;
+      const inLibrary = q.inLibrary === true || normalizedSource === 'library';
+      const publicAvailable = q.publicAvailable !== false;
+
+      if (scope === 'library') return inLibrary;
+      if (scope === 'official') return normalizedSource === 'official' && publicAvailable;
+      if (scope === 'custom') return normalizedSource === 'custom' && publicAvailable;
+      return false;
     };
 
     const filtered = this.modeEligibleQuizzes.filter((q) => {
@@ -303,9 +309,25 @@ export class CasualComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   setPickerScope(scope: 'official' | 'custom' | 'library'): void {
+    if (this.pickerScope !== scope) {
+      const order: Record<'official' | 'custom' | 'library', number> = {
+        official: 0,
+        custom: 1,
+        library: 2,
+      };
+      this.pickerScopeTransition = order[scope] >= order[this.pickerScope] ? 'forward' : 'backward';
+      this.pickerScopeAnimFlip = !this.pickerScopeAnimFlip;
+    }
     this.pickerScope = scope;
     this.ensureQuizSelection();
     this.scheduleMarqueeMeasure();
+  }
+
+  get pickerScopeAnimClass(): string {
+    if (this.pickerScopeTransition === 'backward') {
+      return this.pickerScopeAnimFlip ? 'picker-list--scope-back-a' : 'picker-list--scope-back-b';
+    }
+    return this.pickerScopeAnimFlip ? 'picker-list--scope-forward-a' : 'picker-list--scope-forward-b';
   }
 
   openPicker(): void {

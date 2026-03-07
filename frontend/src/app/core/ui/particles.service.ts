@@ -8,10 +8,6 @@ declare const pJSDom: any;
 })
 export class ParticlesService {
   private initialized = false;
-  private windowResizeHandler: (() => void) | null = null;
-  private resizeRafId: number | null = null;
-  private baseCanvasWidth = 1600;
-  private baseCanvasHeight = 900;
 
   initParticles() {
     if (this.initialized) return;
@@ -53,8 +49,6 @@ export class ParticlesService {
 
     window.requestAnimationFrame(() => {
       this.applyFixedCanvasSizing();
-      this.attachResizeHandling();
-      this.updateCanvasScale();
     });
   }
 
@@ -69,9 +63,6 @@ export class ParticlesService {
     const width = Math.max(960, Math.min(1920, window.innerWidth));
     const height = Math.max(540, Math.min(1080, window.innerHeight));
 
-    this.baseCanvasWidth = width;
-    this.baseCanvasHeight = height;
-
     canvasEl.width = width;
     canvasEl.height = height;
 
@@ -85,49 +76,7 @@ export class ParticlesService {
     canvasEl.style.top = '50%';
     canvasEl.style.width = `${width}px`;
     canvasEl.style.height = `${height}px`;
+    canvasEl.style.transform = 'translate(-50%, -50%)';
     canvasEl.style.transformOrigin = 'center';
-  }
-
-  private attachResizeHandling() {
-    const container = document.getElementById('particles-js');
-    if (!container) return;
-
-    if (!this.windowResizeHandler) {
-      this.windowResizeHandler = () => this.scheduleCanvasScaleUpdate();
-      window.addEventListener('resize', this.windowResizeHandler, {
-        passive: true,
-      });
-      window.addEventListener('orientationchange', this.windowResizeHandler, {
-        passive: true,
-      });
-    }
-  }
-
-  private scheduleCanvasScaleUpdate() {
-    if (this.resizeRafId !== null) return;
-    this.resizeRafId = window.requestAnimationFrame(() => {
-      this.resizeRafId = null;
-      this.updateCanvasScale();
-    });
-  }
-
-  private updateCanvasScale() {
-    const instance = pJSDom?.[0];
-    const canvasEl: HTMLCanvasElement | undefined = instance?.pJS?.canvas?.el;
-    const container = document.getElementById('particles-js');
-
-    if (!canvasEl || !container) return;
-
-    const containerWidth = container.offsetWidth;
-    const containerHeight = container.offsetHeight;
-
-    if (!containerWidth || !containerHeight) return;
-
-    const scale = Math.max(
-      containerWidth / this.baseCanvasWidth,
-      containerHeight / this.baseCanvasHeight,
-    );
-
-    canvasEl.style.transform = `translate(-50%, -50%) scale(${scale})`;
   }
 }

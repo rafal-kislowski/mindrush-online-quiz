@@ -1,6 +1,6 @@
 <div class="quiz">
   <ng-container *ngIf="state as s; else loading">
-    <!-- Start countdown (backend-driven, full screen) -->
+    
     <div class="quiz-precountdown" *ngIf="s.stage === 'PRE_COUNTDOWN'">
       <div
         class="precount-number"
@@ -16,7 +16,7 @@
       </div>
     </div>
 
-    <!-- Reveal (feedback first, then transition overlay) -->
+    
     <div class="quiz-outer" *ngIf="s.stage === 'REVEAL' && s.question as q" [class.quiz-outer--no-media]="!q.imageUrl?.trim()">
       <div
         class="quiz-container"
@@ -24,7 +24,7 @@
         [class.quiz-container--with-option-media]="hasImageOptions(q.options)"
         [class.quiz-container--mobile-media-grid]="shouldUseMobileImageAnswerGrid(q)"
       >
-        <div class="quiz-header quiz-header-full">
+        <div class="quiz-header-full">
           <div class="quiz-meta">
             <div class="quiz-progress">{{ questionProgressLabel(s.questionIndex, s.totalQuestions) }}</div>
             <div class="quiz-hearts" *ngIf="showSoloHearts">
@@ -97,7 +97,7 @@
       </div>
     </div>
 
-    <!-- Between questions overlay (only after brief feedback) -->
+    
     <div class="quiz-question-transition" *ngIf="showRevealTransition">
       <div class="transition-title">
         {{ questionProgressLabel(s.questionIndex, s.totalQuestions) }}
@@ -117,12 +117,10 @@
         </span>
       </div>
 
-      <!-- <div class="transition-sub" *ngIf="remainingSeconds !== null">
-        Next question in <b>{{ remainingSeconds }}s</b>
-      </div> -->
+      
     </div>
 
-    <!-- Question -->
+    
     <div class="quiz-outer" *ngIf="s.stage === 'QUESTION' && s.question as q" [class.quiz-outer--no-media]="!q.imageUrl?.trim()">
       <div
         class="quiz-container"
@@ -130,7 +128,7 @@
         [class.quiz-container--with-option-media]="hasImageOptions(q.options)"
         [class.quiz-container--mobile-media-grid]="shouldUseMobileImageAnswerGrid(q)"
       >
-        <div class="quiz-header quiz-header-full">
+        <div class="quiz-header-full">
           <div class="quiz-meta">
             <div class="quiz-progress">{{ questionProgressLabel(s.questionIndex, s.totalQuestions) }}</div>
             <div class="quiz-hearts" *ngIf="showSoloHearts">
@@ -214,7 +212,7 @@
       </div>
     </div>
 
-    <!-- Finished -->
+    
     <div class="quiz-outer quiz-outer--results" *ngIf="s.stage === 'FINISHED'">
       <section class="mr-game-results-page">
         <div class="mr-game-results-frame">
@@ -341,7 +339,11 @@
                           <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
                           <b>{{ correctAnswersValue(p) }}</b>
                         </span>
-                        <span class="mr-game-results-time" aria-label="Total answer time" *ngIf="p.totalAnswerTimeMs != null">
+                        <span
+                          class="mr-game-results-time"
+                          aria-label="Total answer time"
+                          *ngIf="!isTrainingMode && p.totalAnswerTimeMs != null"
+                        >
                           <i class="fa-regular fa-clock" aria-hidden="true"></i>
                           <b>{{ formatMs(p.totalAnswerTimeMs) }}</b>
                         </span>
@@ -368,7 +370,7 @@
       </section>
     </div>
 
-    <!-- No game -->
+    
     <div class="quiz-outer" *ngIf="s.stage === 'NO_GAME'">
       <div class="results-panel">
         <div class="results-title">No active game</div>

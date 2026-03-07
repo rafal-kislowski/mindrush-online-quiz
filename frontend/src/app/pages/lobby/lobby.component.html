@@ -81,7 +81,7 @@
           *ngIf="joinState === 'joined' && view !== 'picker'"
           aria-label="Leave lobby"
         >
-          <span class="leave-btn__text">Leave lobby</span>
+          <span>Leave lobby</span>
           <span class="leave-btn__icon" aria-hidden="true">&times;</span>
         </button>
       </div>
@@ -363,7 +363,7 @@
 
                       <div class="privacy-right">
                         <div
-                          class="privacy-pin privacy-pin--inline"
+                          class="privacy-pin"
                           [class.is-muted]="!privacyPinEditing || !l.isOwner"
                           aria-label="Lobby PIN"
                           (click)="
@@ -836,6 +836,7 @@
                           role="tab"
                           [class.active]="matchType === 'CASUAL'"
                           [attr.aria-selected]="matchType === 'CASUAL'"
+                          [disabled]="!l.isOwner"
                           (click)="setMatchType('CASUAL')"
                         >
                           <span class="segmented__icon" aria-hidden="true">
@@ -861,6 +862,7 @@
                           role="tab"
                           [class.active]="matchType === 'RANKED'"
                           [attr.aria-selected]="matchType === 'RANKED'"
+                          [disabled]="!l.isOwner"
                           (click)="setMatchType('RANKED')"
                         >
                           <span class="segmented__icon" aria-hidden="true">
@@ -986,7 +988,7 @@
                       aria-label="Search quizzes"
                     />
 
-                    <div class="mr-select-wrap mr-multi">
+                    <div class="mr-select-wrap">
                       <button
                         class="mr-select"
                         type="button"
@@ -1207,7 +1209,7 @@
                       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                     </svg>
                   </div>
-                  <div class="join-banner__text">
+                  <div>
                     <div class="join-banner__title">Private lobby</div>
                     <div class="join-banner__sub">
                       This lobby is protected. Enter the 4-digit PIN to join.

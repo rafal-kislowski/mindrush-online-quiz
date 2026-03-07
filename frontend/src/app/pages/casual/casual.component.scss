@@ -357,7 +357,6 @@
   color: rgba(255, 255, 255, 0.92);
   font-weight: 900;
   font-size: 15px;
-  // line-height: 1.15;
 }
 
 .casual-variant-card .mini__d {
@@ -420,7 +419,6 @@
 /* Casual should animate as one block.
    Disable inherited lobby stagger/entry animation on picker internals. */
 .page.casual-page.lobby-page .picker-panel,
-.page.casual-page.lobby-page .picker-startbar,
 .page.casual-page.lobby-page .lobby-startbar,
 .page.casual-page.lobby-page .picker-head,
 .page.casual-page.lobby-page .picker-filters,
@@ -428,6 +426,17 @@
   opacity: 1;
   transform: none;
   animation: none;
+}
+
+/* Re-enable directional animation for quiz list when switching source tabs. */
+.page.casual-page.lobby-page .picker-list.picker-list--scope-forward-a,
+.page.casual-page.lobby-page .picker-list.picker-list--scope-forward-b {
+  animation: casualScreenEnterForward 260ms var(--ease-out) both;
+}
+
+.page.casual-page.lobby-page .picker-list.picker-list--scope-back-a,
+.page.casual-page.lobby-page .picker-list.picker-list--scope-back-b {
+  animation: casualScreenEnterBack 260ms var(--ease-out) both;
 }
 
 .config-panel__top h3 {
@@ -464,19 +473,6 @@
   width: 100%;
 }
 
-.picker-viewbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 2px;
-}
-
-.picker-viewbar__hint {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 700;
-}
-
 .picker-shell,
 .picker-panel {
   flex: 1;
@@ -495,6 +491,42 @@
   left: auto;
   right: 0;
   transform-origin: top right;
+}
+
+.page.casual-page.lobby-page .picker-filters {
+  margin-top: 14px;
+  column-gap: 14px;
+  row-gap: 10px;
+}
+
+.page.casual-page.lobby-page .picker-filters > .mr-select-wrap {
+  position: relative;
+}
+
+.page.casual-page.lobby-page .picker-filters > .mr-select-wrap .mr-select__menu {
+  width: 100%;
+  min-width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 881px) {
+  .page.casual-page.lobby-page .picker-filters {
+    position: relative;
+  }
+
+  .page.casual-page.lobby-page .picker-filters > .mr-select-wrap {
+    position: static;
+  }
+
+  .page.casual-page.lobby-page .picker-filters > .mr-select-wrap .mr-select__menu {
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    transform-origin: top center;
+  }
 }
 
 .page.casual-page.lobby-page .mr-select__menu {
@@ -606,14 +638,6 @@
   }
 }
 
-.casual-startbar__hint {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 700;
-  text-align: center;
-  max-width: 58ch;
-}
-
 @media (max-width: 980px) {
   .casual-variants {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -672,16 +696,62 @@
   }
 
   .picker-filters {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 8px;
+    row-gap: 8px;
+    position: relative;
+  }
+
+  .picker-filters .picker-filters__search {
+    min-width: 0;
+  }
+
+  .picker-filters > .mr-select-wrap {
+    width: 42px;
+    min-width: 42px;
+    position: static;
+  }
+
+  .picker-filters > .mr-select-wrap .mr-select {
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .picker-filters > .mr-select-wrap .mr-select__left {
+    min-width: 0;
+    gap: 0;
+  }
+
+  .picker-filters > .mr-select-wrap .mr-select__value,
+  .picker-filters > .mr-select-wrap .mr-select__label,
+  .picker-filters > .mr-select-wrap .mr-select__caret {
+    display: none;
+  }
+
+  .picker-filters > .mr-select-wrap .mr-select__icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .picker-filters > .mr-select-wrap .mr-select__icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .picker-filters > .mr-select-wrap .mr-select__menu {
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: 100%;
+    transform-origin: top center;
   }
 
   .picker-list {
     min-height: calc((3 * 86px) + (2 * 10px));
-  }
-
-  .picker-viewbar {
-    flex-wrap: wrap;
-    justify-content: space-between;
   }
 
   .active-session {

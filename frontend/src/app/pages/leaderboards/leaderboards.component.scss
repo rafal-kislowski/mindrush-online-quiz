@@ -41,11 +41,6 @@
   animation: lbFrameIn 560ms var(--lb-ease-out) 90ms both;
 }
 
-.page__top {
-  display: flex;
-  justify-content: flex-start;
-}
-
 .card {
   width: 100%;
   display: flex;
@@ -358,29 +353,39 @@
   padding: 14px 0 0;
 
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "nav meta size";
   align-items: center;
-  gap: 12px;
+  column-gap: 10px;
+  row-gap: 8px;
   opacity: 0;
   transform: translateY(10px);
   animation: lbPanelIn 520ms var(--lb-ease-out) 80ms both;
 }
 
-.pager__btn {
-  height: 38px;
-  padding: 0 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.9);
-  font-weight: 900;
+.pager__nav {
+  grid-area: nav;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
 }
 
-.pager__btn:hover {
-  background: rgba(255, 255, 255, 0.09);
+.pager__btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.82);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.pager__btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .pager__btn:disabled {
@@ -388,35 +393,27 @@
   cursor: not-allowed;
 }
 
-.pager__mid {
-  text-align: center;
-  display: grid;
-  gap: 2px;
-}
-
-.pager__meta {
+.pager__text {
   color: rgba(255, 255, 255, 0.82);
   font-weight: 800;
-  font-size: 12px;
+  font-size: 13px;
 }
 
-.pager__meta.soft {
-  color: rgba(255, 255, 255, 0.58);
+.footer-right {
+  display: contents;
+}
+
+.pager__entries {
+  grid-area: meta;
+  margin: 0;
+  display: block;
+  min-width: 0;
+  text-align: center;
+  justify-self: center;
+  color: rgba(255, 255, 255, 0.64);
   font-weight: 700;
-  font-size: 11px;
-}
-
-.pager__size {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  justify-self: end;
-}
-
-.pager__label {
-  color: rgba(255, 255, 255, 0.6);
-  font-weight: 800;
   font-size: 12px;
+  line-height: 1.25;
 }
 
 .mr-select-wrap {
@@ -428,7 +425,11 @@
 }
 
 .pager__select-wrap {
-  min-width: 86px;
+  grid-area: size;
+  justify-self: end;
+  width: 92px;
+  min-width: 92px;
+  margin-left: 0;
 }
 
 .mr-select {
@@ -467,7 +468,23 @@
 }
 
 .pager__select-btn {
-  min-width: 86px;
+  min-width: 92px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08px;
+  border-color: rgba(255, 255, 255, 0.16);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.02)
+  );
+  box-shadow:
+    0 6px 14px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .mr-select__value {
@@ -481,13 +498,13 @@
 .mr-select__caret {
   position: absolute;
   top: 50%;
-  right: 12px;
+  right: 10px;
   transform: translateY(-50%);
   width: 0;
   height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-top: 6px solid rgba(255, 255, 255, 0.75);
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
+  border-top: 4px solid rgba(255, 255, 255, 0.75);
   pointer-events: none;
 }
 
@@ -517,7 +534,7 @@
   transform-origin: bottom right;
 }
 
-.pager__size .mr-select__menu {
+.footer-right .mr-select__menu {
   left: auto;
   right: 0;
   width: 100%;
@@ -647,33 +664,38 @@
   }
 
   .pager {
-    grid-template-columns: 1fr 1fr;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      "prev next"
-      "mid mid"
-      "size size";
+      "nav size"
+      "meta meta";
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 8px;
   }
 
-  .pager__btn {
+  .pager__nav {
+    grid-area: nav;
+    min-width: 0;
+  }
+
+  .footer-right {
+    display: contents;
+  }
+
+  .footer-right > .pager__entries {
+    grid-area: meta;
+    margin: 2px 0 0;
+    display: block;
     width: 100%;
-    justify-content: center;
+    font-size: 11px;
+    text-align: center;
+    justify-self: stretch;
   }
 
-  .pager__btn:first-child {
-    grid-area: prev;
-  }
-
-  .pager__btn:nth-child(3) {
-    grid-area: next;
-  }
-
-  .pager__mid {
-    grid-area: mid;
-  }
-
-  .pager__size {
+  .footer-right > .pager__select-wrap {
     grid-area: size;
-    justify-self: center;
-    justify-content: center;
+    justify-self: end;
+    margin-left: 0;
   }
 }

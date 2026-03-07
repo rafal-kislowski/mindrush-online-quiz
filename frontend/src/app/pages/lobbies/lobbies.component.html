@@ -140,9 +140,6 @@
         </label>
 
         <div class="toolbar__control mr-select-wrap" [class.menu-open]="openMenu === 'roomFilter'">
-          <span class="toolbar__icon toolbar__icon--accent" aria-hidden="true">
-            <i class="fa-solid fa-filter"></i>
-          </span>
           <button
             class="mr-select mr-select--compact"
             type="button"
@@ -151,7 +148,12 @@
             (click)="toggleMenu('roomFilter', $event)"
             aria-label="Room type filter"
           >
-            <span class="mr-select__value">{{ roomFilterLabel }}</span>
+            <span class="mr-select__left">
+              <span class="mr-select__icon mr-select__icon--accent" aria-hidden="true">
+                <i class="fa-solid fa-filter"></i>
+              </span>
+              <span class="mr-select__value">{{ roomFilterLabel }}</span>
+            </span>
             <span class="mr-select__caret" aria-hidden="true"></span>
           </button>
 
@@ -169,18 +171,20 @@
         </div>
 
         <div class="toolbar__control mr-select-wrap" [class.menu-open]="openMenu === 'sort'">
-          <span class="toolbar__icon toolbar__icon--sort" aria-hidden="true">
-            <i class="fa-solid fa-arrow-down-a-z"></i>
-          </span>
           <button
-            class="mr-select mr-select--compact"
+            class="mr-select mr-select--compact mr-select--sort"
             type="button"
             aria-haspopup="listbox"
             [attr.aria-expanded]="openMenu === 'sort'"
             (click)="toggleMenu('sort', $event)"
             aria-label="Sort rooms"
           >
-            <span class="mr-select__value">{{ sortLabel }}</span>
+            <span class="mr-select__left">
+              <span class="mr-select__icon" aria-hidden="true">
+                <i class="fa-solid fa-arrow-down-a-z"></i>
+              </span>
+              <span class="mr-select__value">{{ sortLabel }}</span>
+            </span>
             <span class="mr-select__caret" aria-hidden="true"></span>
           </button>
 
@@ -199,9 +203,8 @@
       </div>
 
       <div class="table-head" aria-hidden="true">
-        <span>Room</span>
         <span>Leader</span>
-        <span>Privacy</span>
+        <span>Room</span>
         <span>Players</span>
         <span></span>
       </div>
@@ -222,24 +225,27 @@
           [class.is-unjoinable]="!canJoin(row) && !isOwnLobby(row)"
           [class.is-joining]="joiningCode === row.code"
         >
-          <div class="cell cell--room">
-            <span class="room-code">{{ row.code }}</span>
-            <span class="room-time muted">{{ createdAgo(row.createdAt) }}</span>
-          </div>
-
           <div class="cell cell--leader">
             <app-player-avatar
               class="avatar"
               [displayName]="row.leaderDisplayName"
               [isAuthenticated]="isAuthenticatedOwner(row)"
-              [size]="30"
+              [size]="36"
             />
-            <span class="leader-name">{{ row.leaderDisplayName }}</span>
+            <span class="leader-meta">
+              <span class="leader-name-row">
+                <span class="leader-name">{{ row.leaderDisplayName }}</span>
+                <span class="rank-pill rank-pill--lobby" [style.--rank-color]="row.leaderRankColor">
+                  {{ row.leaderRankName }}
+                </span>
+              </span>
+              <span class="leader-room-code">{{ row.code }}</span>
+            </span>
           </div>
 
-          <div class="cell cell--privacy">
-            <i class="fa-solid" [class.fa-lock]="row.hasPassword" [class.fa-lock-open]="!row.hasPassword" aria-hidden="true"></i>
-            <span>{{ row.hasPassword ? 'Private' : 'Public' }}</span>
+          <div class="cell cell--room">
+            <span class="room-code">{{ row.code }}</span>
+            <span class="room-time muted">{{ createdAgo(row.createdAt) }}</span>
           </div>
 
           <div class="cell cell--players" [class.is-full]="isFull(row)">
@@ -255,34 +261,37 @@
               [disabled]="isJoinDisabled(row)"
             >
               <ng-container *ngIf="joiningCode === row.code; else joinLabel">Joining...</ng-container>
-              <ng-template #joinLabel>{{ joinButtonLabel(row) }}</ng-template>
+              <ng-template #joinLabel>
+                <i
+                  class="fa-solid"
+                  [class.fa-lock]="row.hasPassword"
+                  [class.fa-lock-open]="!row.hasPassword"
+                  aria-hidden="true"
+                ></i>
+                <span>{{ joinButtonLabel(row) }}</span>
+              </ng-template>
             </button>
           </div>
         </div>
       </div>
 
       <div class="pager">
-        <button class="pager__btn" type="button" (click)="prev()" [disabled]="!canPrev()">
-          <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
-          Prev
-        </button>
-
-        <div class="pager__mid">
-          <div class="pager__meta">
-            Page <b>{{ page }}</b> / <b>{{ totalPages }}</b>
-          </div>
-          <div class="pager__meta soft" *ngIf="totalRows">
-            {{ totalRows }} rooms
-          </div>
+        <div class="pager__nav">
+          <button class="pager__btn" type="button" (click)="prev()" [disabled]="!canPrev()" aria-label="Previous page">
+            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+          </button>
+          <div class="pager__text">Page {{ page }} / {{ totalPages }}</div>
+          <button class="pager__btn" type="button" (click)="next()" [disabled]="!canNext()" aria-label="Next page">
+            <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+          </button>
         </div>
 
-        <button class="pager__btn" type="button" (click)="next()" [disabled]="!canNext()">
-          Next
-          <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
-        </button>
-
-        <div class="pager__size">
-          <span class="pager__label">Show</span>
+        <div class="footer-right">
+          <div class="muted pager__entries">
+            Showing {{ totalRows ? ((page - 1) * pageSize + 1) : 0 }} to
+            {{ totalRows ? ((page * pageSize) < totalRows ? (page * pageSize) : totalRows) : 0 }}
+            of {{ totalRows }} entries
+          </div>
           <div
             class="mr-select-wrap mr-select-wrap--up pager__select-wrap"
             [class.menu-open]="openMenu === 'pageSize'"
@@ -295,7 +304,7 @@
               (click)="toggleMenu('pageSize', $event)"
               aria-label="Rows per page"
             >
-              <span class="mr-select__value">{{ pageSize }}</span>
+              <span class="mr-select__value">Show {{ pageSize }}</span>
               <span class="mr-select__caret" aria-hidden="true"></span>
             </button>
 
@@ -307,7 +316,7 @@
                 [class.active]="pageSize === option"
                 (click)="setPageSize(option)"
               >
-                {{ option }}
+                Show {{ option }}
               </button>
             </div>
           </div>

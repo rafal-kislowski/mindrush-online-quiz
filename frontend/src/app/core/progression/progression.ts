@@ -155,7 +155,7 @@ export function rankForPoints(rpRaw: number): RankInfo {
     { min: 3800, name: 'Master II', color: '#7B3FE4' },
     { min: 4200, name: 'Master I', color: '#7B3FE4' },
 
-    // Legend (royal indigo / premium, zamiast różu)
+    // Legend (royal indigo / premium, replacing pink)
     { min: 4700, name: 'Legend III', color: '#4B2EFF' },
     { min: 5200, name: 'Legend II', color: '#4B2EFF' },
     { min: 5800, name: 'Legend I', color: '#4B2EFF' },

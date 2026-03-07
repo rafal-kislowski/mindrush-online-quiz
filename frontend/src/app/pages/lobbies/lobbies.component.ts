@@ -7,12 +7,18 @@ import { apiErrorMessage } from '../../core/api/api-error.util';
 import { AuthService } from '../../core/auth/auth.service';
 import { LobbyApi } from '../../core/api/lobby.api';
 import { ActiveLobbyDto, LobbyOwnerType } from '../../core/models/lobby.models';
+import { rankForPoints } from '../../core/progression/progression';
 import { PlayerAvatarComponent } from '../../core/ui/player-avatar.component';
 import { ToastService } from '../../core/ui/toast.service';
 
 type LobbySort = 'newest' | 'oldest' | 'playersDesc' | 'playersAsc';
 type LobbyRoomFilter = 'all' | 'private' | 'public' | 'available' | 'full';
 type LobbiesMenuId = 'roomFilter' | 'sort' | 'pageSize';
+type ActiveLobbyRowVm = ActiveLobbyDto & {
+  leaderRankPoints: number;
+  leaderRankName: string;
+  leaderRankColor: string;
+};
 
 @Component({
   selector: 'app-lobbies',
@@ -35,7 +41,7 @@ export class LobbiesComponent implements OnInit, OnDestroy {
   syncing = false;
   private requestInFlight = false;
 
-  rows: ActiveLobbyDto[] = [];
+  rows: ActiveLobbyRowVm[] = [];
   private _error: string | null = null;
 
   sort: LobbySort = 'newest';
@@ -159,7 +165,7 @@ export class LobbiesComponent implements OnInit, OnDestroy {
     return this.ownerFilter === 'AUTHENTICATED';
   }
 
-  get filteredRows(): ActiveLobbyDto[] {
+  get filteredRows(): ActiveLobbyRowVm[] {
     let filtered = this.rows.filter((row) => row.ownerType === this.ownerFilter);
 
     const q = this.searchTerm.trim().toLowerCase();
@@ -200,7 +206,7 @@ export class LobbiesComponent implements OnInit, OnDestroy {
     return Math.max(1, Math.ceil(this.totalRows / this.pageSize));
   }
 
-  get pagedRows(): ActiveLobbyDto[] {
+  get pagedRows(): ActiveLobbyRowVm[] {
     const start = (this.page - 1) * this.pageSize;
     return this.filteredRows.slice(start, start + this.pageSize);
   }
@@ -270,7 +276,7 @@ export class LobbiesComponent implements OnInit, OnDestroy {
     this.closeMenus();
   }
 
-  trackByCode(_: number, row: ActiveLobbyDto): string {
+  trackByCode(_: number, row: ActiveLobbyRowVm): string {
     return row.code;
   }
 
@@ -473,16 +479,29 @@ export class LobbiesComponent implements OnInit, OnDestroy {
     this.ownerFilter = this.isLoggedIn ? 'AUTHENTICATED' : 'GUEST';
   }
 
-  private normalizeActiveRow(row: ActiveLobbyDto): ActiveLobbyDto {
+  private normalizeActiveRow(row: ActiveLobbyDto): ActiveLobbyRowVm {
     const ownerType = this.resolvedOwnerType(row);
-    if (row.ownerType === ownerType) return row;
-    return { ...row, ownerType };
+    const leaderRankPoints = this.toNonNegativeInt(row.leaderRankPoints);
+    const leaderRank = rankForPoints(leaderRankPoints);
+    return {
+      ...row,
+      ownerType,
+      leaderRankPoints,
+      leaderRankName: leaderRank.name,
+      leaderRankColor: leaderRank.color,
+    };
   }
 
   private resolvedOwnerType(row: ActiveLobbyDto): LobbyOwnerType {
     if (row.ownerType === 'AUTHENTICATED') return 'AUTHENTICATED';
     if (this.isLoggedIn && row.isOwner) return 'AUTHENTICATED';
     return 'GUEST';
+  }
+
+  private toNonNegativeInt(value: unknown): number {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.floor(n));
   }
 
   private clampPage(): void {
