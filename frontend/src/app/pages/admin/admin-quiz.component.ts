@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, HostListener, OnInit } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { AbstractControl, FormControl, FormGroup, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { apiErrorMessage } from '../../core/api/api-error.util';
 import {
   AdminQuestionDto,
@@ -17,6 +19,10 @@ const DEFAULT_QUESTION_TIME_LIMIT_SECONDS = 15;
 const MIN_QUESTIONS_PER_GAME = 1;
 const MAX_QUESTIONS_PER_GAME = 10000;
 const DEFAULT_QUESTIONS_PER_GAME = 7;
+const QUESTION_PAGE_SIZE = 25;
+const BYTES_PER_MB = 1024 * 1024;
+const ADMIN_MAX_UPLOAD_BYTES = 2 * BYTES_PER_MB;
+const ADMIN_ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 function questionTimeLimitValidator(control: AbstractControl): ValidationErrors | null {
   const v = control.value;
@@ -53,10 +59,51 @@ function questionsPerGameValidator(control: AbstractControl): ValidationErrors |
   templateUrl: './admin-quiz.component.html',
   styleUrl: './admin-quiz.component.scss',
 })
-export class AdminQuizComponent implements OnInit {
+export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
+  private static readonly QUESTIONS_TOTAL_DISPLAY_LIMIT = 50;
+  private static readonly MAIN_TAB_ORDER: Record<'manage' | 'create', number> = {
+    manage: 0,
+    create: 1,
+  };
+  private static readonly EDITOR_TAB_ORDER: Record<'details' | 'questions', number> = {
+    details: 0,
+    questions: 1,
+  };
+  private static readonly STATUS_TAB_ORDER: Record<QuizStatus, number> = {
+    ACTIVE: 0,
+    DRAFT: 1,
+    TRASHED: 2,
+  };
+  private static readonly PANE_HEIGHT_DOWN_EPSILON_PX = 10;
+  private static readonly PANE_HEIGHT_UP_EPSILON_PX = 0;
+
   tab: 'manage' | 'create' = 'manage';
+  tabTransition: 'forward' | 'backward' = 'forward';
+  private tabTransitionFlip = false;
   editorTab: 'details' | 'questions' = 'details';
-  openMenu: 'category' | 'sort' | 'pageSize' | null = null;
+  editorTabTransition: 'forward' | 'backward' = 'forward';
+  private editorTabTransitionFlip = false;
+  statusTabTransition: 'forward' | 'backward' = 'forward';
+  private statusTabTransitionFlip = false;
+  avatarPreviewHeightPx: number | null = null;
+  questionPaneHeightPx: number | null = null;
+
+  private leftDetailsRef: ElementRef<HTMLElement> | null = null;
+  private avatarPanelRef: ElementRef<HTMLElement> | null = null;
+  private avatarEditorRef: ElementRef<HTMLElement> | null = null;
+  private avatarResizeObserver: ResizeObserver | null = null;
+  private avatarPreviewRafId: number | null = null;
+  private detailsPaneRef: ElementRef<HTMLElement> | null = null;
+  private detailsFormRef: ElementRef<HTMLElement> | null = null;
+  private detailsPaneHeightPx: number | null = null;
+  private questionsRightPaneRef: ElementRef<HTMLElement> | null = null;
+  private questionsPaneResizeObserver: ResizeObserver | null = null;
+  private questionsPaneRafId: number | null = null;
+
+  openMenu: 'category' | 'sort' | 'pageSize' | 'questionPageSize' | null = null;
+  previewImageUrl: string | null = null;
+  previewImageAlt = 'Image preview';
+  previewImageName = '';
   openQuizActionsId: number | null = null;
   quizActionsMenuStyle: Record<string, string> | null = null;
   private lastQuizActionsOpenedAtMs = 0;
@@ -82,22 +129,69 @@ export class AdminQuizComponent implements OnInit {
   readonly quizStatusTab = new FormControl<QuizStatus>('ACTIVE', { nonNullable: true });
   readonly questionSearch = new FormControl('', { nonNullable: true });
   readonly pageSize = new FormControl<number>(8, { nonNullable: true });
-  readonly quizSort = new FormControl<'titleAsc' | 'titleDesc' | 'questionsDesc' | 'questionsAsc' | 'categoryAsc' | 'categoryDesc'>(
-    'titleAsc',
+  readonly quizSort = new FormControl<'newest' | 'oldest' | 'name_az' | 'name_za'>(
+    'newest',
     { nonNullable: true }
   );
   quizPageIndex = 0;
+  questionPageIndex = 0;
+  readonly questionPageSize = new FormControl<number>(QUESTION_PAGE_SIZE, { nonNullable: true });
+  readonly questionPageSizeOptions: ReadonlyArray<number> = [10, 25, 50, 100];
+  private questionSearchSub?: Subscription;
+
+  @ViewChild('quizDetailsLeft')
+  set quizDetailsLeftRef(ref: ElementRef<HTMLElement> | undefined) {
+    this.leftDetailsRef = ref ?? null;
+    this.rebindAvatarObserver();
+    this.queueAvatarPreviewResize();
+  }
+
+  @ViewChild('avatarPanel')
+  set avatarPanelElementRef(ref: ElementRef<HTMLElement> | undefined) {
+    this.avatarPanelRef = ref ?? null;
+    this.rebindAvatarObserver();
+    this.queueAvatarPreviewResize();
+  }
+
+  @ViewChild('avatarEditor')
+  set avatarEditorElementRef(ref: ElementRef<HTMLElement> | undefined) {
+    this.avatarEditorRef = ref ?? null;
+    this.rebindAvatarObserver();
+    this.queueAvatarPreviewResize();
+  }
+
+  @ViewChild('questionsPaneRight')
+  set questionsPaneRightElementRef(ref: ElementRef<HTMLElement> | undefined) {
+    this.questionsRightPaneRef = ref ?? null;
+    this.rebindQuestionsPaneObserver();
+    this.queueQuestionsPaneResize();
+  }
+
+  @ViewChild('detailsPane')
+  set detailsPaneElementRef(ref: ElementRef<HTMLElement> | undefined) {
+    this.detailsPaneRef = ref ?? null;
+    this.rebindQuestionsPaneObserver();
+    this.queueQuestionsPaneResize();
+  }
+
+  @ViewChild('detailsForm')
+  set detailsFormElementRef(ref: ElementRef<HTMLElement> | undefined) {
+    this.detailsFormRef = ref ?? null;
+    this.rebindQuestionsPaneObserver();
+    this.queueQuestionsPaneResize();
+  }
+
+  @ViewChild('imagePreviewDialog')
+  imagePreviewDialogRef: ElementRef<HTMLDialogElement> | null = null;
 
   readonly quizSortOptions: ReadonlyArray<{
-    value: 'titleAsc' | 'titleDesc' | 'questionsDesc' | 'questionsAsc' | 'categoryAsc' | 'categoryDesc';
+    value: 'newest' | 'oldest' | 'name_az' | 'name_za';
     label: string;
   }> = [
-    { value: 'titleAsc', label: 'Title (A-Z)' },
-    { value: 'titleDesc', label: 'Title (Z-A)' },
-    { value: 'questionsDesc', label: 'Questions (high-low)' },
-    { value: 'questionsAsc', label: 'Questions (low-high)' },
-    { value: 'categoryAsc', label: 'Category (A-Z)' },
-    { value: 'categoryDesc', label: 'Category (Z-A)' },
+    { value: 'newest', label: 'Newest first' },
+    { value: 'oldest', label: 'Oldest first' },
+    { value: 'name_az', label: 'Name A-Z' },
+    { value: 'name_za', label: 'Name Z-A' },
   ];
 
   readonly quizForm = new FormGroup({
@@ -160,8 +254,21 @@ export class AdminQuizComponent implements OnInit {
 
   constructor(
     private readonly api: AdminQuizApi,
-    private readonly toast: ToastService
+    private readonly toast: ToastService,
+    private readonly router: Router
   ) {}
+
+  handleBack(): void {
+    if (this.selectedQuiz && this.tab === 'manage') {
+      this.closeSelectedQuiz();
+      return;
+    }
+    if (!this.selectedQuiz && this.tab === 'create') {
+      this.setTab('manage');
+      return;
+    }
+    void this.router.navigate(['/']);
+  }
 
   get error(): string | null {
     return this._error;
@@ -177,6 +284,36 @@ export class AdminQuizComponent implements OnInit {
     this.loadList();
     this.syncAvatarColorDraft('create');
     this.syncAvatarColorDraft('edit');
+    this.questionSearchSub = this.questionSearch.valueChanges.subscribe(() => {
+      this.resetQuestionPage();
+    });
+    this.questionSearchSub.add(this.questionPageSize.valueChanges.subscribe(() => {
+      this.resetQuestionPage();
+    }));
+  }
+
+  ngAfterViewInit(): void {
+    this.rebindAvatarObserver();
+    this.queueAvatarPreviewResize();
+    this.rebindQuestionsPaneObserver();
+    this.queueQuestionsPaneResize();
+  }
+
+  ngOnDestroy(): void {
+    this.questionSearchSub?.unsubscribe();
+    this.questionSearchSub = undefined;
+    if (this.questionsPaneRafId != null) {
+      cancelAnimationFrame(this.questionsPaneRafId);
+      this.questionsPaneRafId = null;
+    }
+    this.questionsPaneResizeObserver?.disconnect();
+    this.questionsPaneResizeObserver = null;
+    if (this.avatarPreviewRafId != null) {
+      cancelAnimationFrame(this.avatarPreviewRafId);
+      this.avatarPreviewRafId = null;
+    }
+    this.avatarResizeObserver?.disconnect();
+    this.avatarResizeObserver = null;
   }
 
   @HostListener('document:click')
@@ -187,6 +324,11 @@ export class AdminQuizComponent implements OnInit {
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
+    const dialog = this.imagePreviewDialogRef?.nativeElement;
+    if (dialog?.open) {
+      this.closeImagePreview();
+      return;
+    }
     this.openMenu = null;
     this.closeQuizActions();
   }
@@ -195,6 +337,8 @@ export class AdminQuizComponent implements OnInit {
   onWindowResize(): void {
     this.openMenu = null;
     this.closeQuizActions();
+    this.queueAvatarPreviewResize();
+    this.queueQuestionsPaneResize();
   }
 
   @HostListener('window:scroll')
@@ -206,7 +350,7 @@ export class AdminQuizComponent implements OnInit {
     this.closeQuizActions();
   }
 
-  toggleMenu(menu: 'category' | 'sort' | 'pageSize', ev?: Event): void {
+  toggleMenu(menu: 'category' | 'sort' | 'pageSize' | 'questionPageSize', ev?: Event): void {
     ev?.stopPropagation();
     this.closeQuizActions();
     this.openMenu = this.openMenu === menu ? null : menu;
@@ -221,6 +365,13 @@ export class AdminQuizComponent implements OnInit {
 
   setQuizStatusTab(value: QuizStatus, ev?: Event): void {
     ev?.stopPropagation();
+    const current = this.quizStatusTab.value;
+    if (current !== value) {
+      const currentOrder = AdminQuizComponent.STATUS_TAB_ORDER[current];
+      const nextOrder = AdminQuizComponent.STATUS_TAB_ORDER[value];
+      this.statusTabTransition = nextOrder < currentOrder ? 'backward' : 'forward';
+      this.statusTabTransitionFlip = !this.statusTabTransitionFlip;
+    }
     this.quizStatusTab.setValue(value);
     this.quizCategory.setValue('all');
     this.resetQuizPage();
@@ -228,7 +379,7 @@ export class AdminQuizComponent implements OnInit {
   }
 
   setQuizSort(
-    value: 'titleAsc' | 'titleDesc' | 'questionsDesc' | 'questionsAsc' | 'categoryAsc' | 'categoryDesc',
+    value: 'newest' | 'oldest' | 'name_az' | 'name_za',
     ev?: Event
   ): void {
     ev?.stopPropagation();
@@ -241,6 +392,12 @@ export class AdminQuizComponent implements OnInit {
     ev?.stopPropagation();
     this.pageSize.setValue(size);
     this.resetQuizPage();
+    this.openMenu = null;
+  }
+
+  setQuestionPageSize(size: number, ev?: Event): void {
+    ev?.stopPropagation();
+    this.questionPageSize.setValue(size);
     this.openMenu = null;
   }
 
@@ -260,8 +417,47 @@ export class AdminQuizComponent implements OnInit {
     return `Show ${this.pageSize.value ?? 8}`;
   }
 
+  get questionPageSizeLabel(): string {
+    return `Show ${this.questionPageSize.value}`;
+  }
+
+  get maxUploadMbLabel(): string {
+    const mb = Math.max(1, Math.round(ADMIN_MAX_UPLOAD_BYTES / BYTES_PER_MB));
+    return `${mb}MB`;
+  }
+
+  get allowedUploadMimeTypes(): string[] {
+    return ADMIN_ALLOWED_IMAGE_MIME_TYPES;
+  }
+
+  get tabTransitionClass(): string {
+    return this.transitionClass(this.tabTransition, this.tabTransitionFlip);
+  }
+
+  get editorTabTransitionClass(): string {
+    return this.transitionClass(this.editorTabTransition, this.editorTabTransitionFlip);
+  }
+
+  get statusTabTransitionClass(): string {
+    return this.transitionClass(this.statusTabTransition, this.statusTabTransitionFlip);
+  }
+
   setEditorTab(tab: 'details' | 'questions'): void {
+    if (this.editorTab === tab) return;
+    if (tab === 'questions') {
+      this.primeQuestionsPaneHeight();
+    }
+    const currentOrder = AdminQuizComponent.EDITOR_TAB_ORDER[this.editorTab];
+    const nextOrder = AdminQuizComponent.EDITOR_TAB_ORDER[tab];
+    this.editorTabTransition = nextOrder < currentOrder ? 'backward' : 'forward';
+    this.editorTabTransitionFlip = !this.editorTabTransitionFlip;
     this.editorTab = tab;
+    if (tab === 'questions') {
+      this.resetQuestionPage();
+      this.selectInitialQuestionIfNeeded();
+    }
+    this.queueQuestionsPaneResize();
+    this.queueAvatarPreviewResize();
   }
 
   resetQuizPage(): void {
@@ -335,9 +531,11 @@ export class AdminQuizComponent implements OnInit {
     const filtered = this.quizzes.filter((q) => {
       if (q.status !== status) return false;
       const title = (q.title ?? '').toLowerCase();
+      const description = (q.description ?? '').toLowerCase();
+      const categoryLabel = (q.categoryName ?? '').toLowerCase();
       const cat = (q.categoryName ?? '').trim();
 
-      const matchesQuery = !query || title.includes(query);
+      const matchesQuery = !query || title.includes(query) || description.includes(query) || categoryLabel.includes(query);
       const matchesCategory = category === 'all' || cat === category;
       return matchesQuery && matchesCategory;
     });
@@ -479,31 +677,138 @@ export class AdminQuizComponent implements OnInit {
     return quiz.questions.filter((q) => (q.prompt ?? '').toLowerCase().includes(query));
   }
 
+  get pagedFilteredQuestions(): AdminQuestionDto[] {
+    const list = this.filteredQuestions;
+    if (!list.length) return [];
+    const page = Math.min(this.questionPageIndex, this.questionTotalPages - 1);
+    const size = this.questionPageSize.value;
+    const start = page * size;
+    return list.slice(start, start + size);
+  }
+
+  get questionTotalPages(): number {
+    const total = this.filteredQuestions.length;
+    return Math.max(1, Math.ceil(total / this.questionPageSize.value));
+  }
+
+  get questionPageFrom(): number {
+    const total = this.filteredQuestions.length;
+    if (!total) return 0;
+    const page = Math.min(this.questionPageIndex, this.questionTotalPages - 1);
+    return page * this.questionPageSize.value + 1;
+  }
+
+  get questionPageTo(): number {
+    const total = this.filteredQuestions.length;
+    if (!total) return 0;
+    return Math.min(total, this.questionPageFrom + this.questionPageSize.value - 1);
+  }
+
+  get questionTotalLimit(): number {
+    const currentCount = this.selectedQuiz?.questions.length ?? 0;
+    return Math.max(AdminQuizComponent.QUESTIONS_TOTAL_DISPLAY_LIMIT, currentCount);
+  }
+
+  get questionVisiblePages(): number[] {
+    const total = this.questionTotalPages;
+    if (total <= 1) return [1];
+    const current = this.questionPageIndex + 1;
+    const start = Math.max(1, current - 1);
+    const end = Math.min(total, start + 2);
+    const normalizedStart = Math.max(1, end - 2);
+    return Array.from({ length: end - normalizedStart + 1 }, (_, i) => normalizedStart + i);
+  }
+
+  prevQuestionPage(): void {
+    if (this.questionPageIndex <= 0) return;
+    this.questionPageIndex -= 1;
+  }
+
+  nextQuestionPage(): void {
+    const maxPage = this.questionTotalPages - 1;
+    if (this.questionPageIndex >= maxPage) return;
+    this.questionPageIndex += 1;
+  }
+
+  setQuestionPage(page: number): void {
+    this.questionPageIndex = Math.min(Math.max(0, page), this.questionTotalPages - 1);
+  }
+
+  resetQuestionPage(): void {
+    this.questionPageIndex = 0;
+  }
+
+  trackByQuestionId(_: number, q: AdminQuestionDto): number {
+    return q.id;
+  }
+
+  openImagePreview(url: string | null | undefined, alt: string): void {
+    const value = this.normalizeNullableUrl(url ?? null);
+    if (!value) return;
+    this.previewImageUrl = value;
+    this.previewImageAlt = alt;
+    this.previewImageName = alt;
+    const dialog = this.imagePreviewDialogRef?.nativeElement;
+    if (!dialog) return;
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+  }
+
+  closeImagePreview(): void {
+    const dialog = this.imagePreviewDialogRef?.nativeElement;
+    if (dialog?.open) {
+      dialog.close();
+      return;
+    }
+    this.resetImagePreviewState();
+  }
+
+  onImagePreviewDialogClosed(): void {
+    this.resetImagePreviewState();
+  }
+
+  onImagePreviewDialogClick(ev: MouseEvent): void {
+    const dialog = this.imagePreviewDialogRef?.nativeElement;
+    if (!dialog) return;
+    if (ev.target === dialog) {
+      this.closeImagePreview();
+    }
+  }
+
+  onQuestionImageRowClick(mode: 'create' | 'edit', input: HTMLInputElement): void {
+    const url = this.questionImageUrl(mode);
+    if (url) {
+      this.openImagePreview(url, 'Question image');
+      return;
+    }
+    input.value = '';
+    input.click();
+  }
+
+  onOptionImageRowClick(mode: 'create' | 'edit', index: number): void {
+    this.openImagePreview(this.optionImageUrl(mode, index), 'Answer option image');
+  }
+
   private sortQuizzes(list: AdminQuizListItemDto[]): AdminQuizListItemDto[] {
     const sort = this.quizSort.value;
 
-    const byTitle = (a: AdminQuizListItemDto, b: AdminQuizListItemDto) =>
+    const byName = (a: AdminQuizListItemDto, b: AdminQuizListItemDto) =>
       (a.title ?? '').localeCompare(b.title ?? '', undefined, { sensitivity: 'base' });
-    const byCategory = (a: AdminQuizListItemDto, b: AdminQuizListItemDto) =>
-      (a.categoryName ?? '').localeCompare(b.categoryName ?? '', undefined, { sensitivity: 'base' });
-    const byQuestions = (a: AdminQuizListItemDto, b: AdminQuizListItemDto) => (a.questionCount ?? 0) - (b.questionCount ?? 0);
+    const byId = (a: AdminQuizListItemDto, b: AdminQuizListItemDto) => (a.id ?? 0) - (b.id ?? 0);
 
     const cmp = (() => {
       switch (sort) {
-        case 'titleAsc':
-          return byTitle;
-        case 'titleDesc':
-          return (a: AdminQuizListItemDto, b: AdminQuizListItemDto) => -byTitle(a, b);
-        case 'categoryAsc':
-          return byCategory;
-        case 'categoryDesc':
-          return (a: AdminQuizListItemDto, b: AdminQuizListItemDto) => -byCategory(a, b);
-        case 'questionsAsc':
-          return byQuestions;
-        case 'questionsDesc':
-          return (a: AdminQuizListItemDto, b: AdminQuizListItemDto) => -byQuestions(a, b);
+        case 'name_az':
+          return byName;
+        case 'name_za':
+          return (a: AdminQuizListItemDto, b: AdminQuizListItemDto) => -byName(a, b);
+        case 'oldest':
+          return byId;
+        case 'newest':
+          return (a: AdminQuizListItemDto, b: AdminQuizListItemDto) => -byId(a, b);
         default:
-          return byTitle;
+          return (a: AdminQuizListItemDto, b: AdminQuizListItemDto) => -byId(a, b);
       }
     })();
 
@@ -511,9 +816,20 @@ export class AdminQuizComponent implements OnInit {
   }
 
   setTab(tab: 'manage' | 'create'): void {
+    if (this.tab !== tab) {
+      const currentOrder = AdminQuizComponent.MAIN_TAB_ORDER[this.tab];
+      const nextOrder = AdminQuizComponent.MAIN_TAB_ORDER[tab];
+      this.tabTransition = nextOrder < currentOrder ? 'backward' : 'forward';
+      this.tabTransitionFlip = !this.tabTransitionFlip;
+    }
     this.tab = tab;
     this.error = null;
+    if (tab === 'create') {
+      this.editorTab = 'details';
+    }
     if (tab === 'manage') this.loadList();
+    this.queueAvatarPreviewResize();
+    this.queueQuestionsPaneResize();
   }
 
   loadList(): void {
@@ -536,6 +852,7 @@ export class AdminQuizComponent implements OnInit {
     this.loadingQuiz = true;
     this.selectedQuestionId = null;
     this.questionSearch.setValue('');
+    this.resetQuestionPage();
     if (openTab !== 'keep') {
       this.editorTab = openTab;
     }
@@ -555,7 +872,7 @@ export class AdminQuizComponent implements OnInit {
           questionsPerGame: quiz.questionsPerGame ?? DEFAULT_QUESTIONS_PER_GAME,
           avatarImageUrl: quiz.avatarImageUrl ?? null,
           avatarBgStart: quiz.avatarBgStart ?? '#30D0FF',
-          avatarUseGradient: (quiz.avatarBgEnd ?? null) != null,
+          avatarUseGradient: true,
           avatarBgEnd: quiz.avatarBgEnd ?? '#2F86FF',
           avatarTextColor: quiz.avatarTextColor ?? '#0A0E1C',
         });
@@ -573,6 +890,12 @@ export class AdminQuizComponent implements OnInit {
           o4: '',
           o4ImageUrl: null,
         });
+        if (this.editorTab === 'questions') {
+          this.selectInitialQuestionIfNeeded();
+          this.primeQuestionsPaneHeight();
+        }
+        this.queueAvatarPreviewResize();
+        this.queueQuestionsPaneResize();
       },
       error: (err) => {
         this.loadingQuiz = false;
@@ -581,13 +904,41 @@ export class AdminQuizComponent implements OnInit {
     });
   }
 
+  private selectInitialQuestionIfNeeded(): void {
+    const quiz = this.selectedQuiz;
+    if (!quiz) return;
+
+    if (!quiz.questions.length) {
+      this.questionPanelMode = 'create';
+      this.selectedQuestionId = null;
+      this.lastEditingQuestionId = null;
+      return;
+    }
+
+    if (this.selectedQuestionId != null) {
+      const selected = quiz.questions.find((q) => q.id === this.selectedQuestionId);
+      if (selected) return;
+    }
+
+    // Keep explicit "add question" mode chosen by the user.
+    if (this.questionPanelMode === 'create' && this.lastEditingQuestionId != null) return;
+
+    const first = quiz.questions.slice().sort((a, b) => a.orderIndex - b.orderIndex)[0] ?? quiz.questions[0];
+    if (first) {
+      this.selectQuestion(first);
+    }
+  }
+
   closeSelectedQuiz(): void {
     this.selectedQuiz = null;
     this.selectedQuestionId = null;
     this.questionSearch.setValue('');
+    this.resetQuestionPage();
     this.editorTab = 'details';
     this.questionPanelMode = 'create';
     this.lastEditingQuestionId = null;
+    this.avatarPreviewHeightPx = null;
+    this.questionPaneHeightPx = null;
   }
 
   saveQuiz(): void {
@@ -605,9 +956,7 @@ export class AdminQuizComponent implements OnInit {
     const questionsPerGame = this.normalizeQuestionsPerGame(this.editQuizForm.controls.questionsPerGame.value);
     const avatarImageUrl = this.normalizeNullableUrl(this.editQuizForm.controls.avatarImageUrl.value);
     const avatarBgStart = this.normalizeNullableColor(this.editQuizForm.controls.avatarBgStart.value);
-    const avatarBgEnd = this.editQuizForm.controls.avatarUseGradient.value
-      ? this.normalizeNullableColor(this.editQuizForm.controls.avatarBgEnd.value)
-      : null;
+    const avatarBgEnd = this.normalizeNullableColor(this.editQuizForm.controls.avatarBgEnd.value);
     const avatarTextColor = this.normalizeNullableColor(this.editQuizForm.controls.avatarTextColor.value);
 
     this.savingQuiz = true;
@@ -938,9 +1287,7 @@ export class AdminQuizComponent implements OnInit {
     const questionsPerGame = this.normalizeQuestionsPerGame(this.quizForm.controls.questionsPerGame.value);
     const avatarImageUrl = this.normalizeNullableUrl(this.quizForm.controls.avatarImageUrl.value);
     const avatarBgStart = this.normalizeNullableColor(this.quizForm.controls.avatarBgStart.value);
-    const avatarBgEnd = this.quizForm.controls.avatarUseGradient.value
-      ? this.normalizeNullableColor(this.quizForm.controls.avatarBgEnd.value)
-      : null;
+    const avatarBgEnd = this.normalizeNullableColor(this.quizForm.controls.avatarBgEnd.value);
     const avatarTextColor = this.normalizeNullableColor(this.quizForm.controls.avatarTextColor.value);
 
     this.creating = true;
@@ -985,6 +1332,12 @@ export class AdminQuizComponent implements OnInit {
     if (input) input.value = '';
     if (!file) return;
 
+    const fileError = this.validateImageFile(file);
+    if (fileError) {
+      this.error = fileError;
+      return;
+    }
+
     const form = this.getQuestionForm(mode);
     if (!form) return;
 
@@ -1009,6 +1362,12 @@ export class AdminQuizComponent implements OnInit {
     const file = input?.files?.[0] ?? null;
     if (input) input.value = '';
     if (!file) return;
+
+    const fileError = this.validateImageFile(file);
+    if (fileError) {
+      this.error = fileError;
+      return;
+    }
 
     const form = mode === 'create' ? this.quizForm : this.editQuizForm;
 
@@ -1037,9 +1396,7 @@ export class AdminQuizComponent implements OnInit {
     const form = mode === 'create' ? this.quizForm : this.editQuizForm;
     const imageUrl = this.normalizeNullableUrl(form.controls.avatarImageUrl.value);
     const bgStart = this.normalizeNullableColor(form.controls.avatarBgStart.value) ?? '#30D0FF';
-    const bgEnd = form.controls.avatarUseGradient.value
-      ? this.normalizeNullableColor(form.controls.avatarBgEnd.value)
-      : null;
+    const bgEnd = this.normalizeNullableColor(form.controls.avatarBgEnd.value);
     const textColor = this.normalizeNullableColor(form.controls.avatarTextColor.value) ?? '#0A0E1C';
 
     if (imageUrl) {
@@ -1106,6 +1463,7 @@ export class AdminQuizComponent implements OnInit {
     const form = this.getQuestionForm(mode);
     if (!form) return;
     form.controls.imageUrl.setValue(null);
+    this.closeImagePreview();
   }
 
   uploadOptionImage(mode: 'create' | 'edit', index: number, ev: Event): void {
@@ -1113,6 +1471,12 @@ export class AdminQuizComponent implements OnInit {
     const file = input?.files?.[0] ?? null;
     if (input) input.value = '';
     if (!file) return;
+
+    const fileError = this.validateImageFile(file);
+    if (fileError) {
+      this.error = fileError;
+      return;
+    }
 
     const form = this.getQuestionForm(mode);
     if (!form) return;
@@ -1142,6 +1506,7 @@ export class AdminQuizComponent implements OnInit {
     const key = this.optionImageKey(index);
     if (!key) return;
     form.controls[key].setValue(null);
+    this.closeImagePreview();
   }
 
   questionImageUrl(mode: 'create' | 'edit'): string | null {
@@ -1192,6 +1557,23 @@ export class AdminQuizComponent implements OnInit {
   private normalizeNullableColor(color: string | null): string | null {
     const t = (color ?? '').trim();
     return t ? t : null;
+  }
+
+  private validateImageFile(file: File): string | null {
+    if (file.size > ADMIN_MAX_UPLOAD_BYTES) {
+      return `Image is too large. Max ${this.maxUploadMbLabel}.`;
+    }
+    const type = (file.type ?? '').trim().toLowerCase();
+    if (!this.allowedUploadMimeTypes.includes(type)) {
+      return 'Unsupported image format.';
+    }
+    return null;
+  }
+
+  private resetImagePreviewState(): void {
+    this.previewImageUrl = null;
+    this.previewImageAlt = 'Image preview';
+    this.previewImageName = '';
   }
 
   private validateOptions(texts: string[], imageUrls: Array<string | null>): boolean {
@@ -1297,6 +1679,179 @@ export class AdminQuizComponent implements OnInit {
     }
     if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null;
     return `#${hex.toUpperCase()}`;
+  }
+
+  private rebindAvatarObserver(): void {
+    this.avatarResizeObserver?.disconnect();
+    this.avatarResizeObserver = null;
+
+    if (typeof ResizeObserver === 'undefined') return;
+    if (!this.leftDetailsRef || !this.avatarPanelRef || !this.avatarEditorRef) return;
+
+    this.avatarResizeObserver = new ResizeObserver(() => {
+      this.queueAvatarPreviewResize();
+    });
+    this.avatarResizeObserver.observe(this.leftDetailsRef.nativeElement);
+    this.avatarResizeObserver.observe(this.avatarPanelRef.nativeElement);
+    this.avatarResizeObserver.observe(this.avatarEditorRef.nativeElement);
+  }
+
+  private queueAvatarPreviewResize(): void {
+    if (this.avatarPreviewRafId != null) return;
+    this.avatarPreviewRafId = requestAnimationFrame(() => {
+      this.avatarPreviewRafId = null;
+      this.syncAvatarPreviewHeight();
+    });
+  }
+
+  private syncAvatarPreviewHeight(): void {
+    if (this.tab !== 'manage' || !this.selectedQuiz || this.editorTab !== 'details') {
+      this.avatarPreviewHeightPx = null;
+      return;
+    }
+
+    const left = this.leftDetailsRef?.nativeElement;
+    const panel = this.avatarPanelRef?.nativeElement;
+    const editor = this.avatarEditorRef?.nativeElement;
+    if (!left || !panel || !editor) {
+      this.avatarPreviewHeightPx = null;
+      return;
+    }
+
+    if (window.innerWidth <= 1260) {
+      this.avatarPreviewHeightPx = null;
+      return;
+    }
+
+    const leftHeight = left.getBoundingClientRect().height;
+    const editorHeight = editor.getBoundingClientRect().height;
+    const panelStyle = window.getComputedStyle(panel);
+    const rawGap = panelStyle.rowGap || panelStyle.gap || '0';
+    const gap = Number.parseFloat(rawGap);
+    const safeGap = Number.isFinite(gap) ? gap : 0;
+    const target = Math.floor(leftHeight - editorHeight - safeGap);
+    this.avatarPreviewHeightPx = Math.max(64, target);
+  }
+
+  private rebindQuestionsPaneObserver(): void {
+    this.questionsPaneResizeObserver?.disconnect();
+    this.questionsPaneResizeObserver = null;
+
+    if (typeof ResizeObserver === 'undefined') return;
+    if (!this.questionsRightPaneRef && !this.detailsPaneRef && !this.detailsFormRef) return;
+
+    this.questionsPaneResizeObserver = new ResizeObserver(() => {
+      this.queueQuestionsPaneResize();
+    });
+    if (this.questionsRightPaneRef) {
+      this.questionsPaneResizeObserver.observe(this.questionsRightPaneRef.nativeElement);
+    }
+    if (this.detailsPaneRef) {
+      this.questionsPaneResizeObserver.observe(this.detailsPaneRef.nativeElement);
+    }
+    if (this.detailsFormRef) {
+      this.questionsPaneResizeObserver.observe(this.detailsFormRef.nativeElement);
+    }
+  }
+
+  private queueQuestionsPaneResize(): void {
+    if (this.questionsPaneRafId != null) return;
+    this.questionsPaneRafId = requestAnimationFrame(() => {
+      this.questionsPaneRafId = null;
+      this.syncQuestionsPaneHeight();
+    });
+  }
+
+  private syncQuestionsPaneHeight(): void {
+    if (this.tab !== 'manage' || !this.selectedQuiz) {
+      this.questionPaneHeightPx = null;
+      this.detailsPaneHeightPx = null;
+      return;
+    }
+    if (window.innerWidth <= 1260) {
+      this.questionPaneHeightPx = null;
+      this.detailsPaneHeightPx = null;
+      return;
+    }
+
+    let target: number | null = null;
+
+    if (this.editorTab === 'details') {
+      const details = this.detailsPaneRef?.nativeElement;
+      if (!details) return;
+      const detailsHeight = this.measureDetailsContentHeight(details);
+      if (!Number.isFinite(detailsHeight) || detailsHeight <= 0) return;
+      this.detailsPaneHeightPx = detailsHeight;
+      target = detailsHeight;
+    } else {
+      const right = this.questionsRightPaneRef?.nativeElement;
+      if (!right) return;
+      const rightHeight = Math.floor(right.getBoundingClientRect().height);
+      if (!Number.isFinite(rightHeight) || rightHeight <= 0) return;
+      target = rightHeight;
+    }
+
+    this.applyQuestionPaneHeight(target);
+  }
+
+  private measureDetailsContentHeight(details: HTMLElement): number {
+    const detailsStyle = window.getComputedStyle(details);
+    const detailsPaddingTop = Number.parseFloat(detailsStyle.paddingTop) || 0;
+    const detailsPaddingBottom = Number.parseFloat(detailsStyle.paddingBottom) || 0;
+    const detailsBorderTop = Number.parseFloat(detailsStyle.borderTopWidth) || 0;
+    const detailsBorderBottom = Number.parseFloat(detailsStyle.borderBottomWidth) || 0;
+
+    let total = detailsPaddingTop + detailsPaddingBottom + detailsBorderTop + detailsBorderBottom;
+    const children = Array.from(details.children) as HTMLElement[];
+    for (const child of children) {
+      const rect = child.getBoundingClientRect();
+      if (!Number.isFinite(rect.height) || rect.height <= 0) continue;
+      const style = window.getComputedStyle(child);
+      const marginTop = Number.parseFloat(style.marginTop) || 0;
+      const marginBottom = Number.parseFloat(style.marginBottom) || 0;
+      total += rect.height + marginTop + marginBottom;
+    }
+
+    // Extra safety buffer for button shadow/border to prevent bottom clipping.
+    return Math.ceil(total + 6);
+  }
+
+  private primeQuestionsPaneHeight(): void {
+    if (window.innerWidth <= 1260) {
+      this.questionPaneHeightPx = null;
+      return;
+    }
+    if (this.questionPaneHeightPx != null) return;
+
+    const leftHeight = Math.floor(this.leftDetailsRef?.nativeElement.getBoundingClientRect().height ?? 0);
+    const viewportFallback = Math.floor(Math.max(420, Math.min(window.innerHeight * 0.58, 760)));
+    const target = leftHeight > 0 ? leftHeight : viewportFallback;
+    this.applyQuestionPaneHeight(target);
+  }
+
+  private applyQuestionPaneHeight(rawHeight: number): void {
+    const next = Math.max(280, Math.round(rawHeight));
+    const current = this.questionPaneHeightPx;
+    if (current == null) {
+      this.questionPaneHeightPx = next;
+      return;
+    }
+
+    const delta = next - current;
+    if (delta < 0 && Math.abs(delta) <= AdminQuizComponent.PANE_HEIGHT_DOWN_EPSILON_PX) {
+      return;
+    }
+    if (delta > 0 && delta <= AdminQuizComponent.PANE_HEIGHT_UP_EPSILON_PX) {
+      return;
+    }
+    this.questionPaneHeightPx = next;
+  }
+
+  private transitionClass(direction: 'forward' | 'backward', flip: boolean): string {
+    if (direction === 'backward') {
+      return flip ? 'view-screen--enter-back-a' : 'view-screen--enter-back-b';
+    }
+    return flip ? 'view-screen--enter-forward-a' : 'view-screen--enter-forward-b';
   }
 }
 

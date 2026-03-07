@@ -1,0 +1,1140 @@
+<section class="page casual-page lobby-page">
+  <div class="frame">
+    <div class="card" aria-label="Quiz Library">
+      <svg class="svg-defs" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient
+            id="mrTitleGradLibrary"
+            x1="0"
+            y1="0"
+            x2="0"
+            y2="20"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop offset="0" style="stop-color: rgba(255, 205, 77, 0.85)" />
+            <stop offset="1" style="stop-color: rgba(56, 189, 248, 0.85)" />
+          </linearGradient>
+          <symbol id="mrTitleMarkLibrary" viewBox="0 0 10 20">
+            <path
+              d="M5 1c2.1 0 3.2 1.6 3.2 3.5v11C8.2 17.4 7.1 19 5 19S1.8 17.4 1.8 15.5v-11C1.8 2.6 2.9 1 5 1Z"
+              fill="url(#mrTitleGradLibrary)"
+            />
+          </symbol>
+        </defs>
+      </svg>
+
+      <div class="card__top">
+        <div class="title">
+          <h1>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M12 7v14" />
+              <path d="M3 18a4 4 0 0 1 4-4h13" />
+              <path d="M3 6a4 4 0 0 1 4-4h13v16" />
+              <path d="M7 10h4" />
+              <path d="M7 14h4" />
+            </svg>
+            <ng-container *ngIf="tab === 'editor'; else libraryTitle">
+              <ng-container *ngIf="editorMode === 'edit' && selectedQuiz as quiz; else createModeTitle">
+                Editing Quiz
+              </ng-container>
+              <ng-template #createModeTitle>Create a new quiz</ng-template>
+            </ng-container>
+            <ng-template #libraryTitle>Quiz Library</ng-template>
+          </h1>
+        </div>
+
+        <button class="back" type="button" (click)="onTopBack()" aria-label="Back">
+          <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+          <span>Back</span>
+        </button>
+      </div>
+
+      <ng-container *ngIf="tab !== 'editor'">
+        <div class="view-screen">
+          <div class="picker-head picker-head--tabs">
+            <div class="picker-head__controls picker-head__controls--single picker-head__controls--with-create">
+              <div class="segmented segmented--3 picker-sources" role="tablist" aria-label="Quiz statuses">
+                <button
+                  class="segmented__btn"
+                  type="button"
+                  role="tab"
+                  [class.active]="tab === 'active'"
+                  [attr.aria-selected]="tab === 'active'"
+                  (click)="setTab('active')"
+                >
+                  <span class="segmented__icon" aria-hidden="true">
+                    <i class="fa-solid fa-circle-check"></i>
+                  </span>
+                  Active
+                </button>
+                <button
+                  class="segmented__btn"
+                  type="button"
+                  role="tab"
+                  [class.active]="tab === 'draft'"
+                  [attr.aria-selected]="tab === 'draft'"
+                  (click)="setTab('draft')"
+                >
+                  <span class="segmented__icon" aria-hidden="true">
+                    <i class="fa-regular fa-pen-to-square"></i>
+                  </span>
+                  Draft
+                </button>
+                <button
+                  class="segmented__btn"
+                  type="button"
+                  role="tab"
+                  [class.active]="tab === 'trash'"
+                  [attr.aria-selected]="tab === 'trash'"
+                  (click)="setTab('trash')"
+                >
+                  <span class="segmented__icon" aria-hidden="true">
+                    <i class="fa-regular fa-trash-can"></i>
+                  </span>
+                  Trash
+                </button>
+              </div>
+              <button class="btn primary library-create-btn" type="button" (click)="openCreate()" [disabled]="!canCreateQuiz">
+                <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                New quiz
+              </button>
+            </div>
+          </div>
+
+          <div class="lib-top" aria-label="Library info">
+            <div class="lib-top__text">
+              <h2 class="section-title">
+                <svg class="section-title__mark" aria-hidden="true" focusable="false">
+                  <use href="#mrTitleMarkLibrary"></use>
+                </svg>
+                {{ listSectionTitle }}
+              </h2>
+              <div class="muted section-hint">
+                {{ listSectionHint }}
+              </div>
+            </div>
+            <div class="library-stats" aria-label="Quiz limits and usage">
+              <div class="library-stats__item library-stats__item--owned">
+                <span class="library-stats__label">
+                  <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                  Quizzes
+                </span>
+                <span class="library-stats__value">{{ policy.ownedCount }} / {{ policy.maxOwnedQuizzes }}</span>
+              </div>
+              <div class="library-stats__item library-stats__item--published">
+                <span class="library-stats__label">
+                  <i class="fa-regular fa-circle-check" aria-hidden="true"></i>
+                  Published
+                </span>
+                <span class="library-stats__value">{{ policy.publishedCount }} / {{ policy.maxPublishedQuizzes }}</span>
+              </div>
+              <div class="library-stats__item library-stats__item--pending">
+                <span class="library-stats__label">
+                  <i class="fa-regular fa-hourglass-half" aria-hidden="true"></i>
+                  Pending
+                </span>
+                <span class="library-stats__value">{{ policy.pendingCount }} / {{ policy.maxPendingSubmissions }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="view-screen__body">
+
+            <section class="config-panel config-panel--picker" aria-label="My quizzes">
+              <div class="picker-shell">
+                <section class="picker-panel">
+                <div class="picker-filters" aria-label="My quiz filters">
+                  <input
+                    class="picker-filters__search"
+                    [formControl]="searchMine"
+                    placeholder="Search quizzes..."
+                    aria-label="Search quizzes"
+                  />
+
+                  <div class="mr-select-wrap">
+                    <button
+                      class="mr-select"
+                      type="button"
+                      (click)="toggleMenu('mineCategory', $event)"
+                      [attr.aria-expanded]="openMenu === 'mineCategory'"
+                      aria-haspopup="listbox"
+                      aria-label="My quizzes category"
+                    >
+                      <span class="mr-select__left">
+                        <span class="mr-select__icon" aria-hidden="true">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z" />
+                          </svg>
+                        </span>
+                        <span class="mr-select__value">{{ mineCategoryLabel }}</span>
+                      </span>
+                      <span class="mr-select__caret" aria-hidden="true"></span>
+                    </button>
+                    <div class="mr-select__menu" *ngIf="openMenu === 'mineCategory'" role="listbox" (click)="$event.stopPropagation()">
+                      <button class="mr-select__item" type="button" [class.active]="mineCategory.value === 'all'" (click)="setMineCategory('all', $event)">All categories</button>
+                      <button class="mr-select__item" type="button" *ngFor="let c of mineCategories" [class.active]="mineCategory.value === c" (click)="setMineCategory(c, $event)">{{ c }}</button>
+                    </div>
+                  </div>
+
+                  <div class="mr-select-wrap picker-sort">
+                    <button
+                      class="mr-select mr-select--purple"
+                      type="button"
+                      (click)="toggleMenu('mineSort', $event)"
+                      [attr.aria-expanded]="openMenu === 'mineSort'"
+                      aria-haspopup="listbox"
+                      aria-label="My quizzes sort"
+                    >
+                      <span class="mr-select__left">
+                        <span class="mr-select__icon" aria-hidden="true">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 6h12" />
+                            <path d="M3 12h9" />
+                            <path d="M3 18h6" />
+                            <path d="M18 6v14" />
+                            <path d="m21 17-3 3-3-3" />
+                          </svg>
+                        </span>
+                        <span class="mr-select__value">{{ mineSortLabel }}</span>
+                      </span>
+                      <span class="mr-select__caret" aria-hidden="true"></span>
+                    </button>
+                    <div class="mr-select__menu" *ngIf="openMenu === 'mineSort'" role="listbox" (click)="$event.stopPropagation()">
+                      <button class="mr-select__item" type="button" [class.active]="mineSort.value === 'az'" (click)="setMineSort('az', $event)">Name A-Z</button>
+                      <button class="mr-select__item" type="button" [class.active]="mineSort.value === 'za'" (click)="setMineSort('za', $event)">Name Z-A</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  class="picker-list"
+                  [ngClass]="[tabTransitionClass, openRowActionsId !== null ? 'is-row-actions-open' : '']"
+                  *ngIf="!loading || hasLoadedLibrary; else loadingState"
+                  role="region"
+                  aria-label="My quizzes list"
+                >
+                  <div class="qtable" role="table" aria-label="My quizzes table" (scroll)="closeRowActions()">
+                    <div role="rowgroup">
+                      <div class="muted qtable__empty" *ngIf="!filteredMyQuizzes.length">
+                        No quizzes in this status.
+                      </div>
+
+                      <div class="qrow" role="row" *ngFor="let quiz of pagedMyQuizzes">
+                        <div class="cell title" role="cell">
+                          <span class="avatar" [ngStyle]="quizAvatarStyle(quiz)" aria-hidden="true">
+                            <ng-container *ngIf="!quiz.avatarImageUrl">{{ titleInitial(quiz.title) }}</ng-container>
+                          </span>
+                          <div class="title__text">
+                            <div class="title__name">{{ quiz.title }}</div>
+                            <div class="title__meta">
+                              <span class="mr-meta-row">
+                                <span class="title__category">{{ quiz.categoryName || 'No category' }}</span>
+                                <span
+                                  class="quiz-state quiz-state--pending"
+                                  *ngIf="quiz.moderationStatus === 'PENDING'"
+                                  [attr.title]="rowModerationTooltip(quiz)"
+                                  aria-label="Pending review"
+                                >
+                                  <span class="quiz-state__icon" aria-hidden="true">
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      stroke-width="2.6"
+                                      stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                      class="lucide lucide-hourglass-icon lucide-hourglass"
+                                      aria-hidden="true"
+                                    >
+                                      <path d="M5 22h14"/>
+                                      <path d="M5 2h14"/>
+                                      <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/>
+                                      <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/>
+                                    </svg>
+                                  </span>
+                                  <span class="quiz-state__label">Pending</span>
+                                </span>
+                                <span
+                                  class="quiz-state quiz-state--rejected"
+                                  *ngIf="showRowRejectedState(quiz)"
+                                  [attr.title]="rowModerationTooltip(quiz)"
+                                  aria-label="Rejected by administrator"
+                                >
+                                  <span class="quiz-state__icon" aria-hidden="true">
+                                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                                  </span>
+                                  <span class="quiz-state__label">Rejected</span>
+                                </span>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="cell category col-category" role="cell">
+                          <div class="quiz-stats-inline" aria-label="Quiz settings">
+                            <span class="quiz-stats-inline__item">
+                              <i class="fa-regular fa-clock" aria-hidden="true"></i>
+                              <span>{{ quiz.questionTimeLimitSeconds ?? 15 }}s</span>
+                            </span>
+                            <span class="quiz-stats-inline__sep" aria-hidden="true"></span>
+                            <span class="quiz-stats-inline__item">
+                              <i class="fa-regular fa-circle-check" aria-hidden="true"></i>
+                              <span>{{ quiz.questionsPerGame ?? quiz.questionCount }}</span>
+                            </span>
+                          </div>
+                        </div>
+
+                        <div class="cell right actions" role="cell">
+                          <button
+                            class="icon-btn icon-btn--edit"
+                            type="button"
+                            (click)="openEdit(quiz.id)"
+                            [disabled]="loadingQuiz"
+                            aria-label="Edit quiz"
+                          >
+                            <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+                          </button>
+
+                          <div class="row-actions" (click)="$event.stopPropagation()">
+                            <button
+                              class="icon-btn"
+                              type="button"
+                              (click)="toggleRowActions(quiz.id, $event)"
+                              aria-label="Quiz actions"
+                            >
+                              <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    class="row-actions__menu row-actions__menu--floating"
+                    *ngIf="openRowActionsQuiz as quiz"
+                    [ngStyle]="rowActionsMenuStyle"
+                    (click)="$event.stopPropagation()"
+                  >
+                    <button class="row-actions__item" type="button" (click)="openEdit(quiz.id); closeRowActions()">
+                      Edit
+                    </button>
+                    <button
+                      class="row-actions__item"
+                      type="button"
+                      *ngIf="quiz.status === 'DRAFT' && quiz.moderationStatus !== 'PENDING'"
+                      (click)="submitForReview(quiz); closeRowActions()"
+                    >
+                      Submit for review
+                    </button>
+                    <button
+                      class="row-actions__item"
+                      type="button"
+                      *ngIf="quiz.status === 'ACTIVE'"
+                      (click)="setQuizStatus(quiz, 'DRAFT'); closeRowActions()"
+                    >
+                      Disable
+                    </button>
+                    <button
+                      class="row-actions__item"
+                      type="button"
+                      *ngIf="quiz.status !== 'TRASHED'"
+                      (click)="setQuizStatus(quiz, 'TRASHED'); closeRowActions()"
+                    >
+                      Move to trash
+                    </button>
+                    <button
+                      class="row-actions__item"
+                      type="button"
+                      *ngIf="quiz.status === 'TRASHED'"
+                      (click)="setQuizStatus(quiz, 'DRAFT'); closeRowActions()"
+                    >
+                      Restore
+                    </button>
+                    <button
+                      class="row-actions__item row-actions__item--danger"
+                      type="button"
+                      *ngIf="quiz.status === 'TRASHED'"
+                      (click)="purgeQuiz(quiz); closeRowActions()"
+                    >
+                      Delete permanently
+                    </button>
+                  </div>
+
+                </div>
+                <div
+                  class="table-footer"
+                  [class.table-footer--row-actions-open]="openRowActionsId !== null"
+                  *ngIf="filteredMyQuizzes.length"
+                >
+                  <div class="pager">
+                    <button
+                      class="icon-btn"
+                      type="button"
+                      (click)="prevMinePage()"
+                      [disabled]="safeMinePageIndex === 0"
+                      aria-label="Previous page"
+                    >
+                      <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                    </button>
+                    <div class="pager__text">Page {{ safeMinePageIndex + 1 }} / {{ mineTotalPages }}</div>
+                    <button
+                      class="icon-btn"
+                      type="button"
+                      (click)="nextMinePage()"
+                      [disabled]="safeMinePageIndex >= mineTotalPages - 1"
+                      aria-label="Next page"
+                    >
+                      <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                    </button>
+                  </div>
+
+                  <div class="footer-right">
+                    <div class="muted">
+                      Showing {{ minePageFrom }} to {{ minePageTo }} of {{ filteredMyQuizzes.length }} entries
+                    </div>
+                    <div class="mr-select-wrap mr-select-wrap--sm mr-select-wrap--up" [class.menu-open]="openMenu === 'minePageSize'">
+                      <button
+                        class="mr-select"
+                        type="button"
+                        (click)="toggleMenu('minePageSize', $event)"
+                        [attr.aria-expanded]="openMenu === 'minePageSize'"
+                        aria-haspopup="listbox"
+                        aria-label="Page size"
+                      >
+                        <span class="mr-select__value">{{ minePageSizeLabel }}</span>
+                        <span class="mr-select__caret" aria-hidden="true"></span>
+                      </button>
+                      <div class="mr-select__menu" role="listbox" *ngIf="openMenu === 'minePageSize'" (click)="$event.stopPropagation()">
+                        <button
+                          class="mr-select__item"
+                          type="button"
+                          role="option"
+                          *ngFor="let size of minePageSizeOptions"
+                          [class.active]="minePageSize.value === size"
+                          (click)="setMinePageSize(size, $event)"
+                        >
+                          Show {{ size }}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                </section>
+              </div>
+            </section>
+          </div>
+        </div>
+      </ng-container>
+
+      <div class="editor-tabs" *ngIf="tab === 'editor'">
+        <div class="segmented picker-sources" role="tablist" aria-label="Editor tabs">
+          <button
+            class="segmented__btn"
+            type="button"
+            [class.active]="editorTab === 'details'"
+            (click)="setEditorTab('details')"
+          >
+            <span class="segmented__icon" aria-hidden="true">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M12 7v14" />
+                <path d="M3 18a4 4 0 0 1 4-4h13" />
+                <path d="M3 6a4 4 0 0 1 4-4h13v16" />
+              </svg>
+            </span>
+            Details
+          </button>
+          <button
+            class="segmented__btn"
+            type="button"
+            [class.active]="editorTab === 'questions'"
+            [disabled]="editorMode !== 'edit'"
+            (click)="setEditorTab('questions')"
+          >
+            <span class="segmented__icon" aria-hidden="true">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="M9.09 9a3 3 0 1 1 5.82 1c0 2-3 2-3 4" />
+                <path d="M12 17h.01" />
+              </svg>
+            </span>
+            Questions
+          </button>
+        </div>
+      </div>
+
+
+      <div class="panel panel--editor" *ngIf="tab === 'editor'">
+        <ng-container *ngIf="editorMode === 'edit' && selectedQuiz as quiz">
+          <div
+            class="moderation-banner"
+            *ngIf="showModerationBanner"
+            [ngClass]="'moderation-banner--' + moderationClass(quiz.moderationStatus)"
+            role="status"
+            aria-live="polite"
+          >
+            <button
+              type="button"
+              class="moderation-banner__dismiss"
+              (click)="dismissModerationBanner()"
+              aria-label="Dismiss moderation message"
+            >
+              <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+            <div class="moderation-banner__icon" aria-hidden="true">
+              <span class="moderation-banner__icon-glyph">
+                <ng-container *ngIf="quiz.moderationStatus === 'PENDING'; else moderationIconFallback">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="lucide lucide-hourglass-icon lucide-hourglass"
+                    aria-hidden="true"
+                  >
+                    <path d="M5 22h14"/>
+                    <path d="M5 2h14"/>
+                    <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/>
+                    <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/>
+                  </svg>
+                </ng-container>
+                <ng-template #moderationIconFallback>
+                  <i [class]="moderationIcon(quiz.moderationStatus)"></i>
+                </ng-template>
+              </span>
+            </div>
+            <div class="moderation-banner__content">
+              <div class="moderation-banner__title">{{ moderationLabel(quiz.moderationStatus) }}</div>
+              <p class="moderation-banner__text" *ngIf="quiz.moderationStatus === 'PENDING'">
+                This quiz is waiting for admin verification. Editing details or questions will cancel current review and move it back to draft.
+              </p>
+              <p class="moderation-banner__text" *ngIf="quiz.moderationStatus === 'REJECTED'">
+                Administrator reviewed this quiz negatively. Apply fixes and submit again for review.
+              </p>
+              <p class="moderation-banner__reason" *ngIf="quiz.moderationStatus === 'REJECTED' && quiz.moderationReason">
+                <i class="fa-regular fa-message" aria-hidden="true"></i>
+                <span><strong>Admin message:</strong> {{ quiz.moderationReason }}</span>
+              </p>
+            </div>
+          </div>
+        </ng-container>
+
+        <div
+          class="editor-details"
+          *ngIf="editorTab === 'details'"
+          [ngClass]="editorTabTransitionClass"
+          [style.height.px]="questionPaneHeightPx"
+          [style.max-height.px]="questionPaneHeightPx"
+          #detailsPane
+        >
+          <div class="panel__title">
+            <h2>Quiz details</h2>
+            <div class="panel__actions">
+              <ng-container *ngIf="editorMode === 'edit' && selectedQuiz as editQuiz">
+              <button
+                class="btn btn--outline-success"
+                type="button"
+                *ngIf="editQuiz.status === 'DRAFT' && editQuiz.moderationStatus !== 'PENDING'"
+                (click)="submitSelectedQuiz()"
+              >
+                Submit for review
+              </button>
+              <button
+                class="btn secondary"
+                type="button"
+                *ngIf="editQuiz.status === 'ACTIVE'"
+                (click)="setSelectedQuizStatus('DRAFT')"
+              >
+                Disable
+              </button>
+              <button
+                class="btn secondary"
+                type="button"
+                *ngIf="editQuiz.status !== 'TRASHED'"
+                (click)="setSelectedQuizStatus('TRASHED')"
+              >
+                Move to trash
+              </button>
+              <button
+                class="btn secondary"
+                type="button"
+                *ngIf="editQuiz.status === 'TRASHED'"
+                (click)="setSelectedQuizStatus('DRAFT')"
+              >
+                Restore
+              </button>
+              <button
+                class="btn btn--outline-danger"
+                type="button"
+                *ngIf="editQuiz.status === 'TRASHED'"
+                (click)="purgeSelectedQuiz()"
+              >
+                Delete permanently
+              </button>
+              </ng-container>
+            </div>
+          </div>
+
+          <form
+            class="form form--quiz"
+            #detailsForm
+            [formGroup]="quizForm"
+            (ngSubmit)="saveQuiz()"
+          >
+            <div class="quiz-details__left" #quizDetailsLeft>
+              <label class="field">
+                <span class="field__label">Title</span>
+                <input formControlName="title" />
+              </label>
+              <label class="field">
+                <span class="field__label">Category</span>
+                <input formControlName="categoryName" />
+              </label>
+              <label class="field field--description">
+                <span class="field__label">Description</span>
+                <textarea
+                  class="field__textarea field__textarea--description"
+                  formControlName="description"
+                  rows="3"
+                  maxlength="500"
+                  placeholder=""
+                ></textarea>
+                <div class="field__meta">
+                  <span class="muted">Description will be visible in the quiz preview.</span>
+                  <span
+                    class="field__counter"
+                    [class.field__counter--warn]="quizForm.controls.description.value.length >= 450"
+                  >
+                    {{ quizForm.controls.description.value.length }}/500
+                  </span>
+                </div>
+              </label>
+
+              <div class="block block--sub">
+                <h2>Game rules</h2>
+                <div class="rules-grid">
+                  <div class="rules-grid__item">
+                    <label class="field field--inline">
+                      <span class="field__label">Time limit per question (s)</span>
+                      <input
+                        type="number"
+                        [attr.min]="policy.minQuestionTimeLimitSeconds"
+                        [attr.max]="policy.maxQuestionTimeLimitSeconds"
+                        step="1"
+                        inputmode="numeric"
+                        formControlName="questionTimeLimitSeconds"
+                        (blur)="onTimeLimitBlur()"
+                      />
+                    </label>
+
+                    <div class="muted rules-hint">
+                      Allowed range: {{ policy.minQuestionTimeLimitSeconds }}-{{ policy.maxQuestionTimeLimitSeconds }}s. Default: 15s.
+                    </div>
+                  </div>
+
+                  <div class="rules-grid__item">
+                    <label class="field field--inline">
+                      <span class="field__label">Questions per game</span>
+                      <input
+                        type="number"
+                        min="1"
+                        [attr.max]="policy.maxQuestionsPerGame"
+                        step="1"
+                        inputmode="numeric"
+                        formControlName="questionsPerGame"
+                        (blur)="onQuestionsPerGameBlur()"
+                      />
+                    </label>
+
+                    <div class="muted rules-hint">
+                      Allowed range: 1-{{ policy.maxQuestionsPerGame }}. Default: 7 questions.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="quiz-details__right">
+              <div class="avatar-panel" aria-label="Quiz avatar settings" #avatarPanel>
+                <div class="avatar-preview" aria-label="Avatar preview" [style.height.px]="avatarPreviewHeightPx">
+                  <div
+                    class="avatar-preview__circle"
+                    [ngStyle]="quizAvatarStyle(quizForm.value)"
+                  >
+                    <span *ngIf="!quizForm.controls.avatarImageUrl.value">
+                      {{ titleInitial(quizForm.controls.title.value || 'M') }}
+                    </span>
+                  </div>
+
+                  <div class="avatar-preview__actions">
+                    <input
+                      #quizImageInput
+                      type="file"
+                      [attr.accept]="allowedUploadMimeTypes.join(',')"
+                      hidden
+                      (change)="uploadQuizImage($event)"
+                    />
+                    <button
+                      class="icon-btn"
+                      type="button"
+                      (click)="quizImageInput.value=''; quizImageInput.click()"
+                    >
+                      <i class="fa-solid fa-upload" aria-hidden="true"></i>
+                      <span class="sr-only">Upload quiz avatar image</span>
+                    </button>
+                    <button
+                      class="icon-btn danger"
+                      type="button"
+                      *ngIf="quizForm.controls.avatarImageUrl.value"
+                      (click)="quizForm.controls.avatarImageUrl.setValue(null)"
+                    >
+                      <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                      <span class="sr-only">Remove quiz avatar image</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="avatar-editor" #avatarEditor>
+                  <div class="avatar-editor__top">
+                    <div class="avatar-editor__title">Quiz avatar</div>
+                    <label class="toggle" title="Use gradient background">
+                      <input
+                        type="checkbox"
+                        [checked]="avatarGradientEnabled()"
+                        (change)="setAvatarGradient($any($event.target).checked)"
+                      />
+                      <span>Gradient</span>
+                    </label>
+                  </div>
+
+                  <div class="swatches" role="list" aria-label="Avatar presets">
+                    <button
+                      class="swatch"
+                      type="button"
+                      *ngFor="let sw of avatarSwatches"
+                      (click)="applyAvatarSwatch(sw)"
+                      [style.--sw1]="sw.start"
+                      [style.--sw2]="sw.end || sw.start"
+                      [style.--swt]="sw.text"
+                      aria-label="Apply preset"
+                    ></button>
+                  </div>
+
+                  <div class="color-grid">
+                    <label class="color-field">
+                      <span class="field__label">Bg 1</span>
+                      <input
+                        type="color"
+                        formControlName="avatarBgStart"
+                        (input)="onAvatarColorPicker('avatarBgStart', $any($event.target).value)"
+                      />
+                      <input
+                        class="color-field__text"
+                        type="text"
+                        [value]="avatarColorText('avatarBgStart')"
+                        (input)="onAvatarColorTextInput('avatarBgStart', $any($event.target).value)"
+                        (blur)="onAvatarColorTextBlur('avatarBgStart')"
+                      />
+                    </label>
+
+                    <label class="color-field">
+                      <span class="field__label">Bg 2</span>
+                      <input
+                        type="color"
+                        formControlName="avatarBgEnd"
+                        [disabled]="!avatarGradientEnabled()"
+                        (input)="onAvatarColorPicker('avatarBgEnd', $any($event.target).value)"
+                      />
+                      <input
+                        class="color-field__text"
+                        type="text"
+                        [value]="avatarColorText('avatarBgEnd')"
+                        [disabled]="!avatarGradientEnabled()"
+                        (input)="onAvatarColorTextInput('avatarBgEnd', $any($event.target).value)"
+                        (blur)="onAvatarColorTextBlur('avatarBgEnd')"
+                      />
+                    </label>
+
+                    <label class="color-field">
+                      <span class="field__label">Text</span>
+                      <input
+                        type="color"
+                        formControlName="avatarTextColor"
+                        (input)="onAvatarColorPicker('avatarTextColor', $any($event.target).value)"
+                      />
+                      <input
+                        class="color-field__text"
+                        type="text"
+                        [value]="avatarColorText('avatarTextColor')"
+                        (input)="onAvatarColorTextInput('avatarTextColor', $any($event.target).value)"
+                        (blur)="onAvatarColorTextBlur('avatarTextColor')"
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button
+              class="btn primary quiz-details__save"
+              type="submit"
+              [disabled]="savingQuiz || quizForm.invalid || (editorMode === 'create' && !canCreateQuiz)"
+            >
+              {{ editorMode === 'create' ? 'Create quiz' : 'Save quiz' }}
+            </button>
+          </form>
+        </div>
+
+        <div class="editor-split" *ngIf="editorTab === 'questions' && selectedQuiz as quiz" [ngClass]="editorTabTransitionClass">
+          <div class="editor-panel editor-panel--questions" [style.height.px]="questionPaneHeightPx">
+            <div class="panel__title">
+              <h2>Questions</h2>
+              <div class="muted">{{ quiz.questions.length }} / {{ policy.maxQuestionsPerQuiz }} total</div>
+            </div>
+
+            <div class="editor-panel__body">
+              <label class="field field--inline">
+                <span class="field__label">Search questions</span>
+                <input
+                  [formControl]="questionSearch"
+                  placeholder="Search by prompt..."
+                />
+              </label>
+
+              <div class="question-list">
+                <div
+                  *ngFor="let question of pagedSelectedQuestions; trackBy: trackByQuestionId"
+                  class="qitem"
+                  [class.active]="question.id === selectedQuestionId"
+                  [class.qitem--issue]="questionHasModerationIssue(question.id)"
+                  [class.qitem--issue-open]="isQuestionIssueExpanded(question.id)"
+                >
+                  <button
+                    class="qitem__main"
+                    type="button"
+                    (click)="onQuestionRowClick(question)"
+                    [attr.aria-expanded]="questionHasModerationIssue(question.id) ? isQuestionIssueExpanded(question.id) : null"
+                    [attr.aria-controls]="questionHasModerationIssue(question.id) ? ('qitem-feedback-' + question.id) : null"
+                  >
+                    <div class="qitem__n">Q{{ question.orderIndex + 1 }}</div>
+                    <div class="qitem__txt">{{ question.prompt }}</div>
+                  </button>
+
+                  <ng-container *ngIf="questionModerationIssueMessage(question.id) as issue">
+                    <div
+                      class="qitem__feedback-panel"
+                      *ngIf="isQuestionIssueExpanded(question.id)"
+                      [id]="'qitem-feedback-' + question.id"
+                      role="region"
+                      [attr.aria-label]="'Admin feedback for question ' + (question.orderIndex + 1)"
+                    >
+                      <i class="fa-solid fa-quote-left" aria-hidden="true"></i>
+                      <p>{{ issue }}</p>
+                    </div>
+                  </ng-container>
+                </div>
+
+                <div class="muted question-list__empty" *ngIf="!filteredSelectedQuestions.length">
+                  No matching questions.
+                </div>
+              </div>
+
+              <div class="question-pager" *ngIf="filteredSelectedQuestions.length">
+                <div class="pager">
+                  <button
+                    class="icon-btn"
+                    type="button"
+                    (click)="prevQuestionPage()"
+                    [disabled]="questionPageIndex === 0"
+                    aria-label="Previous questions page"
+                  >
+                    <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                  </button>
+                  <div class="pager__text">Page {{ questionPageIndex + 1 }} / {{ questionTotalPages }}</div>
+                  <button
+                    class="icon-btn"
+                    type="button"
+                    (click)="nextQuestionPage()"
+                    [disabled]="questionPageIndex >= questionTotalPages - 1"
+                    aria-label="Next questions page"
+                  >
+                    <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                  </button>
+                </div>
+
+                <div class="footer-right">
+                  <div class="muted question-pager__meta">
+                    Showing {{ questionPageFrom }} to {{ questionPageTo }} of {{ filteredSelectedQuestions.length }} entries
+                  </div>
+                  <div class="mr-select-wrap mr-select-wrap--up question-pager__size" [class.menu-open]="openMenu === 'questionPageSize'">
+                    <button
+                      class="mr-select"
+                      type="button"
+                      (click)="toggleMenu('questionPageSize', $event)"
+                      [attr.aria-expanded]="openMenu === 'questionPageSize'"
+                      aria-haspopup="listbox"
+                      aria-label="Questions page size"
+                    >
+                      <span class="mr-select__label">{{ questionPageSizeLabel }}</span>
+                      <span class="mr-select__caret" aria-hidden="true"></span>
+                    </button>
+                    <div class="mr-select__menu" role="listbox" *ngIf="openMenu === 'questionPageSize'" (click)="$event.stopPropagation()">
+                      <button
+                        class="mr-select__item"
+                        type="button"
+                        role="option"
+                        *ngFor="let size of questionPageSizeOptions"
+                        [class.active]="questionPageSize.value === size"
+                        (click)="setQuestionPageSize(size, $event)"
+                      >
+                        Show {{ size }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="editor-panel editor-panel--questionform" #questionsPaneRight>
+            <div class="panel__title">
+              <h2>
+                {{ selectedQuestionId ? 'Edit question' : 'Add question' }}
+              </h2>
+              <div class="panel__actions">
+                <button
+                  class="btn btn--outline-success"
+                  type="button"
+                  *ngIf="selectedQuestionId"
+                  (click)="startNewQuestion()"
+                  [disabled]="!canAddQuestion"
+                >
+                  Add question
+                </button>
+                <button
+                  class="btn btn--outline-danger"
+                  type="button"
+                  *ngIf="selectedQuestion"
+                  (click)="deleteQuestion(selectedQuestion)"
+                  [disabled]="deletingQuestion"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+
+            <div class="editor-panel__body">
+              <form class="form" [formGroup]="questionForm" (ngSubmit)="saveQuestion()">
+                <label class="field field--prompt">
+                  <span class="field__label">Prompt</span>
+                  <textarea
+                    class="field__textarea field__textarea--prompt"
+                    formControlName="prompt"
+                    rows="3"
+                    maxlength="500"
+                    placeholder="Type the full question..."
+                  ></textarea>
+                  <div class="field__meta">
+                    <span class="muted">You can write a longer, multi-line question.</span>
+                    <span
+                      class="field__counter"
+                      [class.field__counter--warn]="questionForm.controls.prompt.value.length >= 450"
+                    >
+                      {{ questionForm.controls.prompt.value.length }}/500
+                    </span>
+                  </div>
+                </label>
+
+                <div class="media-block">
+                  <input
+                    #questionImageInput
+                    type="file"
+                    [attr.accept]="allowedUploadMimeTypes.join(',')"
+                    hidden
+                    (change)="uploadQuestionImage($event, 'prompt')"
+                  />
+                  <div class="media-file media-file--question" [class.is-empty]="!questionImageUrl()">
+                    <ng-container *ngIf="questionImageUrl() as url; else questionImageAdd">
+                      <button
+                        class="media-file__name media-file__name--full"
+                        type="button"
+                        (click)="openImagePreview(url, 'Question image')"
+                        aria-label="Open question image preview"
+                      >
+                        <i class="fa-regular fa-image" aria-hidden="true"></i>
+                        <span>Question image</span>
+                      </button>
+                    </ng-container>
+                    <ng-template #questionImageAdd>
+                      <button
+                        class="media-file__name media-file__name--full media-file__name--muted"
+                        type="button"
+                        (click)="questionImageInput.value=''; questionImageInput.click()"
+                        aria-label="Upload question image"
+                      >
+                        <i class="fa-solid fa-upload" aria-hidden="true"></i>
+                        <span class="media-file__upload-label">Add question image</span>
+                        <small class="media-file__upload-meta">Max {{ maxUploadMbLabel }}</small>
+                      </button>
+                    </ng-template>
+                    <button
+                      class="icon-btn danger media-file__remove"
+                      type="button"
+                      *ngIf="questionImageUrl()"
+                      (click)="clearQuestionImage()"
+                    >
+                      <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                      <span class="sr-only">Remove question image</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="options">
+                  <div class="opt" *ngFor="let idx of [1, 2, 3, 4]">
+                    <label class="opt__radio">
+                      <input
+                        type="radio"
+                        [value]="idx - 1"
+                        formControlName="correctIndex"
+                      />
+                      <span><span class="sr-only">Correct</span></span>
+                    </label>
+
+                    <div class="opt__content">
+                      <div class="opt__top">
+                        <ng-container *ngIf="optionImageUrl(idx) as optUrl; else optionTextInput">
+                          <div class="media-file media-file--inline">
+                            <button
+                              class="media-file__name media-file__name--full"
+                              type="button"
+                              (click)="openImagePreview(optUrl, 'Answer option image')"
+                              [attr.aria-label]="'Open option ' + idx + ' image preview'"
+                            >
+                              <i class="fa-regular fa-image" aria-hidden="true"></i>
+                              <span>Option {{ idx }} image</span>
+                            </button>
+                          </div>
+                        </ng-container>
+                        <ng-template #optionTextInput>
+                          <input
+                            [formControlName]="'o' + idx"
+                            [placeholder]="'Option ' + idx"
+                          />
+                        </ng-template>
+
+                        <input
+                          #optImageInput
+                          type="file"
+                          [attr.accept]="allowedUploadMimeTypes.join(',')"
+                          hidden
+                          (change)="uploadQuestionImage($event, $any(idx))"
+                        />
+                        <button
+                          class="icon-btn"
+                          type="button"
+                          (click)="optImageInput.value=''; optImageInput.click()"
+                        >
+                          <i class="fa-solid fa-image" aria-hidden="true"></i>
+                          <span class="sr-only">Upload option image</span>
+                        </button>
+                        <button
+                          class="icon-btn danger"
+                          type="button"
+                          *ngIf="optionImageUrl(idx)"
+                          (click)="clearOptionImage(idx)"
+                        >
+                          <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                          <span class="sr-only">Remove option image</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <button class="btn btn-question-submit" type="submit" [disabled]="savingQuestion || questionForm.invalid || (selectedQuestionId == null && !canAddQuestion)">
+                  {{ selectedQuestionId ? 'Save question' : 'Add question' }}
+                </button>
+              </form>
+
+              <dialog
+                #imagePreviewDialog
+                class="image-preview-dialog"
+                [attr.aria-label]="previewImageAlt"
+                (close)="onImagePreviewDialogClosed()"
+                (click)="onImagePreviewDialogClick($event)"
+              >
+                <div class="image-preview-overlay__card" *ngIf="previewImageUrl as previewUrl">
+                  <div class="image-preview-overlay__head">
+                    <div class="image-preview-overlay__name" [title]="previewImageName">
+                      {{ previewImageName }}
+                    </div>
+                    <button
+                      class="icon-btn"
+                      type="button"
+                      aria-label="Close image preview"
+                      (click)="closeImagePreview()"
+                    >
+                      <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                  <img
+                    class="image-preview-overlay__img"
+                    [src]="previewUrl"
+                    [alt]="previewImageAlt"
+                    loading="lazy"
+                  />
+                  <div class="image-preview-overlay__footer">
+                    <a
+                      class="image-preview-overlay__open image-preview-overlay__open--footer"
+                      [href]="previewUrl"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Open in new page
+                    </a>
+                  </div>
+                </div>
+              </dialog>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <ng-template #loadingState>
+        <div class="muted">Loading...</div>
+      </ng-template>
+    </div>
+  </div>
+</section>
