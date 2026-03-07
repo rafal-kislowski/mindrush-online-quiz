@@ -11,6 +11,8 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.Version;
+import java.time.Instant;
 
 @Entity
 @Table(name = "quizzes")
@@ -22,6 +24,10 @@ public class Quiz {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Version
+    @Column(name = "version")
+    private Long version;
 
     @Column(name = "title", length = 120, nullable = false)
     private String title;
@@ -65,6 +71,19 @@ public class Quiz {
     @Column(name = "quiz_source", length = 16)
     private QuizSource source;
 
+    @Column(name = "owner_user_id")
+    private Long ownerUserId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "moderation_status", length = 16)
+    private QuizModerationStatus moderationStatus;
+
+    @Column(name = "moderation_reason", length = 500)
+    private String moderationReason;
+
+    @Column(name = "moderation_updated_at")
+    private Instant moderationUpdatedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
     private QuizCategory category;
@@ -83,10 +102,18 @@ public class Quiz {
         this.questionsPerGame = DEFAULT_QUESTIONS_PER_GAME;
         this.status = QuizStatus.DRAFT;
         this.source = QuizSource.OFFICIAL;
+        this.ownerUserId = null;
+        this.moderationStatus = QuizModerationStatus.NONE;
+        this.moderationReason = null;
+        this.moderationUpdatedAt = null;
     }
 
     public Long getId() {
         return id;
+    }
+
+    public Long getVersion() {
+        return version == null ? 0L : version;
     }
 
     public String getTitle() {
@@ -145,6 +172,22 @@ public class Quiz {
         return source == null ? QuizSource.OFFICIAL : source;
     }
 
+    public Long getOwnerUserId() {
+        return ownerUserId;
+    }
+
+    public QuizModerationStatus getModerationStatus() {
+        return moderationStatus == null ? QuizModerationStatus.NONE : moderationStatus;
+    }
+
+    public String getModerationReason() {
+        return moderationReason;
+    }
+
+    public Instant getModerationUpdatedAt() {
+        return moderationUpdatedAt;
+    }
+
     public QuizCategory getCategory() {
         return category;
     }
@@ -199,6 +242,22 @@ public class Quiz {
 
     public void setSource(QuizSource source) {
         this.source = source;
+    }
+
+    public void setOwnerUserId(Long ownerUserId) {
+        this.ownerUserId = ownerUserId;
+    }
+
+    public void setModerationStatus(QuizModerationStatus moderationStatus) {
+        this.moderationStatus = moderationStatus;
+    }
+
+    public void setModerationReason(String moderationReason) {
+        this.moderationReason = moderationReason;
+    }
+
+    public void setModerationUpdatedAt(Instant moderationUpdatedAt) {
+        this.moderationUpdatedAt = moderationUpdatedAt;
     }
 
     public void setCategory(QuizCategory category) {
