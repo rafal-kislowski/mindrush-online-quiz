@@ -34,6 +34,7 @@ export interface ActiveLobbyDto {
   maxPlayers: number;
   playerCount: number;
   leaderDisplayName: string;
+  leaderRankPoints?: number;
   ownerType: LobbyOwnerType;
   isOwner: boolean;
   isParticipant: boolean;

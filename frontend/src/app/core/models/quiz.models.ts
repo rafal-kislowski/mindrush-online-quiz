@@ -3,6 +3,10 @@ export interface QuizListItemDto {
   title: string;
   description: string | null;
   categoryName: string | null;
+  favorite?: boolean;
+  inLibrary?: boolean;
+  ownedByViewer?: boolean;
+  publicAvailable?: boolean;
   avatarImageUrl?: string | null;
   avatarBgStart?: string | null;
   avatarBgEnd?: string | null;

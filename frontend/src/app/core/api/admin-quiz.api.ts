@@ -81,6 +81,71 @@ export interface AdminQuizDetailDto {
   questions: AdminQuestionDto[];
 }
 
+export type QuizModerationStatus = 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED';
+export type QuizSource = 'OFFICIAL' | 'CUSTOM';
+
+export interface AdminQuizSubmissionListItemDto {
+  id: number;
+  title: string;
+  categoryName: string | null;
+  ownerDisplayName: string | null;
+  ownerIsPremium: boolean;
+  avatarImageUrl: string | null;
+  avatarBgStart: string | null;
+  avatarBgEnd: string | null;
+  avatarTextColor: string | null;
+  questionCount: number;
+  status: QuizStatus;
+  moderationStatus: QuizModerationStatus;
+  submissionVersion: number;
+  moderationUpdatedAt?: string | null;
+}
+
+export interface AdminQuizSubmissionDetailDto {
+  id: number;
+  title: string;
+  description: string | null;
+  categoryName: string | null;
+  avatarImageUrl: string | null;
+  avatarBgStart: string | null;
+  avatarBgEnd: string | null;
+  avatarTextColor: string | null;
+  questionTimeLimitSeconds: number | null;
+  questionsPerGame: number | null;
+  status: QuizStatus;
+  source: QuizSource;
+  moderationStatus: QuizModerationStatus;
+  moderationReason: string | null;
+  ownerUserId: number | null;
+  ownerDisplayName: string | null;
+  ownerEmail: string | null;
+  ownerBanned: boolean;
+  ownerRoles: string[];
+  questions: AdminQuestionDto[];
+  submissionVersion: number;
+}
+
+export interface AdminSubmissionOwnerModerationDto {
+  userId: number | null;
+  displayName: string | null;
+  email: string | null;
+  banned: boolean;
+  roles: string[];
+}
+
+export interface ModerationResultDto {
+  quizId: number;
+  moderationStatus: QuizModerationStatus;
+  status: QuizStatus;
+  moderationReason: string | null;
+  quizVersion: number;
+}
+
+export interface AdminQuestionIssueInputDto {
+  questionId: number;
+  message: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdminQuizApi {
   constructor(private readonly http: HttpClient) {}
@@ -206,6 +271,73 @@ export class AdminQuizApi {
     return this.http.put<AdminQuizDto>(
       `/api/admin/quizzes/${encodeURIComponent(String(quizId))}/status`,
       { status },
+      { withCredentials: true }
+    );
+  }
+
+  listPendingSubmissions(): Observable<AdminQuizSubmissionListItemDto[]> {
+    return this.http.get<AdminQuizSubmissionListItemDto[]>('/api/admin/quiz-submissions', {
+      withCredentials: true,
+    });
+  }
+
+  getPendingSubmission(quizId: number): Observable<AdminQuizSubmissionDetailDto> {
+    return this.http.get<AdminQuizSubmissionDetailDto>(
+      `/api/admin/quiz-submissions/${encodeURIComponent(String(quizId))}`,
+      { withCredentials: true }
+    );
+  }
+
+  approveSubmission(quizId: number, expectedSubmissionVersion: number): Observable<ModerationResultDto> {
+    return this.http.post<ModerationResultDto>(
+      `/api/admin/quiz-submissions/${encodeURIComponent(String(quizId))}/approve`,
+      { expectedSubmissionVersion },
+      { withCredentials: true }
+    );
+  }
+
+  rejectSubmission(
+    quizId: number,
+    expectedSubmissionVersion: number,
+    reason: string,
+    questionIssues: AdminQuestionIssueInputDto[] = []
+  ): Observable<ModerationResultDto> {
+    return this.http.post<ModerationResultDto>(
+      `/api/admin/quiz-submissions/${encodeURIComponent(String(quizId))}/reject`,
+      { expectedSubmissionVersion, reason, questionIssues },
+      { withCredentials: true }
+    );
+  }
+
+  removeSubmissionQuestionImage(quizId: number, questionId: number): Observable<AdminQuizSubmissionDetailDto> {
+    return this.http.delete<AdminQuizSubmissionDetailDto>(
+      `/api/admin/quiz-submissions/${encodeURIComponent(String(quizId))}/questions/${encodeURIComponent(String(questionId))}/image`,
+      { withCredentials: true }
+    );
+  }
+
+  removeSubmissionAvatarImage(quizId: number): Observable<AdminQuizSubmissionDetailDto> {
+    return this.http.delete<AdminQuizSubmissionDetailDto>(
+      `/api/admin/quiz-submissions/${encodeURIComponent(String(quizId))}/avatar`,
+      { withCredentials: true }
+    );
+  }
+
+  removeSubmissionOptionImage(
+    quizId: number,
+    questionId: number,
+    optionId: number
+  ): Observable<AdminQuizSubmissionDetailDto> {
+    return this.http.delete<AdminQuizSubmissionDetailDto>(
+      `/api/admin/quiz-submissions/${encodeURIComponent(String(quizId))}/questions/${encodeURIComponent(String(questionId))}/options/${encodeURIComponent(String(optionId))}/image`,
+      { withCredentials: true }
+    );
+  }
+
+  banSubmissionOwner(quizId: number): Observable<AdminSubmissionOwnerModerationDto> {
+    return this.http.post<AdminSubmissionOwnerModerationDto>(
+      `/api/admin/quiz-submissions/${encodeURIComponent(String(quizId))}/owner/ban`,
+      {},
       { withCredentials: true }
     );
   }

@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { adminGuard } from './core/auth/admin.guard';
+import { authGuard } from './core/auth/auth.guard';
 import { lobbyDeactivateGuard } from './pages/lobby/lobby-deactivate.guard';
 
 export const routes: Routes = [
@@ -15,7 +16,9 @@ export const routes: Routes = [
   { path: 'forum', loadComponent: () => import('./pages/placeholder/placeholder.component').then(m => m.PlaceholderComponent), data: { title: 'Forum' } },
   { path: 'settings', loadComponent: () => import('./pages/placeholder/placeholder.component').then(m => m.PlaceholderComponent), data: { title: 'Settings' } },
   { path: 'leaderboards', loadComponent: () => import('./pages/leaderboards/leaderboards.component').then(m => m.LeaderboardsComponent) },
+  { path: 'library', canActivate: [authGuard], loadComponent: () => import('./pages/library/library.component').then(m => m.LibraryComponent) },
   { path: 'create-quiz', canActivate: [adminGuard], loadComponent: () => import('./pages/admin/admin-quiz.component').then(m => m.AdminQuizComponent) },
+  { path: 'admin/quiz-submissions', canActivate: [adminGuard], loadComponent: () => import('./pages/admin/admin-quiz-submissions.component').then(m => m.AdminQuizSubmissionsComponent) },
   {
     path: 'lobby/:code',
     canDeactivate: [lobbyDeactivateGuard],
