@@ -188,6 +188,33 @@ Notes:
   - `custom` -> user-created and shared quiz (stored in DB as `quiz_source=CUSTOM`)
   - `library` is a frontend view/filter concept (user's own quizzes), not a separate DB enum value.
 
+## Library (user-created quizzes)
+Endpoints for authenticated users:
+- `GET /api/library/quizzes/mine` -> list your quizzes
+- `GET /api/library/quizzes/mine/{id}` -> details with questions + correct answers (owner only)
+- `GET /api/library/quizzes/policy` -> current limits + usage counters for your account tier
+- `GET /api/library/quizzes/public` -> list public library quizzes (official + approved custom)
+- `GET /api/library/quizzes/favorites` -> list your favorited public quizzes
+- `POST /api/library/quizzes` -> create quiz draft
+- `PUT /api/library/quizzes/{id}` -> update draft/owned quiz
+- `POST /api/library/quizzes/{id}/questions` -> add question (4 options, exactly 1 correct)
+- `PUT /api/library/quizzes/{id}/questions/{questionId}` -> update question/options
+- `DELETE /api/library/quizzes/{id}/questions/{questionId}` -> delete question
+- `POST /api/library/quizzes/{id}/submit` -> send quiz to moderation
+- `POST /api/library/quizzes/{id}/favorite-toggle` -> add/remove quiz from favorites
+- `PUT /api/library/quizzes/{id}/status` -> move draft/trash state (`ACTIVE` cannot be set directly by user)
+- `DELETE /api/library/quizzes/{id}` -> move to trash
+- `DELETE /api/library/quizzes/{id}/purge` -> permanently delete (only from trash)
+- `POST /api/library/media` (`multipart/form-data`, field: `file`) -> upload image, returns `{ "url": "/media/..." }`
+
+Notes:
+- Limits are enforced on backend and configurable in `application.properties` under `app.library.policy.*` (`user` and `premium` tiers).
+- Default `USER` limits: `20` owned quizzes, `5` published quizzes, `3` pending submissions, `50` max questions/quiz.
+- Submission requires at least `5` questions by default.
+- User media URLs in library flows must reference stored files (`/media/...`) and avatar colors must be valid HEX values.
+- Upload limits and MIME whitelist are controlled by `app.library.policy.media.*` (default max upload `2MB`).
+- Favorite operations are available only for publicly visible quizzes.
+
 ## Admin (quiz management)
 Admin-only quiz endpoints (requires `ADMIN` role):
 - `GET /api/admin/quizzes` -> list quizzes
@@ -200,6 +227,17 @@ Admin-only quiz endpoints (requires `ADMIN` role):
 - `POST /api/admin/quizzes/{id}/questions` -> add a question (4 options, exactly 1 correct)
 - `PUT /api/admin/quizzes/{id}/questions/{questionId}` -> update question + options (requires option ids, exactly 1 correct)
 - `DELETE /api/admin/quizzes/{id}/questions/{questionId}` -> delete question
+
+### Admin moderation queue
+Admin-only submission moderation endpoints:
+- `GET /api/admin/quiz-submissions` -> list pending user submissions
+- `GET /api/admin/quiz-submissions/{id}` -> submission detail (with moderation context)
+- `POST /api/admin/quiz-submissions/{id}/approve` -> approve submission (`expectedSubmissionVersion` required)
+- `POST /api/admin/quiz-submissions/{id}/reject` -> reject submission with reason and optional per-question issues
+- `POST /api/admin/quiz-submissions/{id}/owner/ban` -> ban submission owner
+- `DELETE /api/admin/quiz-submissions/{id}/avatar` -> remove submission avatar image
+- `DELETE /api/admin/quiz-submissions/{id}/questions/{questionId}/image` -> remove question image
+- `DELETE /api/admin/quiz-submissions/{id}/questions/{questionId}/options/{optionId}/image` -> remove answer option image
 
 Optional dev seed data:
 - Seed is enabled by default for local development (`app.seed.enabled=true`) and runs only when there are no quizzes in DB.
