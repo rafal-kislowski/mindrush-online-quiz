@@ -14,7 +14,7 @@ import pl.mindrush.backend.lobby.chat.LobbySystemMessageService;
 import pl.mindrush.backend.lobby.events.LobbyEventPublisher;
 import pl.mindrush.backend.quiz.Quiz;
 import pl.mindrush.backend.quiz.QuizRepository;
-import pl.mindrush.backend.quiz.QuizStatus;
+import pl.mindrush.backend.quiz.QuizVisibilityRules;
 
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -209,6 +209,7 @@ public class LobbyService {
                     || (isOwner && viewerAuthenticated)
                     ? "AUTHENTICATED"
                     : "GUEST";
+            int leaderRankPoints = ownerSession == null ? 0 : Math.max(0, ownerSession.getRankPoints());
 
             Map<String, Object> row = new HashMap<>();
             row.put("code", lobby.getCode());
@@ -218,6 +219,7 @@ public class LobbyService {
             row.put("maxPlayers", lobby.getMaxPlayers());
             row.put("playerCount", lobbyParticipants.size());
             row.put("leaderDisplayName", leaderDisplayName);
+            row.put("leaderRankPoints", leaderRankPoints);
             row.put("ownerType", ownerType);
             row.put("isOwner", isOwner);
             row.put("isParticipant", isParticipant);
@@ -361,7 +363,8 @@ public class LobbyService {
         if (normalizedQuizId != null) {
             Quiz quiz = quizRepository.findById(normalizedQuizId)
                     .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
-            if (quiz.getStatus() != QuizStatus.ACTIVE) {
+            boolean selectable = QuizVisibilityRules.canUserPlay(quiz, guestSession.getUserId());
+            if (!selectable) {
                 throw new ResponseStatusException(NOT_FOUND, "Quiz not found");
             }
             if (nextRankingEnabled && !quiz.isIncludeInRanking()) {
@@ -382,16 +385,14 @@ public class LobbyService {
         lobby.setRankingEnabled(nextRankingEnabled);
         lobbyRepository.save(lobby);
         participantRepository.clearReadyByLobbyId(lobby.getId());
-        String ownerName = resolveParticipantDisplayName(lobby.getId(), guestSession.getId(), "Owner");
         if (quizChanged) {
-            String categoryText = normalizedQuizId == null ? "none" : selectedCategoryLabel;
-            lobbySystemMessageService.publish(lobby.getCode(), ownerName + " set quiz category to " + categoryText + ".");
-        }
-        if (rankingChanged) {
-            lobbySystemMessageService.publish(
-                    lobby.getCode(),
-                    ownerName + " set match type to " + (nextRankingEnabled ? "Ranked." : "Casual.")
-            );
+            if (normalizedQuizId != null) {
+                String ownerName = resolveParticipantDisplayName(lobby.getId(), guestSession.getId(), "Owner");
+                lobbySystemMessageService.publish(
+                        lobby.getCode(),
+                        ownerName + " set quiz category to " + selectedCategoryLabel + "."
+                );
+            }
         }
         lobbyEventPublisher.lobbyUpdated(lobby.getCode());
         maybeStartGameWhenAllPlayersReady(lobby);

@@ -146,6 +146,10 @@ public class GameService {
         return !isTraining(session);
     }
 
+    private boolean isQuizPlayableForUser(Quiz quiz, Long userId) {
+        return QuizVisibilityRules.canUserPlay(quiz, userId);
+    }
+
     private boolean normalizeRankingRequested(Boolean ranked, boolean fallback) {
         return ranked == null ? fallback : ranked;
     }
@@ -241,7 +245,7 @@ public class GameService {
         }
 
         Quiz quiz = quizRepository.findById(quizId).orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
-        if (quiz.getStatus() != QuizStatus.ACTIVE) {
+        if (!isQuizPlayableForUser(quiz, guestSession.getUserId())) {
             throw new ResponseStatusException(CONFLICT, "Quiz is not active");
         }
 
@@ -298,7 +302,7 @@ public class GameService {
         }
 
         Quiz quiz = quizRepository.findById(quizId).orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
-        if (quiz.getStatus() != QuizStatus.ACTIVE) {
+        if (!isQuizPlayableForUser(quiz, guestSession.getUserId())) {
             throw new ResponseStatusException(CONFLICT, "Quiz is not active");
         }
 
@@ -337,7 +341,9 @@ public class GameService {
         }
 
         Quiz quiz = quizRepository.findById(lobby.getSelectedQuizId()).orElse(null);
-        if (quiz == null || quiz.getStatus() != QuizStatus.ACTIVE) return Optional.empty();
+        GuestSession ownerSession = guestSessionRepository.findById(lobby.getOwnerGuestSessionId()).orElse(null);
+        Long ownerUserId = ownerSession == null ? null : ownerSession.getUserId();
+        if (!isQuizPlayableForUser(quiz, ownerUserId)) return Optional.empty();
         long questionCount = questionRepository.countByQuizId(quiz.getId());
         if (questionCount == 0) return Optional.empty();
 

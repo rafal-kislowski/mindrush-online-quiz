@@ -1,10 +1,10 @@
 package pl.mindrush.backend.media;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+import pl.mindrush.backend.quiz.QuizLibraryPolicyProperties;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -22,28 +22,32 @@ import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 @Service
 public class MediaStorageService {
 
-    private static final long MAX_BYTES = 5L * 1024L * 1024L;
-
     private final Path rootDir;
+    private final QuizLibraryPolicyProperties policyProperties;
 
-    public MediaStorageService(@Value("${app.media.dir:uploads}") String mediaDir) {
+    public MediaStorageService(
+            @Value("${app.media.dir:uploads}") String mediaDir,
+            QuizLibraryPolicyProperties policyProperties
+    ) {
         this.rootDir = Paths.get(mediaDir).toAbsolutePath().normalize();
+        this.policyProperties = policyProperties;
     }
 
     public StoredMedia storeImage(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(BAD_REQUEST, "File is required");
         }
-        if (file.getSize() > MAX_BYTES) {
-            throw new ResponseStatusException(BAD_REQUEST, "File is too large (max 5MB)");
+
+        String contentType = (file.getContentType() == null ? "" : file.getContentType()).trim().toLowerCase(Locale.ROOT);
+        long maxBytes = policyProperties.getMedia().getMaxUploadBytes();
+        if (file.getSize() > maxBytes) {
+            throw new ResponseStatusException(BAD_REQUEST, "File is too large (max " + bytesLabel(maxBytes) + ")");
+        }
+        if (!policyProperties.getMedia().getAllowedMimeTypes().contains(contentType)) {
+            throw new ResponseStatusException(BAD_REQUEST, "Unsupported image type");
         }
 
-        String contentType = (file.getContentType() == null ? "" : file.getContentType()).toLowerCase(Locale.ROOT);
-        if (!contentType.startsWith("image/")) {
-            throw new ResponseStatusException(BAD_REQUEST, "Only image uploads are supported");
-        }
-
-        String ext = extensionFrom(file.getOriginalFilename(), contentType);
+        String ext = extensionFrom(contentType);
         String filename = UUID.randomUUID() + ext;
 
         try {
@@ -63,26 +67,17 @@ public class MediaStorageService {
         return new StoredMedia(urlPath, contentType, file.getOriginalFilename());
     }
 
-    private static String extensionFrom(String originalName, String contentType) {
-        String ext = "";
-        if (originalName != null) {
-            int idx = originalName.lastIndexOf('.');
-            if (idx >= 0 && idx < originalName.length() - 1) {
-                String candidate = originalName.substring(idx + 1).toLowerCase(Locale.ROOT);
-                if (candidate.matches("[a-z0-9]{1,6}")) {
-                    ext = "." + candidate;
-                }
-            }
-        }
-
-        if (!ext.isBlank()) return ext;
-
-        if (MediaType.IMAGE_PNG_VALUE.equals(contentType)) return ".png";
-        if (MediaType.IMAGE_JPEG_VALUE.equals(contentType)) return ".jpg";
-        if (MediaType.IMAGE_GIF_VALUE.equals(contentType)) return ".gif";
+    private static String extensionFrom(String contentType) {
+        if ("image/png".equals(contentType)) return ".png";
+        if ("image/jpeg".equals(contentType)) return ".jpg";
+        if ("image/gif".equals(contentType)) return ".gif";
         if ("image/webp".equals(contentType)) return ".webp";
-        if ("image/svg+xml".equals(contentType)) return ".svg";
-        return "";
+        throw new ResponseStatusException(BAD_REQUEST, "Unsupported image type");
+    }
+
+    private static String bytesLabel(long bytes) {
+        long mb = Math.max(1L, Math.round((double) bytes / (1024d * 1024d)));
+        return mb + "MB";
     }
 
     public record StoredMedia(String url, String contentType, String originalName) {}

@@ -1,10 +1,12 @@
 package pl.mindrush.backend.quiz;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import pl.mindrush.backend.JwtCookieAuthenticationFilter;
 import pl.mindrush.backend.quiz.dto.QuizDetailDto;
 import pl.mindrush.backend.quiz.dto.QuizListItemDto;
 import pl.mindrush.backend.quiz.dto.QuizQuestionDto;
@@ -22,8 +24,12 @@ public class QuizController {
     }
 
     @GetMapping
-    public ResponseEntity<List<QuizListItemDto>> listQuizzes() {
-        return ResponseEntity.ok(quizService.listQuizzes());
+    public ResponseEntity<List<QuizListItemDto>> listQuizzes(Authentication authentication) {
+        Long viewerUserId = null;
+        if (authentication != null && authentication.getPrincipal() instanceof JwtCookieAuthenticationFilter.AuthenticatedUser user) {
+            viewerUserId = user.id();
+        }
+        return ResponseEntity.ok(quizService.listQuizzes(viewerUserId));
     }
 
     @GetMapping("/{id}")
@@ -36,4 +42,3 @@ public class QuizController {
         return ResponseEntity.ok(quizService.getQuizQuestions(quizId));
     }
 }
-

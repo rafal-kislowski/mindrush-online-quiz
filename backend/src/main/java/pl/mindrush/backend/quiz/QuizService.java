@@ -8,9 +8,13 @@ import pl.mindrush.backend.quiz.dto.QuizDetailDto;
 import pl.mindrush.backend.quiz.dto.QuizListItemDto;
 import pl.mindrush.backend.quiz.dto.QuizQuestionDto;
 
+import java.util.HashSet;
 import java.util.HashMap;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
@@ -21,25 +25,48 @@ public class QuizService {
     private final QuizRepository quizRepository;
     private final QuizQuestionRepository questionRepository;
     private final QuizAnswerOptionRepository optionRepository;
+    private final QuizFavoriteRepository favoriteRepository;
 
     public QuizService(
             QuizRepository quizRepository,
             QuizQuestionRepository questionRepository,
-            QuizAnswerOptionRepository optionRepository
+            QuizAnswerOptionRepository optionRepository,
+            QuizFavoriteRepository favoriteRepository
     ) {
         this.quizRepository = quizRepository;
         this.questionRepository = questionRepository;
         this.optionRepository = optionRepository;
+        this.favoriteRepository = favoriteRepository;
     }
 
-    public List<QuizListItemDto> listQuizzes() {
-        return quizRepository.findAllWithCategoryByStatus(QuizStatus.ACTIVE).stream()
+    public List<QuizListItemDto> listQuizzes(Long viewerUserId) {
+        Map<Long, Quiz> visibleById = new LinkedHashMap<>();
+
+        for (Quiz quiz : quizRepository.findAllWithCategoryByStatus(QuizStatus.ACTIVE)) {
+            if (!QuizVisibilityRules.isPubliclyVisible(quiz)) continue;
+            visibleById.put(quiz.getId(), quiz);
+        }
+
+        if (viewerUserId != null) {
+            for (Quiz quiz : quizRepository.findAllOwnedVisibleByUserId(viewerUserId)) {
+                visibleById.put(quiz.getId(), quiz);
+            }
+        }
+
+        Set<Long> favoriteIds = favoriteQuizIds(viewerUserId);
+
+        return visibleById.values().stream()
+                .sorted(Comparator.comparing(Quiz::getId).reversed())
                 .map(q -> new QuizListItemDto(
                         q.getId(),
                         q.getTitle(),
                         q.getDescription(),
                         q.getCategory() == null ? null : q.getCategory().getName(),
                         q.getSource().name().toLowerCase(),
+                        favoriteIds.contains(q.getId()),
+                        isInLibraryForViewer(q, viewerUserId, favoriteIds),
+                        QuizVisibilityRules.isOwnedBy(q, viewerUserId),
+                        QuizVisibilityRules.isPubliclyVisible(q),
                         q.getAvatarImageUrl(),
                         q.getAvatarBgStart(),
                         q.getAvatarBgEnd(),
@@ -54,11 +81,27 @@ public class QuizService {
                 .toList();
     }
 
+    private Set<Long> favoriteQuizIds(Long viewerUserId) {
+        if (viewerUserId == null) return Set.of();
+        Set<Long> ids = new HashSet<>();
+        for (QuizFavorite favorite : favoriteRepository.findAllByUserId(viewerUserId)) {
+            if (favorite.getQuizId() != null) {
+                ids.add(favorite.getQuizId());
+            }
+        }
+        return ids;
+    }
+
+    private boolean isInLibraryForViewer(Quiz quiz, Long viewerUserId, Set<Long> favoriteIds) {
+        if (viewerUserId == null) return false;
+        return QuizVisibilityRules.isOwnedBy(quiz, viewerUserId) || favoriteIds.contains(quiz.getId());
+    }
+
     public QuizDetailDto getQuiz(Long quizId) {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
 
-        if (quiz.getStatus() != QuizStatus.ACTIVE) {
+        if (!QuizVisibilityRules.isPubliclyVisible(quiz)) {
             throw new ResponseStatusException(NOT_FOUND, "Quiz not found");
         }
 
@@ -83,7 +126,7 @@ public class QuizService {
     public List<QuizQuestionDto> getQuizQuestions(Long quizId) {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
-        if (quiz.getStatus() != QuizStatus.ACTIVE) {
+        if (!QuizVisibilityRules.isPubliclyVisible(quiz)) {
             throw new ResponseStatusException(NOT_FOUND, "Quiz not found");
         }
 
