@@ -73,6 +73,7 @@ public class AuthService {
         String normalized = normalizeEmail(email);
         AppUser user = userRepository.findByEmailIgnoreCase(normalized)
                 .orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "Invalid credentials"));
+        ensureNotBanned(user);
 
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new ResponseStatusException(UNAUTHORIZED, "Invalid credentials");
@@ -98,6 +99,11 @@ public class AuthService {
         }
 
         AppUser user = token.getUser();
+        if (user != null && user.getRoles().contains(AppRole.BANNED)) {
+            token.setRevoked(true);
+            refreshTokenRepository.save(token);
+            throw new ResponseStatusException(UNAUTHORIZED, "Account is banned");
+        }
         JwtService.Token access = jwtService.createAccessToken(user);
 
         Duration refreshRemaining = Duration.between(now, token.getExpiresAt());
@@ -140,6 +146,7 @@ public class AuthService {
     }
 
     private AuthResult issueTokens(AppUser user) {
+        ensureNotBanned(user);
         JwtService.Token access = jwtService.createAccessToken(user);
 
         Instant now = clock.instant();
@@ -188,6 +195,12 @@ public class AuthService {
             if (!ok) throw new ResponseStatusException(BAD_REQUEST, "Nickname contains invalid characters");
         }
         return d;
+    }
+
+    private static void ensureNotBanned(AppUser user) {
+        if (user != null && user.getRoles().contains(AppRole.BANNED)) {
+            throw new ResponseStatusException(UNAUTHORIZED, "Account is banned");
+        }
     }
 
     private static String randomToken() {

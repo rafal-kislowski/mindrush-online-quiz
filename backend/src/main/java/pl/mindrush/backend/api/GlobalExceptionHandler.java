@@ -1,6 +1,7 @@
 package pl.mindrush.backend.api;
 
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+import jakarta.persistence.OptimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
@@ -9,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -107,6 +109,20 @@ public class GlobalExceptionHandler {
         String message = safeMessage(ex.getReason(), defaultMessageFor(ex.getStatusCode()));
         String code = "HTTP_" + ex.getStatusCode().value();
         return response(ex.getStatusCode(), code, message, request, List.of());
+    }
+
+    @ExceptionHandler({ ObjectOptimisticLockingFailureException.class, OptimisticLockException.class })
+    public ResponseEntity<ApiErrorResponse> handleOptimisticLock(
+            Exception ex,
+            HttpServletRequest request
+    ) {
+        return response(
+                HttpStatus.CONFLICT,
+                "STALE_STATE",
+                "Resource changed by another request. Refresh and try again.",
+                request,
+                List.of()
+        );
     }
 
     @ExceptionHandler(Exception.class)

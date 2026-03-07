@@ -38,6 +38,9 @@ public class JwtCookieAuthenticationFilter extends OncePerRequestFilter {
                     JwtService.JwtPayload payload = jwtService.parseAndValidateAccessToken(token);
                     AppUser user = userRepository.findById(payload.userId()).orElse(null);
                     if (user != null) {
+                        if (user.getRoles().contains(AppRole.BANNED)) {
+                            return;
+                        }
                         AuthenticatedUser principal = new AuthenticatedUser(
                                 user.getId(),
                                 user.getEmail(),

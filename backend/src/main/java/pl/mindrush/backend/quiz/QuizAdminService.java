@@ -81,6 +81,7 @@ public class QuizAdminService {
     @Transactional(readOnly = true)
     public List<AdminQuizListItem> listQuizzes() {
         return quizRepository.findAllWithCategory().stream()
+                .filter(q -> q.getSource() == QuizSource.OFFICIAL)
                 .map(q -> new AdminQuizListItem(
                         q.getId(),
                         q.getTitle(),
@@ -103,8 +104,7 @@ public class QuizAdminService {
 
     @Transactional(readOnly = true)
     public AdminQuizDetail getQuiz(Long quizId) {
-        Quiz quiz = quizRepository.findById(quizId)
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
+        Quiz quiz = requireOfficialQuiz(quizId);
 
         List<QuizQuestion> questions = questionRepository.findAllByQuizIdOrderByOrderIndexAsc(quizId);
         List<Long> questionIds = questions.stream().map(QuizQuestion::getId).toList();
@@ -161,8 +161,7 @@ public class QuizAdminService {
             Integer questionTimeLimitSeconds,
             Integer questionsPerGame
     ) {
-        Quiz quiz = quizRepository.findById(quizId)
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
+        Quiz quiz = requireOfficialQuiz(quizId);
 
         String t = title == null ? "" : title.trim();
         if (t.isBlank()) throw new ResponseStatusException(BAD_REQUEST, "Title is required");
@@ -182,8 +181,7 @@ public class QuizAdminService {
     }
 
     public QuizQuestion addQuestion(Long quizId, String prompt, String imageUrl, List<AnswerOptionInput> options) {
-        Quiz quiz = quizRepository.findById(quizId)
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
+        Quiz quiz = requireOfficialQuiz(quizId);
 
         String p = prompt == null ? "" : prompt.trim();
         if (p.isBlank()) throw new ResponseStatusException(BAD_REQUEST, "Prompt is required");
@@ -220,6 +218,7 @@ public class QuizAdminService {
     }
 
     public void updateQuestion(Long quizId, Long questionId, String prompt, String imageUrl, List<AnswerOptionUpdateInput> options) {
+        requireOfficialQuiz(quizId);
         QuizQuestion question = questionRepository.findByIdAndQuizId(questionId, quizId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Question not found"));
 
@@ -273,6 +272,7 @@ public class QuizAdminService {
     }
 
     public void deleteQuestion(Long quizId, Long questionId) {
+        requireOfficialQuiz(quizId);
         QuizQuestion question = questionRepository.findByIdAndQuizId(questionId, quizId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Question not found"));
         optionRepository.deleteAllByQuestionId(questionId);
@@ -280,8 +280,7 @@ public class QuizAdminService {
     }
 
     public void deleteQuiz(Long quizId) {
-        Quiz quiz = quizRepository.findById(quizId)
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
+        Quiz quiz = requireOfficialQuiz(quizId);
         quiz.setStatus(QuizStatus.TRASHED);
         quizRepository.save(quiz);
     }
@@ -289,8 +288,7 @@ public class QuizAdminService {
     public Quiz setStatus(Long quizId, QuizStatus status) {
         if (status == null) throw new ResponseStatusException(BAD_REQUEST, "Status is required");
 
-        Quiz quiz = quizRepository.findByIdWithCategory(quizId)
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
+        Quiz quiz = requireOfficialQuizWithCategory(quizId);
 
         if (status == QuizStatus.ACTIVE) {
             long questionCount = questionRepository.countByQuizId(quizId);
@@ -304,8 +302,7 @@ public class QuizAdminService {
     }
 
     public void purgeQuiz(Long quizId) {
-        Quiz quiz = quizRepository.findById(quizId)
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
+        Quiz quiz = requireOfficialQuiz(quizId);
 
         List<QuizQuestion> questions = questionRepository.findAllByQuizIdOrderByOrderIndexAsc(quizId);
         List<Long> qIds = questions.stream().map(QuizQuestion::getId).toList();
@@ -462,5 +459,23 @@ public class QuizAdminService {
         quiz.setXpEnabled(xp);
         quiz.setQuestionTimeLimitSeconds(normalizedLimit);
         quiz.setQuestionsPerGame(normalizedQuestionsPerGame);
+    }
+
+    private Quiz requireOfficialQuiz(Long quizId) {
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
+        if (quiz.getSource() != QuizSource.OFFICIAL) {
+            throw new ResponseStatusException(NOT_FOUND, "Quiz not found");
+        }
+        return quiz;
+    }
+
+    private Quiz requireOfficialQuizWithCategory(Long quizId) {
+        Quiz quiz = quizRepository.findByIdWithCategory(quizId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
+        if (quiz.getSource() != QuizSource.OFFICIAL) {
+            throw new ResponseStatusException(NOT_FOUND, "Quiz not found");
+        }
+        return quiz;
     }
 }
