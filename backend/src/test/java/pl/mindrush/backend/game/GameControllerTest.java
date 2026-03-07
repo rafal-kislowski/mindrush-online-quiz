@@ -231,6 +231,8 @@ class GameControllerTest {
         Number qIdNum = JsonPath.read(state.getResponse().getContentAsString(), "$.question.id");
         long qId = qIdNum.longValue();
         List<Integer> ownerOptions = JsonPath.read(state.getResponse().getContentAsString(), "$.question.options[*].id");
+        Number stageTotalMs = JsonPath.read(state.getResponse().getContentAsString(), "$.stageTotalMs");
+        long timeoutMs = Math.max(1_000L, stageTotalMs.longValue() + 100L);
 
         mockMvc.perform(post("/api/lobbies/" + lobbyCode + "/game/answer")
                         .cookie(new Cookie("guestSessionId", ownerSessionId))
@@ -239,7 +241,8 @@ class GameControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.stage").value("QUESTION"));
 
-        clock.advance(Duration.ofSeconds(16));
+        clock.advance(Duration.ofMillis(timeoutMs));
+        gameService.tickDueSessions();
 
         mockMvc.perform(get("/api/lobbies/" + lobbyCode + "/game/state")
                         .cookie(new Cookie("guestSessionId", ownerSessionId)))
@@ -277,14 +280,19 @@ class GameControllerTest {
         clock.advance(Duration.ofSeconds(4));
 
         for (int round = 1; round <= 3; round++) {
-            mockMvc.perform(get("/api/lobbies/" + lobbyCode + "/game/state")
+            MvcResult questionState = mockMvc.perform(get("/api/lobbies/" + lobbyCode + "/game/state")
                             .cookie(new Cookie("guestSessionId", ownerSessionId)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.mode").value("THREE_LIVES"))
-                    .andExpect(jsonPath("$.stage").value("QUESTION"));
+                    .andExpect(jsonPath("$.stage").value("QUESTION"))
+                    .andReturn();
+
+            Number stageTotalMs = JsonPath.read(questionState.getResponse().getContentAsString(), "$.stageTotalMs");
+            long timeoutMs = Math.max(1_000L, stageTotalMs.longValue() + 100L);
 
             // Timeout answer -> wrong answer in 3-lives mode.
-            clock.advance(Duration.ofSeconds(16));
+            clock.advance(Duration.ofMillis(timeoutMs));
+            gameService.tickDueSessions();
 
             int expectedLives = 3 - round;
             mockMvc.perform(get("/api/lobbies/" + lobbyCode + "/game/state")
@@ -296,6 +304,7 @@ class GameControllerTest {
 
             if (round < 3) {
                 clock.advance(Duration.ofSeconds(4));
+                gameService.tickDueSessions();
             }
         }
 
