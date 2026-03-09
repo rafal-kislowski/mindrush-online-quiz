@@ -32,7 +32,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "spring.jpa.hibernate.ddl-auto=create-drop",
-        "app.seed.enabled=true"
+        "app.seed.enabled=true",
+        "app.auth.require-verified-email=false"
 })
 @AutoConfigureMockMvc
 class LobbyControllerTest {

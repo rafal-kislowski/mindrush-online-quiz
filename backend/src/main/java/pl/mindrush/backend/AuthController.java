@@ -19,6 +19,7 @@ import pl.mindrush.backend.guest.GuestSessionService;
 import pl.mindrush.backend.lobby.LobbyService;
 
 import static org.springframework.http.HttpStatus.CREATED;
+import static org.springframework.http.HttpStatus.OK;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -94,11 +95,46 @@ public class AuthController {
                             u.getRoles().stream().map(Enum::name).sorted().toList(),
                             u.getRankPoints(),
                             u.getXp(),
-                            u.getCoins()
+                            u.getCoins(),
+                            u.isEmailVerified()
                     )))
                     .orElseGet(() -> ResponseEntity.status(401).build());
         }
         return ResponseEntity.status(401).build();
+    }
+
+    @PostMapping("/verification/resend")
+    public ResponseEntity<ActionResponse> resendVerificationEmail(@Valid @RequestBody EmailRequest request) {
+        authService.resendVerificationEmail(request.email());
+        return ResponseEntity.status(OK).body(new ActionResponse(
+                "If this account exists and still requires verification, an email has been sent."
+        ));
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<ActionResponse> verifyEmail(@Valid @RequestBody TokenRequest request) {
+        authService.verifyEmail(request.token());
+        return ResponseEntity.ok(new ActionResponse("Your account email has been verified."));
+    }
+
+    @PostMapping("/password/forgot")
+    public ResponseEntity<ActionResponse> forgotPassword(@Valid @RequestBody EmailRequest request) {
+        authService.requestPasswordReset(request.email());
+        return ResponseEntity.ok(new ActionResponse(
+                "If this email is registered, a password reset link has been sent."
+        ));
+    }
+
+    @PostMapping("/password/reset")
+    public ResponseEntity<ActionResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        if (!request.password().equals(request.confirmPassword())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "Passwords do not match"
+            );
+        }
+        authService.resetPassword(request.token(), request.password());
+        return ResponseEntity.ok(new ActionResponse("Password was reset successfully."));
     }
 
     private static <T> ResponseEntity<T> withCookies(ResponseEntity<T> response, AuthService.ResponseCookies cookies) {
@@ -136,4 +172,31 @@ public class AuthController {
             @Size(min = 8, max = 72, message = "Password must be 8-72 characters")
             String password
     ) {}
+
+    public record EmailRequest(
+            @NotBlank(message = "Email is required")
+            @Email(message = "Email format is invalid")
+            @Size(max = 320, message = "Email is too long")
+            String email
+    ) {}
+
+    public record TokenRequest(
+            @NotBlank(message = "Token is required")
+            @Size(max = 400, message = "Token is too long")
+            String token
+    ) {}
+
+    public record ResetPasswordRequest(
+            @NotBlank(message = "Token is required")
+            @Size(max = 400, message = "Token is too long")
+            String token,
+            @NotBlank(message = "Password is required")
+            @Size(min = 8, max = 72, message = "Password must be 8-72 characters")
+            String password,
+            @NotBlank(message = "Confirm password is required")
+            @Size(min = 8, max = 72, message = "Password must be 8-72 characters")
+            String confirmPassword
+    ) {}
+
+    public record ActionResponse(String message) {}
 }

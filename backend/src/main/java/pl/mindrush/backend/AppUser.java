@@ -57,6 +57,18 @@ public class AppUser {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "email_verified", nullable = false, columnDefinition = "boolean not null default true")
+    private boolean emailVerified;
+
+    @Column(name = "email_verified_at")
+    private Instant emailVerifiedAt;
+
+    @Column(name = "last_verification_email_sent_at")
+    private Instant lastVerificationEmailSentAt;
+
+    @Column(name = "last_password_reset_email_sent_at")
+    private Instant lastPasswordResetEmailSentAt;
+
     protected AppUser() {
     }
 
@@ -69,6 +81,10 @@ public class AppUser {
         this.coins = 0;
         this.roles = roles == null ? new HashSet<>() : new HashSet<>(roles);
         this.createdAt = createdAt;
+        this.emailVerified = true;
+        this.emailVerifiedAt = createdAt;
+        this.lastVerificationEmailSentAt = null;
+        this.lastPasswordResetEmailSentAt = null;
     }
 
     public Long getId() {
@@ -107,6 +123,22 @@ public class AppUser {
         return createdAt;
     }
 
+    public boolean isEmailVerified() {
+        return emailVerified;
+    }
+
+    public Instant getEmailVerifiedAt() {
+        return emailVerifiedAt;
+    }
+
+    public Instant getLastVerificationEmailSentAt() {
+        return lastVerificationEmailSentAt;
+    }
+
+    public Instant getLastPasswordResetEmailSentAt() {
+        return lastPasswordResetEmailSentAt;
+    }
+
     public void setPasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
     }
@@ -129,5 +161,21 @@ public class AppUser {
 
     public void setRoles(Set<AppRole> roles) {
         this.roles = roles == null ? new HashSet<>() : new HashSet<>(roles);
+    }
+
+    public void setEmailVerified(boolean emailVerified) {
+        this.emailVerified = emailVerified;
+    }
+
+    public void setEmailVerifiedAt(Instant emailVerifiedAt) {
+        this.emailVerifiedAt = emailVerifiedAt;
+    }
+
+    public void setLastVerificationEmailSentAt(Instant lastVerificationEmailSentAt) {
+        this.lastVerificationEmailSentAt = lastVerificationEmailSentAt;
+    }
+
+    public void setLastPasswordResetEmailSentAt(Instant lastPasswordResetEmailSentAt) {
+        this.lastPasswordResetEmailSentAt = lastPasswordResetEmailSentAt;
     }
 }
