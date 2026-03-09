@@ -6,4 +6,5 @@ export interface AuthUserDto {
   rankPoints: number;
   xp: number;
   coins: number;
+  emailVerified: boolean;
 }

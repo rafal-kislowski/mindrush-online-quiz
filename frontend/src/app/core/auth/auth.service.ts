@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
-import { BehaviorSubject, Observable, catchError, finalize, of, shareReplay, tap } from 'rxjs';
-import { AuthApi } from '../api/auth.api';
+import { BehaviorSubject, Observable, catchError, finalize, of, shareReplay, switchMap, tap } from 'rxjs';
+import { AuthActionResponseDto, AuthApi } from '../api/auth.api';
 import { AuthUserDto } from '../models/auth.models';
 import { SessionService } from '../session/session.service';
 
@@ -62,12 +62,37 @@ export class AuthService {
 
   register(email: string, displayName: string, password: string): Observable<AuthUserDto> {
     return this.api.register(email, displayName, password).pipe(
-      tap((u) => {
-        this.loaded = true;
-        this.userSubject.next(u);
-        this.sessionService.refresh().subscribe({ error: () => {} });
-      })
+      switchMap((registered) =>
+        this.api.me().pipe(
+          tap((currentUser) => {
+            this.loaded = true;
+            this.userSubject.next(currentUser);
+            this.sessionService.refresh().subscribe({ error: () => {} });
+          }),
+          catchError(() => {
+            this.loaded = true;
+            this.userSubject.next(null);
+            return of(registered);
+          })
+        )
+      )
     );
+  }
+
+  resendVerificationEmail(email: string): Observable<AuthActionResponseDto> {
+    return this.api.resendVerificationEmail(email);
+  }
+
+  forgotPassword(email: string): Observable<AuthActionResponseDto> {
+    return this.api.forgotPassword(email);
+  }
+
+  verifyEmail(token: string): Observable<AuthActionResponseDto> {
+    return this.api.verifyEmail(token);
+  }
+
+  resetPassword(token: string, password: string, confirmPassword: string): Observable<AuthActionResponseDto> {
+    return this.api.resetPassword(token, password, confirmPassword);
   }
 
   refreshOnce(): Observable<AuthUserDto> {

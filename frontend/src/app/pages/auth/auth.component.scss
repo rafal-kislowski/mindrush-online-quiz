@@ -74,7 +74,6 @@
 
 .auth__lead {
   margin: 0;
-  max-width: 44ch;
   font-size: clamp(13px, 1.15vw, 15px);
   line-height: 1.45;
 }
@@ -307,6 +306,35 @@
 
 .auth__foot a:hover {
   color: rgba(255, 242, 206, 0.98);
+}
+
+.auth__forgot {
+  margin: 2px 0 0;
+  text-align: right;
+  font-size: 12px;
+}
+
+.auth__forgot a {
+  color: rgba(173, 225, 255, 0.92);
+  font-weight: 700;
+}
+
+.auth__resend {
+  margin-top: 6px;
+}
+
+.auth__resendButton.btn.secondary {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 12px;
+  border: none;
+  justify-content: center;
+}
+
+.auth__hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 @keyframes authSpin {

@@ -1,16 +1,12 @@
 <section class="auth" [class.auth--register]="mode === 'register'">
-  <article class="auth__card">
+  <article class="auth__card" *ngIf="mode !== 'verify'">
     <header class="auth__top">
       <p class="auth__kicker">MindRush Account</p>
-      <h1>{{ mode === 'login' ? 'Welcome back' : 'Create your account' }}</h1>
-      <p class="auth__lead muted">
-        {{ mode === 'login'
-          ? 'Sign in and jump straight into your dashboard and lobby.'
-          : 'Register to unlock lobbies, progression, and all game features.' }}
-      </p>
+      <h1>{{ title }}</h1>
+      <p class="auth__lead muted">{{ lead }}</p>
     </header>
 
-    <nav class="auth__switch" aria-label="Authentication mode">
+    <nav class="auth__switch" aria-label="Authentication mode" *ngIf="showModeSwitch">
       <a class="auth__switchBtn" [class.is-active]="mode === 'login'" routerLink="/login">Login</a>
       <a class="auth__switchBtn" [class.is-active]="mode === 'register'" routerLink="/register">Register</a>
     </nav>
@@ -26,7 +22,7 @@
         </span>
       </label>
 
-      <label class="field" [class.has-error]="!!controlError('email')">
+      <label class="field" *ngIf="mode === 'login' || mode === 'register' || mode === 'forgot'" [class.has-error]="!!controlError('email')">
         <span class="field__label">Email</span>
         <input #authEmailInput type="email" formControlName="email" placeholder="you@example.com" autocomplete="email" />
         <span class="field__meta">
@@ -36,7 +32,7 @@
         </span>
       </label>
 
-      <label class="field" [class.has-error]="!!controlError('password')">
+      <label class="field" *ngIf="mode === 'login' || mode === 'register' || mode === 'reset'" [class.has-error]="!!controlError('password')">
         <span class="field__label">Password</span>
         <input
           type="password"
@@ -51,7 +47,7 @@
         </span>
       </label>
 
-      <label class="field" *ngIf="mode === 'register'" [class.has-error]="!!controlError('confirmPassword')">
+      <label class="field" *ngIf="mode === 'register' || mode === 'reset'" [class.has-error]="!!controlError('confirmPassword')">
         <span class="field__label">Confirm password</span>
         <input type="password" formControlName="confirmPassword" placeholder="Repeat password" autocomplete="new-password" />
         <span class="field__meta">
@@ -61,19 +57,63 @@
         </span>
       </label>
 
-      <button class="btn primary auth__submit" type="submit" [disabled]="loading || form.invalid">
-        <span *ngIf="!loading">{{ mode === 'login' ? 'Login' : 'Create account' }}</span>
+      <button class="btn primary auth__submit" type="submit" [disabled]="!canSubmit">
+        <span *ngIf="!loading">
+          {{
+            mode === 'login'
+              ? 'Login'
+              : mode === 'register'
+                ? 'Create account'
+                : mode === 'forgot'
+                  ? (forgotPasswordCooldownSeconds > 0
+                      ? 'Send again in ' + forgotPasswordCooldownSeconds + 's'
+                      : 'Send reset link')
+                  : 'Reset password'
+          }}
+        </span>
         <span class="auth__submitState" *ngIf="loading">
           <span class="auth__spinner" aria-hidden="true"></span>
           Please wait
         </span>
       </button>
 
-      <p class="auth__foot muted">
+      <p class="auth__forgot muted" *ngIf="mode === 'login'">
+        <a routerLink="/forgot-password">Forgot password?</a>
+      </p>
+
+      <div class="auth__resend" *ngIf="mode === 'login' && showResendVerification">
+        <button
+          class="btn secondary auth__resendButton"
+          type="button"
+          (click)="resendVerificationEmail()"
+          [disabled]="resendVerificationLoading || resendVerificationCooldownSeconds > 0"
+        >
+          <span *ngIf="!resendVerificationLoading && resendVerificationCooldownSeconds === 0">Resend verification email</span>
+          <span *ngIf="!resendVerificationLoading && resendVerificationCooldownSeconds > 0">
+            Resend available in {{ resendVerificationCooldownSeconds }}s
+          </span>
+          <span class="auth__submitState" *ngIf="resendVerificationLoading">
+            <span class="auth__spinner" aria-hidden="true"></span>
+            Please wait
+          </span>
+        </button>
+      </div>
+
+      <p class="auth__foot muted" *ngIf="mode === 'login' || mode === 'register'">
         {{ mode === 'login' ? 'No account yet?' : 'Already have an account?' }}
         <a [routerLink]="mode === 'login' ? '/register' : '/login'">
           {{ mode === 'login' ? 'Create one' : 'Login instead' }}
         </a>
+      </p>
+
+      <p class="auth__foot muted" *ngIf="mode === 'forgot'">
+        Remembered your password?
+        <a routerLink="/login">Back to login</a>
+      </p>
+
+      <p class="auth__foot muted" *ngIf="mode === 'reset'">
+        Need a new link?
+        <a routerLink="/forgot-password">Request reset again</a>
       </p>
     </form>
   </article>

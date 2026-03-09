@@ -3,6 +3,10 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { AuthUserDto } from '../models/auth.models';
 
+export interface AuthActionResponseDto {
+  message: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthApi {
   constructor(private readonly http: HttpClient) {}
@@ -37,5 +41,37 @@ export class AuthApi {
 
   me(): Observable<AuthUserDto> {
     return this.http.get<AuthUserDto>('/api/auth/me', { withCredentials: true });
+  }
+
+  resendVerificationEmail(email: string): Observable<AuthActionResponseDto> {
+    return this.http.post<AuthActionResponseDto>(
+      '/api/auth/verification/resend',
+      { email },
+      { withCredentials: true }
+    );
+  }
+
+  verifyEmail(token: string): Observable<AuthActionResponseDto> {
+    return this.http.post<AuthActionResponseDto>(
+      '/api/auth/verify-email',
+      { token },
+      { withCredentials: true }
+    );
+  }
+
+  forgotPassword(email: string): Observable<AuthActionResponseDto> {
+    return this.http.post<AuthActionResponseDto>(
+      '/api/auth/password/forgot',
+      { email },
+      { withCredentials: true }
+    );
+  }
+
+  resetPassword(token: string, password: string, confirmPassword: string): Observable<AuthActionResponseDto> {
+    return this.http.post<AuthActionResponseDto>(
+      '/api/auth/password/reset',
+      { token, password, confirmPassword },
+      { withCredentials: true }
+    );
   }
 }
