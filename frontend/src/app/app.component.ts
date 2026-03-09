@@ -7,11 +7,11 @@ import {
   RouterLinkActive,
   RouterOutlet,
 } from '@angular/router';
-import { Subscription, catchError, combineLatest, filter, interval, map, of, startWith, switchMap } from 'rxjs';
+import { Subscription, catchError, combineLatest, distinctUntilChanged, filter, finalize, interval, map, of, startWith, switchMap } from 'rxjs';
 import { AuthService } from './core/auth/auth.service';
 import { GameApi } from './core/api/game.api';
-import { LibraryQuizApi, LibraryQuizListItemDto } from './core/api/library-quiz.api';
 import { LobbyApi } from './core/api/lobby.api';
+import { NotificationApi, NotificationStreamEventDto, UserNotificationDto } from './core/api/notification.api';
 import { ActiveGameDto } from './core/models/game.models';
 import { LobbyDto } from './core/models/lobby.models';
 import { SessionService } from './core/session/session.service';
@@ -63,15 +63,15 @@ type AppNotificationCategory = 'moderation' | 'reward' | 'news' | 'system';
 type AppNotificationSeverity = 'neutral' | 'success' | 'warning' | 'danger';
 
 interface AppNotification {
-  id: string;
+  id: number;
   category: AppNotificationCategory;
   severity: AppNotificationSeverity;
   title: string;
   subtitle: string | null;
-  text: string;
+  text: string | null;
   meta: string | null;
   createdAt: string | null;
-  actionLabel: string | null;
+  readAt: string | null;
   decision: 'approved' | 'rejected' | null;
   avatarImageUrl: string | null;
   avatarBgStart: string | null;
@@ -93,7 +93,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly sessionService = inject(SessionService);
   private readonly authService = inject(AuthService);
   private readonly gameApi = inject(GameApi);
-  private readonly libraryQuizApi = inject(LibraryQuizApi);
+  private readonly notificationApi = inject(NotificationApi);
   private readonly lobbyApi = inject(LobbyApi);
   private readonly lobbyEvents = inject(LobbyEventsService);
   private readonly toast = inject(ToastService);
@@ -156,7 +156,11 @@ export class AppComponent implements OnInit, OnDestroy {
   notifications: AppNotification[] = [];
   notificationFilter: 'all' | 'unread' = 'all';
   notificationsOpen = false;
-  private readonly readNotificationIds = new Set<string>();
+  private unreadNotificationCountValue = 0;
+  private notificationStream: EventSource | null = null;
+  private notificationStreamReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private notificationStreamReconnectDelayMs = 0;
+  private notificationRefreshInFlight = false;
   private currentLobbyEventsSub: Subscription | null = null;
   private currentLobbyEventsCode: string | null = null;
   private scrollResetRafId: number | null = null;
@@ -210,6 +214,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.startCurrentLobbyTracking();
     this.startCurrentGameTracking();
     this.startNotificationTracking();
+    this.startNotificationFallbackRefresh();
 
     // Prevent sidebar collapse animation flash on initial page load.
     requestAnimationFrame(() => {
@@ -227,6 +232,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.currentLobbyEventsSub?.unsubscribe();
     this.currentLobbyEventsSub = null;
     this.currentLobbyEventsCode = null;
+    this.stopNotificationStream();
     this.subscriptions.unsubscribe();
   }
 
@@ -267,10 +273,8 @@ export class AppComponent implements OnInit, OnDestroy {
     this.authService.logout().subscribe(() => {
       this.currentLobby = null;
       this.currentGame = null;
-      this.notificationsOpen = false;
-      this.notifications = [];
-      this.notificationFilter = 'all';
-      this.readNotificationIds.clear();
+      this.resetNotificationsState();
+      this.stopNotificationStream();
       this.router.navigate(['/']);
     });
   }
@@ -280,11 +284,7 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   get unreadNotificationCount(): number {
-    let count = 0;
-    for (const item of this.notifications) {
-      if (this.isNotificationUnread(item)) count += 1;
-    }
-    return count;
+    return Math.max(0, this.unreadNotificationCountValue);
   }
 
   get visibleNotifications(): AppNotification[] {
@@ -302,17 +302,24 @@ export class AppComponent implements OnInit, OnDestroy {
     this.notificationFilter = filter;
   }
 
-  isNotificationUnread(item: Pick<AppNotification, 'id'>): boolean {
-    return !this.readNotificationIds.has(item.id);
+  isNotificationUnread(item: Pick<AppNotification, 'readAt'>): boolean {
+    return !item.readAt;
   }
 
   openNotification(item: AppNotification): void {
-    this.readNotificationIds.add(item.id);
+    this.markNotificationRead(item.id);
     this.notificationsOpen = false;
     if (!item.routeCommands?.length) return;
     void this.router.navigate(item.routeCommands, {
       queryParams: item.routeQueryParams ?? undefined,
     });
+  }
+
+  removeNotification(item: AppNotification, event?: Event): void {
+    event?.stopPropagation();
+    const confirmed = window.confirm('Delete this notification permanently?');
+    if (!confirmed) return;
+    this.dismissNotification(item.id);
   }
 
   notificationCategoryLabel(category: AppNotificationCategory): string {
@@ -458,30 +465,27 @@ export class AppComponent implements OnInit, OnDestroy {
     this.subscriptions.add(
       this.authService.user$
         .pipe(
-          switchMap((user) => {
-            if (!user) return of<LibraryQuizListItemDto[]>([]);
-            return interval(15000).pipe(
-              startWith(0),
-              switchMap(() => this.libraryQuizApi.listMy().pipe(catchError(() => of<LibraryQuizListItemDto[]>([]))))
-            );
-          })
+          map((user) => user?.id ?? null),
+          distinctUntilChanged()
         )
-        .subscribe((items) => {
-          const moderationNotifications = this.toModerationNotifications(items ?? []);
-          const rewardNotifications = this.toRewardNotifications();
-          const newsNotifications = this.toNewsNotifications();
-          const systemNotifications = this.toSystemNotifications();
-          this.notifications = this.sortNotifications([
-            ...moderationNotifications,
-            ...rewardNotifications,
-            ...newsNotifications,
-            ...systemNotifications,
-          ]);
-          this.pruneReadNotificationIds(this.notifications);
-          if (!this.notifications.length) {
-            this.notificationsOpen = false;
+        .subscribe((userId) => {
+          this.stopNotificationStream();
+          if (!userId) {
+            this.resetNotificationsState();
+            return;
           }
+          this.refreshNotifications();
+          this.openNotificationStream();
         })
+    );
+  }
+
+  private startNotificationFallbackRefresh(): void {
+    this.subscriptions.add(
+      interval(60000).subscribe(() => {
+        if (!this.authService.snapshot) return;
+        this.refreshNotifications();
+      })
     );
   }
 
@@ -593,60 +597,206 @@ export class AppComponent implements OnInit, OnDestroy {
     return !code || routeCode === code;
   }
 
-  private toModerationNotifications(items: LibraryQuizListItemDto[]): AppNotification[] {
-    return (items ?? [])
-      .filter((item) => item.moderationStatus === 'APPROVED' || item.moderationStatus === 'REJECTED')
-      .map((item) => ({
-        id: `moderation:${item.id}:${item.moderationUpdatedAt ?? ''}`,
-        category: 'moderation' as const,
-        severity: item.moderationStatus === 'APPROVED' ? ('success' as const) : ('danger' as const),
-        title: 'Quiz verification',
-        subtitle: item.title,
-        text: this.buildModerationText(item),
-        meta: this.buildModerationMeta(item),
-        createdAt: item.moderationUpdatedAt,
-        actionLabel: null,
-        decision: item.moderationStatus === 'APPROVED' ? ('approved' as const) : ('rejected' as const),
-        avatarImageUrl: item.avatarImageUrl ?? null,
-        avatarBgStart: item.avatarBgStart ?? null,
-        avatarBgEnd: item.avatarBgEnd ?? null,
-        avatarTextColor: item.avatarTextColor ?? null,
-        routeCommands: ['/library'],
-        routeQueryParams: {
-          openQuiz: item.id,
-          moderationTab: (item.moderationQuestionIssueCount ?? 0) > 0 ? 'questions' : 'details',
-          ...(item.moderationStatus === 'REJECTED' ? { reopenModeration: '1' } : {}),
-        },
+  private refreshNotifications(): void {
+    if (!this.authService.snapshot || this.notificationRefreshInFlight) return;
+    this.notificationRefreshInFlight = true;
+    this.notificationApi.list(50).pipe(
+      catchError(() => of({ items: [], unreadCount: 0 })),
+      finalize(() => {
+        this.notificationRefreshInFlight = false;
+      })
+    ).subscribe((response) => {
+      this.notifications = this.sortNotifications((response.items ?? []).map((item) => this.mapNotification(item)));
+      this.unreadNotificationCountValue = Math.max(0, Number(response.unreadCount ?? 0));
+      if (!this.notifications.length) {
+        this.notificationsOpen = false;
+      }
+    });
+  }
+
+  private mapNotification(item: UserNotificationDto): AppNotification {
+    const category = this.normalizeCategory(item.category);
+    const severity = this.normalizeSeverity(item.severity);
+    return {
+      id: Number(item.id),
+      category,
+      severity,
+      title: String(item.title ?? '').trim() || 'Notification',
+      subtitle: item.subtitle ?? null,
+      text: item.text ?? null,
+      meta: item.meta ?? null,
+      createdAt: item.createdAt ?? null,
+      readAt: item.readAt ?? null,
+      decision: item.decision ?? null,
+      avatarImageUrl: item.avatarImageUrl ?? null,
+      avatarBgStart: item.avatarBgStart ?? null,
+      avatarBgEnd: item.avatarBgEnd ?? null,
+      avatarTextColor: item.avatarTextColor ?? null,
+      routeCommands: this.routeCommandsFor(item.routePath),
+      routeQueryParams: this.normalizeRouteQuery(item.routeQueryParams),
+    };
+  }
+
+  private normalizeCategory(value: string | null | undefined): AppNotificationCategory {
+    if (value === 'moderation') return 'moderation';
+    if (value === 'reward') return 'reward';
+    if (value === 'news') return 'news';
+    return 'system';
+  }
+
+  private normalizeSeverity(value: string | null | undefined): AppNotificationSeverity {
+    if (value === 'success') return 'success';
+    if (value === 'warning') return 'warning';
+    if (value === 'danger') return 'danger';
+    return 'neutral';
+  }
+
+  private routeCommandsFor(path: string | null | undefined): any[] | null {
+    const normalized = String(path ?? '').trim();
+    if (!normalized) return null;
+    if (normalized.startsWith('/')) return [normalized];
+    return ['/', normalized];
+  }
+
+  private normalizeRouteQuery(
+    input: Record<string, string | number> | null | undefined
+  ): Record<string, string | number> | null {
+    if (!input) return null;
+    const entries = Object.entries(input).filter(([key, value]) => {
+      if (!key) return false;
+      return typeof value === 'string' || typeof value === 'number';
+    });
+    if (!entries.length) return null;
+    return Object.fromEntries(entries);
+  }
+
+  private openNotificationStream(): void {
+    if (this.notificationStream || !this.authService.snapshot) return;
+    try {
+      const stream = this.notificationApi.openStream();
+      stream.addEventListener('connected', (event) => this.handleNotificationStreamEvent(event));
+      stream.addEventListener('refresh', (event) => this.handleNotificationStreamEvent(event));
+      stream.onerror = () => {
+        this.closeNotificationStream();
+        this.scheduleNotificationStreamReconnect();
+      };
+      this.notificationStream = stream;
+    } catch {
+      this.scheduleNotificationStreamReconnect();
+    }
+  }
+
+  private handleNotificationStreamEvent(event: Event): void {
+    const message = event as MessageEvent<string>;
+    const parsed = this.parseNotificationStreamEvent(message.data);
+    if (!parsed) return;
+    this.notificationStreamReconnectDelayMs = 0;
+    this.unreadNotificationCountValue = Math.max(0, Number(parsed.unreadCount ?? 0));
+    this.refreshNotifications();
+  }
+
+  private parseNotificationStreamEvent(raw: string | null | undefined): NotificationStreamEventDto | null {
+    const data = String(raw ?? '').trim();
+    if (!data) return null;
+    try {
+      const parsed = JSON.parse(data) as Partial<NotificationStreamEventDto>;
+      const type = parsed.type === 'connected' || parsed.type === 'refresh' ? parsed.type : null;
+      if (!type) return null;
+      return {
+        type,
+        unreadCount: Math.max(0, Number(parsed.unreadCount ?? 0)),
+        ts: String(parsed.ts ?? ''),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private scheduleNotificationStreamReconnect(): void {
+    if (!this.authService.snapshot || this.notificationStreamReconnectTimer) return;
+    this.notificationStreamReconnectDelayMs = this.notificationStreamReconnectDelayMs <= 0
+      ? 2000
+      : Math.min(this.notificationStreamReconnectDelayMs * 2, 15000);
+    this.notificationStreamReconnectTimer = setTimeout(() => {
+      this.notificationStreamReconnectTimer = null;
+      this.openNotificationStream();
+    }, this.notificationStreamReconnectDelayMs);
+  }
+
+  private closeNotificationStream(): void {
+    if (!this.notificationStream) return;
+    try {
+      this.notificationStream.close();
+    } catch {
+    }
+    this.notificationStream = null;
+  }
+
+  private stopNotificationStream(): void {
+    if (this.notificationStreamReconnectTimer) {
+      clearTimeout(this.notificationStreamReconnectTimer);
+      this.notificationStreamReconnectTimer = null;
+    }
+    this.closeNotificationStream();
+    this.notificationStreamReconnectDelayMs = 0;
+  }
+
+  private resetNotificationsState(): void {
+    this.notifications = [];
+    this.unreadNotificationCountValue = 0;
+    this.notificationsOpen = false;
+    this.notificationFilter = 'all';
+  }
+
+  private dismissNotification(notificationId: number): void {
+    const target = this.notifications.find((item) => item.id === notificationId);
+    if (!target) return;
+    const unread = this.isNotificationUnread(target);
+
+    this.notifications = this.notifications.filter((item) => item.id !== notificationId);
+    if (!this.notifications.length) this.notificationsOpen = false;
+    if (unread && this.unreadNotificationCountValue > 0) {
+      this.unreadNotificationCountValue -= 1;
+    }
+
+    this.notificationApi.dismiss(notificationId)
+      .pipe(catchError(() => {
+        this.refreshNotifications();
+        return of(void 0);
       }))
-      .sort((a, b) => this.notificationTimestamp(b.createdAt) - this.notificationTimestamp(a.createdAt));
+      .subscribe();
   }
 
-  private toRewardNotifications(): AppNotification[] {
-    return [];
-  }
+  private markNotificationRead(notificationId: number): void {
+    const index = this.notifications.findIndex((item) => item.id === notificationId);
+    if (index < 0) return;
 
-  private toNewsNotifications(): AppNotification[] {
-    return [];
-  }
+    const current = this.notifications[index];
+    if (!this.isNotificationUnread(current)) return;
 
-  private toSystemNotifications(): AppNotification[] {
-    return [];
-  }
+    const next = [...this.notifications];
+    next[index] = {
+      ...current,
+      readAt: new Date().toISOString(),
+    };
+    this.notifications = next;
+    if (this.unreadNotificationCountValue > 0) {
+      this.unreadNotificationCountValue -= 1;
+    }
 
-  private buildModerationMeta(
-    item: Pick<LibraryQuizListItemDto, 'moderationStatus' | 'moderationQuestionIssueCount'>
-  ): string {
-    if (item.moderationStatus === 'APPROVED') return 'Approved';
-    const issueCount = Math.max(0, item.moderationQuestionIssueCount ?? 0);
-    if (issueCount <= 0) return 'Rejected';
-    return `Rejected - ${issueCount} question issue${issueCount === 1 ? '' : 's'}`;
-  }
-
-  private buildModerationText(
-    item: Pick<LibraryQuizListItemDto, 'moderationStatus' | 'moderationReason'>
-  ): string {
-    if (item.moderationStatus === 'APPROVED') return '';
-    return '';
+    this.notificationApi.markRead(notificationId)
+      .pipe(catchError(() => {
+        this.refreshNotifications();
+        return of(null);
+      }))
+      .subscribe((updated) => {
+        if (!updated) return;
+        const updatedIndex = this.notifications.findIndex((item) => item.id === notificationId);
+        if (updatedIndex < 0) return;
+        const patched = [...this.notifications];
+        patched[updatedIndex] = this.mapNotification(updated);
+        this.notifications = patched;
+      });
   }
 
   private notificationTimestamp(value: string | null | undefined): number {
@@ -657,17 +807,6 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private sortNotifications(items: AppNotification[]): AppNotification[] {
     return [...items].sort((a, b) => this.notificationTimestamp(b.createdAt) - this.notificationTimestamp(a.createdAt));
-  }
-
-  private pruneReadNotificationIds(items: AppNotification[]): void {
-    const active = new Set(items.map((item) => item.id));
-    const toDelete: string[] = [];
-    this.readNotificationIds.forEach((id) => {
-      if (!active.has(id)) toDelete.push(id);
-    });
-    for (const id of toDelete) {
-      this.readNotificationIds.delete(id);
-    }
   }
 
   @HostListener('document:click', ['$event'])

@@ -16,6 +16,7 @@ import pl.mindrush.backend.AppRole;
 import pl.mindrush.backend.AppUser;
 import pl.mindrush.backend.AppUserRepository;
 import pl.mindrush.backend.RefreshTokenRepository;
+import pl.mindrush.backend.notification.UserNotificationRepository;
 
 import java.time.Clock;
 import java.util.Optional;
@@ -71,12 +72,16 @@ class AdminQuizSubmissionControllerTest {
     @Autowired
     private QuizModerationIssueRepository moderationIssueRepository;
 
+    @Autowired
+    private UserNotificationRepository userNotificationRepository;
+
     @BeforeEach
     void setUp() {
         favoriteRepository.deleteAll();
         optionRepository.deleteAll();
         questionRepository.deleteAll();
         moderationIssueRepository.deleteAll();
+        userNotificationRepository.deleteAll();
         quizRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
@@ -147,6 +152,66 @@ class AdminQuizSubmissionControllerTest {
                                 """.formatted(staleSubmissionVersion)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value(containsString("Submission changed during review")));
+    }
+
+    @Test
+    void undoApprove_rejectsStaleSubmissionVersion() throws Exception {
+        Cookie adminCookie = loginAs("admin-undo-stale@example.com", Set.of(AppRole.ADMIN));
+        AppUser owner = createUser("owner-undo-stale@example.com", Set.of(AppRole.USER));
+
+        Quiz approved = new Quiz("Approved v1", "desc", null);
+        approved.setSource(QuizSource.CUSTOM);
+        approved.setOwnerUserId(owner.getId());
+        approved.setStatus(QuizStatus.ACTIVE);
+        approved.setModerationStatus(QuizModerationStatus.APPROVED);
+        approved = quizRepository.save(approved);
+        long staleSubmissionVersion = approved.getVersion();
+
+        approved.setTitle("Approved v2");
+        approved = quizRepository.save(approved);
+
+        mockMvc.perform(post("/api/admin/quiz-submissions/" + approved.getId() + "/undo-approve")
+                        .cookie(adminCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "expectedSubmissionVersion": %d
+                                }
+                                """.formatted(staleSubmissionVersion)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(containsString("Submission changed during review")));
+    }
+
+    @Test
+    void undoApprove_movesSubmissionBackToPending() throws Exception {
+        Cookie adminCookie = loginAs("admin-undo-ok@example.com", Set.of(AppRole.ADMIN));
+        AppUser owner = createUser("owner-undo-ok@example.com", Set.of(AppRole.USER));
+
+        Quiz approved = new Quiz("Approved quiz", "desc", null);
+        approved.setSource(QuizSource.CUSTOM);
+        approved.setOwnerUserId(owner.getId());
+        approved.setStatus(QuizStatus.ACTIVE);
+        approved.setModerationStatus(QuizModerationStatus.APPROVED);
+        approved = quizRepository.save(approved);
+
+        mockMvc.perform(post("/api/admin/quiz-submissions/" + approved.getId() + "/undo-approve")
+                        .cookie(adminCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "expectedSubmissionVersion": %d
+                                }
+                                """.formatted(approved.getVersion())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.moderationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.status").value("DRAFT"))
+                .andExpect(jsonPath("$.moderationReason").value(nullValue()));
+
+        Quiz stored = quizRepository.findById(approved.getId()).orElseThrow();
+        org.assertj.core.api.Assertions.assertThat(stored.getModerationStatus()).isEqualTo(QuizModerationStatus.PENDING);
+        org.assertj.core.api.Assertions.assertThat(stored.getStatus()).isEqualTo(QuizStatus.DRAFT);
+        org.assertj.core.api.Assertions.assertThat(stored.getModerationReason()).isNull();
+        org.assertj.core.api.Assertions.assertThat(stored.getModerationUpdatedAt()).isNotNull();
     }
 
     @Test
@@ -307,8 +372,83 @@ class AdminQuizSubmissionControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void unbanOwner_removesBanAndAllowsLogin() throws Exception {
+        Cookie adminCookie = loginAs("admin-unban-owner@example.com", Set.of(AppRole.ADMIN));
+        AppUser owner = createUser("owner-unban-owner@example.com", Set.of(AppRole.USER));
+
+        Quiz pending = new Quiz("Unban owner quiz", "desc", null);
+        pending.setSource(QuizSource.CUSTOM);
+        pending.setOwnerUserId(owner.getId());
+        pending.setStatus(QuizStatus.DRAFT);
+        pending.setModerationStatus(QuizModerationStatus.PENDING);
+        pending = quizRepository.save(pending);
+
+        mockMvc.perform(post("/api/admin/quiz-submissions/" + pending.getId() + "/owner/ban")
+                        .cookie(adminCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.banned").value(true));
+
+        mockMvc.perform(post("/api/admin/quiz-submissions/" + pending.getId() + "/owner/unban")
+                        .cookie(adminCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.banned").value(false));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new Login(owner.getEmail(), "Password123"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void rejectSubmission_createsNotificationAndAllowsDismiss() throws Exception {
+        Cookie adminCookie = loginAs("admin-notify@example.com", Set.of(AppRole.ADMIN));
+        AppUser owner = createUser("owner-notify@example.com", Set.of(AppRole.USER));
+        Cookie ownerCookie = loginExisting(owner.getEmail());
+
+        Quiz pending = new Quiz("Notify quiz", "desc", null);
+        pending.setSource(QuizSource.CUSTOM);
+        pending.setOwnerUserId(owner.getId());
+        pending.setStatus(QuizStatus.DRAFT);
+        pending.setModerationStatus(QuizModerationStatus.PENDING);
+        pending = quizRepository.save(pending);
+
+        mockMvc.perform(post("/api/admin/quiz-submissions/" + pending.getId() + "/reject")
+                        .cookie(adminCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"expectedSubmissionVersion":%d,"reason":"Needs fixes","questionIssues":[]}
+                                """.formatted(pending.getVersion())))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/notifications?limit=20").cookie(ownerCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.unreadCount").value(1))
+                .andExpect(jsonPath("$.items[0].category").value("moderation"))
+                .andExpect(jsonPath("$.items[0].decision").value("rejected"));
+
+        Long notificationId = userNotificationRepository.findAll().stream()
+                .filter(n -> owner.getId().equals(n.getUserId()))
+                .findFirst()
+                .orElseThrow()
+                .getId();
+
+        mockMvc.perform(post("/api/notifications/" + notificationId + "/dismiss").cookie(ownerCookie))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/notifications?limit=20").cookie(ownerCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.unreadCount").value(0))
+                .andExpect(jsonPath("$.items").isEmpty());
+    }
+
     private Cookie loginAs(String email, Set<AppRole> roles) throws Exception {
         createUser(email, roles);
+
+        return loginExisting(email);
+    }
+
+    private Cookie loginExisting(String email) throws Exception {
 
         MvcResult loginRes = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

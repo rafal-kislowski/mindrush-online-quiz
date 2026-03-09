@@ -76,6 +76,23 @@ public class AdminQuizSubmissionController {
         );
     }
 
+    @PostMapping("/{id}/undo-approve")
+    public ResponseEntity<ModerationResultDto> undoApprove(
+            @PathVariable("id") Long quizId,
+            @Valid @RequestBody ApproveRequest request
+    ) {
+        Quiz quiz = libraryService.undoApprovedSubmission(quizId, request.expectedSubmissionVersion());
+        return ResponseEntity.ok(
+                new ModerationResultDto(
+                        quiz.getId(),
+                        quiz.getModerationStatus(),
+                        quiz.getStatus(),
+                        null,
+                        quiz.getVersion()
+                )
+        );
+    }
+
     @PostMapping("/{id}/reject")
     public ResponseEntity<ModerationResultDto> reject(
             @PathVariable("id") Long quizId,
@@ -106,6 +123,18 @@ public class AdminQuizSubmissionController {
     @PostMapping("/{id}/owner/ban")
     public ResponseEntity<OwnerModerationDto> banOwner(@PathVariable("id") Long quizId) {
         QuizLibraryService.OwnerModerationResult result = libraryService.banSubmissionOwner(quizId);
+        return ResponseEntity.ok(new OwnerModerationDto(
+                result.userId(),
+                result.displayName(),
+                result.email(),
+                result.banned(),
+                result.roles()
+        ));
+    }
+
+    @PostMapping("/{id}/owner/unban")
+    public ResponseEntity<OwnerModerationDto> unbanOwner(@PathVariable("id") Long quizId) {
+        QuizLibraryService.OwnerModerationResult result = libraryService.unbanSubmissionOwner(quizId);
         return ResponseEntity.ok(new OwnerModerationDto(
                 result.userId(),
                 result.displayName(),

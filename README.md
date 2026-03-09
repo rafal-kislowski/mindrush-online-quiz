@@ -233,11 +233,35 @@ Admin-only submission moderation endpoints:
 - `GET /api/admin/quiz-submissions` -> list pending user submissions
 - `GET /api/admin/quiz-submissions/{id}` -> submission detail (with moderation context)
 - `POST /api/admin/quiz-submissions/{id}/approve` -> approve submission (`expectedSubmissionVersion` required)
+- `POST /api/admin/quiz-submissions/{id}/undo-approve` -> move approved submission back to pending review (`expectedSubmissionVersion` required)
 - `POST /api/admin/quiz-submissions/{id}/reject` -> reject submission with reason and optional per-question issues
 - `POST /api/admin/quiz-submissions/{id}/owner/ban` -> ban submission owner
+- `POST /api/admin/quiz-submissions/{id}/owner/unban` -> remove owner ban
 - `DELETE /api/admin/quiz-submissions/{id}/avatar` -> remove submission avatar image
 - `DELETE /api/admin/quiz-submissions/{id}/questions/{questionId}/image` -> remove question image
 - `DELETE /api/admin/quiz-submissions/{id}/questions/{questionId}/options/{optionId}/image` -> remove answer option image
+
+## User notifications
+Persistent user notifications are stored in DB table `user_notifications` and exposed via REST + SSE.
+
+Current categories:
+- `moderation` (already used for quiz approval/rejection)
+- `reward` (gift-like notifications, reserved for future)
+- `news` (platform updates, reserved for future)
+- `system` (generic fallback)
+
+Endpoints for authenticated users:
+- `GET /api/notifications?limit=50` -> list notifications + unread count
+- `POST /api/notifications/{id}/read` -> mark one notification as read
+- `POST /api/notifications/{id}/dismiss` -> dismiss notification (removed from list)
+- `POST /api/notifications/read-all` -> mark all visible notifications as read
+- `GET /api/notifications/stream` -> server-sent events (`connected`, `refresh`) for live navbar updates
+
+Notes:
+- Moderation decisions generate notifications automatically when admin approves/rejects a submission.
+- Frontend uses SSE to refresh navbar badge/list without page reload.
+- Clicking a notification marks it as read and can navigate to target route (for moderation: library with relevant query params).
+- Deleting notification is an explicit action (with confirmation in UI) and maps to `dismiss` API.
 
 Optional dev seed data:
 - Seed is enabled by default for local development (`app.seed.enabled=true`) and runs only when there are no quizzes in DB.

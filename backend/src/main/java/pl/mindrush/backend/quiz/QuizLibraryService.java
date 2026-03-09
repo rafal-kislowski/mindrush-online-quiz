@@ -8,6 +8,7 @@ import pl.mindrush.backend.AppUser;
 import pl.mindrush.backend.AppUserRepository;
 import pl.mindrush.backend.RefreshTokenRepository;
 import pl.mindrush.backend.media.MediaStorageService;
+import pl.mindrush.backend.notification.UserNotificationService;
 
 import java.net.URI;
 import java.time.Instant;
@@ -47,6 +48,7 @@ public class QuizLibraryService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final MediaStorageService mediaStorageService;
     private final QuizLibraryPolicyProperties policyProperties;
+    private final UserNotificationService userNotificationService;
 
     public QuizLibraryService(
             QuizRepository quizRepository,
@@ -58,7 +60,8 @@ public class QuizLibraryService {
             AppUserRepository appUserRepository,
             RefreshTokenRepository refreshTokenRepository,
             MediaStorageService mediaStorageService,
-            QuizLibraryPolicyProperties policyProperties
+            QuizLibraryPolicyProperties policyProperties,
+            UserNotificationService userNotificationService
     ) {
         this.quizRepository = quizRepository;
         this.categoryRepository = categoryRepository;
@@ -70,6 +73,7 @@ public class QuizLibraryService {
         this.refreshTokenRepository = refreshTokenRepository;
         this.mediaStorageService = mediaStorageService;
         this.policyProperties = policyProperties;
+        this.userNotificationService = userNotificationService;
     }
 
     @Transactional(readOnly = true)
@@ -530,10 +534,29 @@ public class QuizLibraryService {
         return toOwnerModerationResult(owner);
     }
 
+    public OwnerModerationResult unbanSubmissionOwner(Long quizId) {
+        Quiz quiz = requireSubmissionForAdmin(quizId);
+        Long ownerUserId = quiz.getOwnerUserId();
+        if (ownerUserId == null || ownerUserId <= 0) {
+            throw new ResponseStatusException(BAD_REQUEST, "Submission has no owner account");
+        }
+
+        AppUser owner = appUserRepository.findById(ownerUserId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Owner account not found"));
+
+        Set<AppRole> updatedRoles = new HashSet<>(owner.getRoles());
+        if (updatedRoles.remove(AppRole.BANNED)) {
+            owner.setRoles(updatedRoles);
+            owner = appUserRepository.save(owner);
+        }
+
+        return toOwnerModerationResult(owner);
+    }
+
     public Quiz approveSubmission(Long quizId, Long expectedSubmissionVersion) {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
-        ensureSubmissionStillCurrent(quiz, expectedSubmissionVersion);
+        ensureSubmissionStillCurrent(quiz, expectedSubmissionVersion, QuizModerationStatus.PENDING, "Quiz is not pending moderation");
 
         long questionCount = questionRepository.countByQuizId(quizId);
         if (questionCount <= 0) {
@@ -568,6 +591,21 @@ public class QuizLibraryService {
         quiz.setModerationReason(null);
         quiz.setModerationUpdatedAt(Instant.now());
         clearModerationIssues(quiz.getId());
+        Quiz saved = quizRepository.save(quiz);
+        userNotificationService.createModerationDecisionNotification(saved, 0);
+        return saved;
+    }
+
+    public Quiz undoApprovedSubmission(Long quizId, Long expectedSubmissionVersion) {
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
+        ensureSubmissionStillCurrent(quiz, expectedSubmissionVersion, QuizModerationStatus.APPROVED, "Quiz is not passed");
+
+        quiz.setStatus(QuizStatus.DRAFT);
+        quiz.setModerationStatus(QuizModerationStatus.PENDING);
+        quiz.setModerationReason(null);
+        quiz.setModerationUpdatedAt(Instant.now());
+        clearModerationIssues(quiz.getId());
         return quizRepository.save(quiz);
     }
 
@@ -579,7 +617,7 @@ public class QuizLibraryService {
     ) {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
-        ensureSubmissionStillCurrent(quiz, expectedSubmissionVersion);
+        ensureSubmissionStillCurrent(quiz, expectedSubmissionVersion, QuizModerationStatus.PENDING, "Quiz is not pending moderation");
 
         String normalizedReason = normalizeRequiredReason(reason);
         List<QuestionIssueInput> normalizedQuestionIssues = normalizeQuestionIssuesForQuiz(quiz, questionIssues);
@@ -595,6 +633,8 @@ public class QuizLibraryService {
                     new QuizModerationIssue(saved, issue.questionId(), issue.message())
             ));
         }
+
+        userNotificationService.createModerationDecisionNotification(saved, normalizedQuestionIssues.size());
 
         return saved;
     }
@@ -744,9 +784,14 @@ public class QuizLibraryService {
         return 3;
     }
 
-    private static void ensureSubmissionStillCurrent(Quiz quiz, Long expectedSubmissionVersion) {
-        if (quiz.getModerationStatus() != QuizModerationStatus.PENDING) {
-            throw new ResponseStatusException(CONFLICT, "Quiz is not pending moderation");
+    private static void ensureSubmissionStillCurrent(
+            Quiz quiz,
+            Long expectedSubmissionVersion,
+            QuizModerationStatus requiredStatus,
+            String statusConflictMessage
+    ) {
+        if (quiz.getModerationStatus() != requiredStatus) {
+            throw new ResponseStatusException(CONFLICT, statusConflictMessage);
         }
         if (expectedSubmissionVersion == null || expectedSubmissionVersion < 0) {
             throw new ResponseStatusException(BAD_REQUEST, "Submission version is required");

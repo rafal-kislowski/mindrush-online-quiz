@@ -867,13 +867,20 @@
   border-bottom: 1px solid rgba(165, 197, 236, 0.14);
   background: var(--item-glow);
   color: rgba(232, 243, 255, 0.95);
-  display: block;
+  display: flex;
+  align-items: stretch;
   padding: 0;
   transition: background 120ms ease;
   opacity: 0;
   transform: translateY(6px);
   animation: appNotificationsItemIn 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: var(--item-delay);
+}
+
+.app-notifications__item.is-unread {
+  background:
+    radial-gradient(130% 190% at 0% 50%, rgba(120, 185, 255, 0.2), transparent 66%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03), transparent 32%);
 }
 
 .app-notifications__item:nth-child(1) { --item-delay: 30ms; }
@@ -896,7 +903,7 @@
 }
 
 .app-notifications__item-main {
-  width: 100%;
+  flex: 1 1 auto;
   min-width: 0;
   max-height: 96px;
   border: 0;
@@ -909,6 +916,30 @@
   align-items: center;
   gap: 12px;
   cursor: pointer;
+}
+
+.app-notifications__item-remove {
+  width: 42px;
+  min-width: 42px;
+  max-height: 96px;
+  border: 0;
+  border-left: 1px solid rgba(165, 197, 236, 0.12);
+  background: transparent;
+  color: rgba(188, 208, 237, 0.84);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.app-notifications__item-remove:hover {
+  background: rgba(226, 88, 124, 0.12);
+  color: rgba(255, 197, 214, 0.95);
+}
+
+.app-notifications__item-remove:focus-visible {
+  outline: 2px solid rgba(255, 151, 183, 0.52);
+  outline-offset: -2px;
 }
 
 .app-notifications__item-main:focus-visible {

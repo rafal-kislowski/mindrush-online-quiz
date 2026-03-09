@@ -419,6 +419,7 @@
                   class="app-notifications__item"
                   role="none"
                   *ngFor="let item of visibleNotifications"
+                  [class.is-unread]="isNotificationUnread(item)"
                 >
                   <button class="app-notifications__item-main" type="button" role="menuitem" (click)="openNotification(item)">
                     <span
@@ -446,6 +447,15 @@
                       <span class="app-notifications__item-meta">{{ item.subtitle || item.title }}</span>
                       <span class="app-notifications__item-time">{{ notificationTimeLabel(item.createdAt) }}</span>
                     </span>
+                  </button>
+                  <button
+                    class="app-notifications__item-remove"
+                    type="button"
+                    (click)="removeNotification(item, $event)"
+                    aria-label="Delete notification"
+                    title="Delete notification"
+                  >
+                    <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
                   </button>
                 </div>
               </div>
