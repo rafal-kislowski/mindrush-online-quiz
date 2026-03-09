@@ -204,7 +204,6 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
     questionsPerGame: new FormControl<number | null>(DEFAULT_QUESTIONS_PER_GAME, { validators: [questionsPerGameValidator] }),
     avatarImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
     avatarBgStart: new FormControl<string>('#30D0FF', { nonNullable: true, validators: [Validators.maxLength(32)] }),
-    avatarUseGradient: new FormControl<boolean>(true, { nonNullable: true }),
     avatarBgEnd: new FormControl<string>('#2F86FF', { nonNullable: true, validators: [Validators.maxLength(32)] }),
     avatarTextColor: new FormControl<string>('#0A0E1C', { nonNullable: true, validators: [Validators.maxLength(32)] }),
   });
@@ -233,7 +232,6 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
     questionsPerGame: new FormControl<number | null>(DEFAULT_QUESTIONS_PER_GAME, { validators: [questionsPerGameValidator] }),
     avatarImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
     avatarBgStart: new FormControl<string>('#30D0FF', { nonNullable: true, validators: [Validators.maxLength(32)] }),
-    avatarUseGradient: new FormControl<boolean>(true, { nonNullable: true }),
     avatarBgEnd: new FormControl<string>('#2F86FF', { nonNullable: true, validators: [Validators.maxLength(32)] }),
     avatarTextColor: new FormControl<string>('#0A0E1C', { nonNullable: true, validators: [Validators.maxLength(32)] }),
   });
@@ -872,7 +870,6 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
           questionsPerGame: quiz.questionsPerGame ?? DEFAULT_QUESTIONS_PER_GAME,
           avatarImageUrl: quiz.avatarImageUrl ?? null,
           avatarBgStart: quiz.avatarBgStart ?? '#30D0FF',
-          avatarUseGradient: true,
           avatarBgEnd: quiz.avatarBgEnd ?? '#2F86FF',
           avatarTextColor: quiz.avatarTextColor ?? '#0A0E1C',
         });
@@ -1396,7 +1393,7 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
     const form = mode === 'create' ? this.quizForm : this.editQuizForm;
     const imageUrl = this.normalizeNullableUrl(form.controls.avatarImageUrl.value);
     const bgStart = this.normalizeNullableColor(form.controls.avatarBgStart.value) ?? '#30D0FF';
-    const bgEnd = this.normalizeNullableColor(form.controls.avatarBgEnd.value);
+    const bgEnd = this.normalizeNullableColor(form.controls.avatarBgEnd.value) ?? '#2F86FF';
     const textColor = this.normalizeNullableColor(form.controls.avatarTextColor.value) ?? '#0A0E1C';
 
     if (imageUrl) {
@@ -1408,15 +1405,8 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
       };
     }
 
-    if (bgEnd) {
-      return {
-        'background-image': `linear-gradient(180deg, ${bgStart}, ${bgEnd})`,
-        'color': textColor,
-      };
-    }
-
     return {
-      'background': bgStart,
+      'background-image': `linear-gradient(180deg, ${bgStart}, ${bgEnd})`,
       'color': textColor,
     };
   }
@@ -1424,7 +1414,7 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
   quizListAvatarStyle(q: AdminQuizListItemDto): { [key: string]: string } {
     const imageUrl = this.normalizeNullableUrl(q.avatarImageUrl ?? null);
     const bgStart = this.normalizeNullableColor(q.avatarBgStart ?? null) ?? '#30D0FF';
-    const bgEnd = this.normalizeNullableColor(q.avatarBgEnd ?? null);
+    const bgEnd = this.normalizeNullableColor(q.avatarBgEnd ?? null) ?? '#2F86FF';
     const textColor = this.normalizeNullableColor(q.avatarTextColor ?? null) ?? '#0A0E1C';
 
     if (imageUrl) {
@@ -1436,27 +1426,10 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
       };
     }
 
-    if (bgEnd) {
-      return {
-        'background-image': `linear-gradient(180deg, ${bgStart}, ${bgEnd})`,
-        'color': textColor,
-      };
-    }
-
     return {
-      'background': bgStart,
+      'background-image': `linear-gradient(180deg, ${bgStart}, ${bgEnd})`,
       'color': textColor,
     };
-  }
-
-  avatarGradientEnabled(mode: 'create' | 'edit'): boolean {
-    const form = mode === 'create' ? this.quizForm : this.editQuizForm;
-    return form.controls.avatarUseGradient.value;
-  }
-
-  setAvatarGradient(mode: 'create' | 'edit', enabled: boolean): void {
-    const form = mode === 'create' ? this.quizForm : this.editQuizForm;
-    form.controls.avatarUseGradient.setValue(enabled);
   }
 
   clearQuestionImage(mode: 'create' | 'edit'): void {
@@ -1593,24 +1566,6 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
     if (status === 'DRAFT') return 'Quiz moved to draft mode.';
     if (status === 'TRASHED') return 'Quiz moved to trash.';
     return 'Quiz status updated.';
-  }
-
-  avatarSwatches: ReadonlyArray<{ start: string; end?: string; text: string }> = [
-    { start: '#30D0FF', end: '#2F86FF', text: '#0A0E1C' },
-    { start: '#FFB454', end: '#FF6B6B', text: '#1A0F0F' },
-    { start: '#33D9A0', end: '#1EC8FF', text: '#07131A' },
-    { start: '#A77BFF', end: '#FF5BD6', text: '#120815' },
-    { start: '#2B2F44', end: '#151A2D', text: '#FFFFFF' },
-  ];
-
-  applyAvatarSwatch(mode: 'create' | 'edit', sw: { start: string; end?: string; text: string }): void {
-    const form = mode === 'create' ? this.quizForm : this.editQuizForm;
-    form.controls.avatarBgStart.setValue(sw.start);
-    form.controls.avatarUseGradient.setValue(!!sw.end);
-    form.controls.avatarBgEnd.setValue(sw.end ?? sw.start);
-    form.controls.avatarTextColor.setValue(sw.text);
-    form.controls.avatarImageUrl.setValue(null);
-    this.syncAvatarColorDraft(mode);
   }
 
   private readonly avatarColorDraft: Record<

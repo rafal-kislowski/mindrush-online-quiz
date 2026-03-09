@@ -14,12 +14,13 @@ import {
   AdminQuizSubmissionDetailDto,
   AdminQuizSubmissionListItemDto,
 } from '../../core/api/admin-quiz.api';
+import { PlayerAvatarComponent } from '../../core/ui/player-avatar.component';
 import { ToastService } from '../../core/ui/toast.service';
 
 @Component({
   selector: 'app-admin-quiz-submissions',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, PlayerAvatarComponent],
   templateUrl: './admin-quiz-submissions.component.html',
   styleUrl: './admin-quiz-submissions.component.scss',
 })
@@ -70,13 +71,6 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
   readonly questionSearch = new FormControl('', { nonNullable: true });
   readonly questionPageSize = new FormControl<number>(10, { nonNullable: true });
   readonly questionPageSizeOptions: ReadonlyArray<number> = [10, 25, 50, 100];
-  readonly avatarSwatchesReadonly: ReadonlyArray<{ start: string; end: string; text: string }> = [
-    { start: '#30D0FF', end: '#2F86FF', text: '#0A0E1C' },
-    { start: '#FFB347', end: '#FF6A88', text: '#0A0E1C' },
-    { start: '#34D399', end: '#22D3EE', text: '#062A23' },
-    { start: '#C084FC', end: '#F472B6', text: '#12061F' },
-    { start: '#1E293B', end: '#334155', text: '#E2E8F0' },
-  ];
   readonly rejectForm = new FormGroup({
     reason: new FormControl('', {
       nonNullable: true,
@@ -208,6 +202,10 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
     return this.normalizeModerationStatus(this.selectedSubmission?.moderationStatus) === 'PENDING';
   }
 
+  get canUndoSelectedApproval(): boolean {
+    return this.normalizeModerationStatus(this.selectedSubmission?.moderationStatus) === 'APPROVED';
+  }
+
   get selectedSubmissionStatusLabel(): string {
     return this.moderationStatusLabel(this.selectedSubmission?.moderationStatus);
   }
@@ -218,13 +216,14 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
     return `v${version}`;
   }
 
-  get canBanSelectedOwner(): boolean {
+  get canModerateSelectedOwner(): boolean {
     const detail = this.selectedSubmission;
-    return !!detail?.ownerUserId && !detail.ownerBanned;
+    return !!detail?.ownerUserId;
   }
 
   get selectedOwnerRolesLabel(): string {
-    const roles = (this.selectedSubmission?.ownerRoles ?? []).filter(Boolean);
+    const roles = (this.selectedSubmission?.ownerRoles ?? [])
+      .filter((role) => !!role && role !== 'BANNED');
     if (!roles.length) return 'No roles';
     return roles.join(', ');
   }
@@ -568,6 +567,30 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
     this.openSubmission(id);
   }
 
+  undoApproveFromActions(item: AdminQuizSubmissionListItemDto): void {
+    const status = this.normalizeModerationStatus(item?.moderationStatus);
+    if (!item?.id || status !== 'APPROVED' || this.actionBusy) return;
+
+    this.closeRowActions();
+    const confirmed = window.confirm('Reopen review and move this quiz back to Pending?');
+    if (!confirmed) return;
+
+    this.actionBusy = true;
+    this.error = null;
+    this.api.undoApproveSubmission(item.id, item.submissionVersion).subscribe({
+      next: () => {
+        this.actionBusy = false;
+        this.toast.success('Review reopened. Quiz moved back to Pending.', { title: 'Review Submissions' });
+        this.loadSubmissions();
+      },
+      error: (err) => {
+        this.actionBusy = false;
+        this.error = apiErrorMessage(err, 'Failed to reopen review');
+        this.loadSubmissions();
+      },
+    });
+  }
+
   prevPage(): void {
     const page = this.safePageIndex;
     if (page <= 0) return;
@@ -680,6 +703,30 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
     });
   }
 
+  undoApproveSelected(): void {
+    const detail = this.selectedSubmission;
+    if (!detail || !this.canUndoSelectedApproval || this.actionBusy) return;
+
+    const confirmed = window.confirm('Reopen review and move this quiz back to Pending?');
+    if (!confirmed) return;
+
+    this.actionBusy = true;
+    this.error = null;
+    this.api.undoApproveSubmission(detail.id, detail.submissionVersion).subscribe({
+      next: () => {
+        this.actionBusy = false;
+        this.toast.success('Review reopened. Quiz moved back to Pending.', { title: 'Review Submissions' });
+        this.openSubmission(detail.id);
+        this.loadSubmissions();
+      },
+      error: (err) => {
+        this.actionBusy = false;
+        if (this.handleOutdatedSubmission(err)) return;
+        this.error = apiErrorMessage(err, 'Failed to reopen review');
+      },
+    });
+  }
+
   reject(): void {
     const detail = this.selectedSubmission;
     if (!detail || !this.canModerateSelected || this.actionBusy) return;
@@ -725,26 +772,33 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
   banSubmissionOwner(): void {
     const detail = this.selectedSubmission;
     if (!detail?.ownerUserId || this.actionBusy) return;
-    if (detail.ownerBanned) {
-      this.toast.warning('Owner account is already banned.', { title: 'Review Submissions' });
-      return;
-    }
-
     const ownerLabel = detail.ownerDisplayName || detail.ownerEmail || `User #${detail.ownerUserId}`;
-    const confirmed = window.confirm(`Ban ${ownerLabel} and revoke active sessions?`);
+    const confirmed = detail.ownerBanned
+      ? window.confirm(`Unban ${ownerLabel}?`)
+      : window.confirm(`Ban ${ownerLabel} and revoke active sessions?`);
     if (!confirmed) return;
 
     this.actionBusy = true;
     this.error = null;
-    this.api.banSubmissionOwner(detail.id).subscribe({
+    const request$ = detail.ownerBanned
+      ? this.api.unbanSubmissionOwner(detail.id)
+      : this.api.banSubmissionOwner(detail.id);
+    request$.subscribe({
       next: (result) => {
         this.actionBusy = false;
         this.applyOwnerModeration(result);
-        this.toast.warning('User has been banned.', { title: 'Review Submissions' });
+        if (result.banned) {
+          this.toast.warning('User has been banned.', { title: 'Review Submissions' });
+        } else {
+          this.toast.success('User has been unbanned.', { title: 'Review Submissions' });
+        }
       },
       error: (err) => {
         this.actionBusy = false;
-        this.error = apiErrorMessage(err, 'Failed to ban submission owner');
+        this.error = apiErrorMessage(
+          err,
+          detail.ownerBanned ? 'Failed to unban submission owner' : 'Failed to ban submission owner'
+        );
       },
     });
   }
@@ -898,13 +952,11 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
     avatarImageUrl?: string | null;
     avatarBgStart?: string | null;
     avatarBgEnd?: string | null;
-    avatarUseGradient?: boolean | null;
     avatarTextColor?: string | null;
   } | null | undefined): Record<string, string> {
     const img = (q?.avatarImageUrl ?? '').trim();
     const start = (q?.avatarBgStart ?? '').trim() || '#30D0FF';
-    const end = (q?.avatarBgEnd ?? '').trim();
-    const useGradient = q?.avatarUseGradient == null ? !!end : !!q.avatarUseGradient;
+    const end = (q?.avatarBgEnd ?? '').trim() || '#2F86FF';
     const text = (q?.avatarTextColor ?? '').trim() || '#0A0E1C';
 
     if (img) {
@@ -915,14 +967,8 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
         color: text,
       };
     }
-    if (useGradient && end) {
-      return {
-        'background-image': `linear-gradient(180deg, ${start}, ${end})`,
-        color: text,
-      };
-    }
     return {
-      background: start,
+      'background-image': `linear-gradient(180deg, ${start}, ${end})`,
       color: text,
     };
   }
@@ -938,10 +984,6 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
 
   hasQuizAvatarImage(detail: AdminQuizSubmissionDetailDto | null | undefined): boolean {
     return !!(detail?.avatarImageUrl ?? '').trim();
-  }
-
-  detailAvatarGradientEnabled(detail: AdminQuizSubmissionDetailDto | null | undefined): boolean {
-    return !!(detail?.avatarBgEnd ?? '').trim();
   }
 
   detailAvatarColor(
@@ -960,27 +1002,6 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
         : detail?.avatarTextColor;
     const normalized = (value ?? '').trim();
     return normalized || fallback;
-  }
-
-  ownerInitial(detail: AdminQuizSubmissionDetailDto | null | undefined): string {
-    const display = (detail?.ownerDisplayName ?? '').trim();
-    const email = (detail?.ownerEmail ?? '').trim();
-    const base = display || email.split('@', 1)[0] || 'U';
-    return this.titleInitial(base);
-  }
-
-  ownerAvatarStyle(detail: AdminQuizSubmissionDetailDto | null | undefined): Record<string, string> {
-    const key = String(detail?.ownerUserId ?? detail?.ownerEmail ?? detail?.ownerDisplayName ?? '');
-    let hash = 0;
-    for (const char of Array.from(key)) {
-      hash = ((hash << 5) - hash + char.codePointAt(0)!) | 0;
-    }
-    const hue = Math.abs(hash) % 360;
-    const hue2 = (hue + 42) % 360;
-    return {
-      'background-image': `linear-gradient(145deg, hsl(${hue} 68% 58%), hsl(${hue2} 64% 46%))`,
-      color: '#F8FCFF',
-    };
   }
 
   private handleOutdatedSubmission(error: unknown): boolean {
@@ -1206,8 +1227,9 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
     };
   }
 
-  private rowActionsMenuEstimatedHeight(_: AdminQuizSubmissionListItemDto | null): number {
-    return 58;
+  private rowActionsMenuEstimatedHeight(item: AdminQuizSubmissionListItemDto | null): number {
+    const status = this.normalizeModerationStatus(item?.moderationStatus);
+    return status === 'APPROVED' ? 96 : 58;
   }
 
   private submissionAvatarData(

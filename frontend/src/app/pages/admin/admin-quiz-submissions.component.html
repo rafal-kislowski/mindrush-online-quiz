@@ -245,6 +245,16 @@
                       <button class="mr-select__item" type="button" role="menuitem" (click)="openSubmissionFromActions(item.id)" [disabled]="loadingDetail">
                         Review
                       </button>
+                      <button
+                        class="mr-select__item"
+                        type="button"
+                        role="menuitem"
+                        *ngIf="moderationStatusClass(item.moderationStatus) === 'approved'"
+                        (click)="undoApproveFromActions(item)"
+                        [disabled]="actionBusy"
+                      >
+                        Reopen review
+                      </button>
                     </div>
 
                     <div class="table-footer" *ngIf="filteredSubmissions.length">
@@ -352,7 +362,7 @@
               <div class="panel__actions">
                 <span
                   class="detail-top__status"
-                  *ngIf="!canModerateSelected"
+                  *ngIf="!canModerateSelected && !canUndoSelectedApproval"
                   [ngClass]="'is-' + moderationStatusClass(detail.moderationStatus)"
                 >
                   {{ selectedSubmissionStatusLabel }}
@@ -372,6 +382,9 @@
                 </button>
                 <button class="btn success btn-approve-compact" type="button" *ngIf="canModerateSelected" (click)="approve()" [disabled]="actionBusy">
                   Approve & publish
+                </button>
+                <button class="btn secondary btn-undo-compact" type="button" *ngIf="canUndoSelectedApproval" (click)="undoApproveSelected()" [disabled]="actionBusy">
+                  Reopen review
                 </button>
               </div>
             </div>
@@ -448,27 +461,7 @@
                     </div>
 
                     <div class="avatar-editor avatar-editor--readonly" aria-label="Quiz avatar colors (read only)">
-                      <div class="avatar-editor__top">
-                        <div class="avatar-editor__title">Quiz avatar</div>
-                        <label class="toggle" title="Read-only gradient setting">
-                          <input type="checkbox" [checked]="detailAvatarGradientEnabled(detail)" disabled />
-                          <span>Gradient</span>
-                        </label>
-                      </div>
-
-                      <div class="swatches" role="list" aria-label="Avatar presets (disabled)">
-                        <button
-                          class="swatch"
-                          type="button"
-                          *ngFor="let sw of avatarSwatchesReadonly"
-                          [style.--sw1]="sw.start"
-                          [style.--sw2]="sw.end || sw.start"
-                          [style.--swt]="sw.text"
-                          disabled
-                          tabindex="-1"
-                          aria-hidden="true"
-                        ></button>
-                      </div>
+                      <div class="avatar-editor__title">Quiz avatar</div>
 
                       <div class="color-grid">
                         <label class="color-field">
@@ -512,7 +505,37 @@
                       </div>
                     </div>
                   </section>
+                  <section class="owner-card owner-card--compact" aria-label="Submission owner">
+                    <div class="owner-card__identity">
+                      <app-player-avatar
+                        class="owner-card__avatar"
+                        [displayName]="detail.ownerDisplayName || detail.ownerEmail"
+                        [isAuthenticated]="true"
+                        [size]="34"
+                        [decorative]="true"
+                      ></app-player-avatar>
+                      <div class="owner-card__meta">
+                        <div class="owner-card__name">{{ detail.ownerDisplayName || detail.ownerEmail || 'Unknown user' }}</div>
+                        <div class="owner-card__id">
+                          ID: {{ detail.ownerUserId || 'N/A' }} &middot; {{ selectedOwnerRolesLabel }}
+                        </div>
+                      </div>
+                    </div>
 
+                    <span class="owner-card__state" [class.is-banned]="detail.ownerBanned">
+                      {{ detail.ownerBanned ? 'Banned' : 'Active' }}
+                    </span>
+
+                    <button
+                      class="btn secondary owner-card__ban"
+                      type="button"
+                      (click)="banSubmissionOwner()"
+                      [disabled]="actionBusy || !canModerateSelectedOwner"
+                    >
+                      <i class="fa-solid" [class.fa-user-slash]="!detail.ownerBanned" [class.fa-user-check]="detail.ownerBanned" aria-hidden="true"></i>
+                      <span>{{ detail.ownerBanned ? 'Unban' : 'Ban' }}</span>
+                    </button>
+                  </section>
                 </div>
               </div>
             </form>

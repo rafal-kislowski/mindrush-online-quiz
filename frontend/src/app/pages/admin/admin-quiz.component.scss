@@ -1032,22 +1032,6 @@ h2 {
   color: rgba(255, 255, 255, 0.78);
 }
 
-.toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 800;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.72);
-  user-select: none;
-}
-
-.toggle input {
-  width: 16px;
-  height: 16px;
-  accent-color: rgba(47, 208, 255, 0.95);
-}
-
 .toggle--pill {
   display: block;
   width: 100%;
@@ -1146,21 +1130,6 @@ h2 {
     0 10px 24px rgba(5, 11, 30, 0.34),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
-
-.swatches {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.swatch {
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: linear-gradient(180deg, var(--sw1), var(--sw2));
-}
-
 
 .color-grid {
   display: grid;

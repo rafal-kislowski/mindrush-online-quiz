@@ -296,6 +296,14 @@ export class AdminQuizApi {
     );
   }
 
+  undoApproveSubmission(quizId: number, expectedSubmissionVersion: number): Observable<ModerationResultDto> {
+    return this.http.post<ModerationResultDto>(
+      `/api/admin/quiz-submissions/${encodeURIComponent(String(quizId))}/undo-approve`,
+      { expectedSubmissionVersion },
+      { withCredentials: true }
+    );
+  }
+
   rejectSubmission(
     quizId: number,
     expectedSubmissionVersion: number,
@@ -337,6 +345,14 @@ export class AdminQuizApi {
   banSubmissionOwner(quizId: number): Observable<AdminSubmissionOwnerModerationDto> {
     return this.http.post<AdminSubmissionOwnerModerationDto>(
       `/api/admin/quiz-submissions/${encodeURIComponent(String(quizId))}/owner/ban`,
+      {},
+      { withCredentials: true }
+    );
+  }
+
+  unbanSubmissionOwner(quizId: number): Observable<AdminSubmissionOwnerModerationDto> {
+    return this.http.post<AdminSubmissionOwnerModerationDto>(
+      `/api/admin/quiz-submissions/${encodeURIComponent(String(quizId))}/owner/unban`,
       {},
       { withCredentials: true }
     );

@@ -727,30 +727,7 @@
                 </div>
 
                 <div class="avatar-editor" #avatarEditor>
-                  <div class="avatar-editor__top">
-                    <div class="avatar-editor__title">Quiz avatar</div>
-                    <label class="toggle" title="Use gradient background">
-                      <input
-                        type="checkbox"
-                        [checked]="avatarGradientEnabled()"
-                        (change)="setAvatarGradient($any($event.target).checked)"
-                      />
-                      <span>Gradient</span>
-                    </label>
-                  </div>
-
-                  <div class="swatches" role="list" aria-label="Avatar presets">
-                    <button
-                      class="swatch"
-                      type="button"
-                      *ngFor="let sw of avatarSwatches"
-                      (click)="applyAvatarSwatch(sw)"
-                      [style.--sw1]="sw.start"
-                      [style.--sw2]="sw.end || sw.start"
-                      [style.--swt]="sw.text"
-                      aria-label="Apply preset"
-                    ></button>
-                  </div>
+                  <div class="avatar-editor__title">Quiz avatar</div>
 
                   <div class="color-grid">
                     <label class="color-field">
@@ -774,14 +751,12 @@
                       <input
                         type="color"
                         formControlName="avatarBgEnd"
-                        [disabled]="!avatarGradientEnabled()"
                         (input)="onAvatarColorPicker('avatarBgEnd', $any($event.target).value)"
                       />
                       <input
                         class="color-field__text"
                         type="text"
                         [value]="avatarColorText('avatarBgEnd')"
-                        [disabled]="!avatarGradientEnabled()"
                         (input)="onAvatarColorTextInput('avatarBgEnd', $any($event.target).value)"
                         (blur)="onAvatarColorTextBlur('avatarBgEnd')"
                       />

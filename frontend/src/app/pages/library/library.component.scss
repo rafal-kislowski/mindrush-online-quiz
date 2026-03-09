@@ -1938,42 +1938,12 @@
   overflow: auto;
 }
 
-.panel--editor .avatar-editor__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
 .panel--editor .avatar-editor__title {
   font-weight: 900;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.2px;
   color: rgba(255, 255, 255, 0.78);
-}
-
-.panel--editor .toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 800;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.72);
-}
-
-.panel--editor .swatches {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.panel--editor .swatch {
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: linear-gradient(180deg, var(--sw1), var(--sw2));
 }
 
 .panel--editor .color-grid {

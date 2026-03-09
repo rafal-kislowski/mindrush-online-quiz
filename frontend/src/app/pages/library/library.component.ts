@@ -187,13 +187,6 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly mineCategory = new FormControl<string>(LibraryComponent.ALL_CATEGORIES, { nonNullable: true });
   readonly mineSort = new FormControl<'az' | 'za'>('az', { nonNullable: true });
   readonly questionSearch = new FormControl('', { nonNullable: true });
-  readonly avatarSwatches: ReadonlyArray<{ start: string; end?: string; text: string }> = [
-    { start: '#30D0FF', end: '#2F86FF', text: '#0A0E1C' },
-    { start: '#FFB454', end: '#FF6B6B', text: '#1A0F0F' },
-    { start: '#33D9A0', end: '#1EC8FF', text: '#07131A' },
-    { start: '#A77BFF', end: '#FF5BD6', text: '#120815' },
-    { start: '#2B2F44', end: '#151A2D', text: '#FFFFFF' },
-  ];
 
   readonly quizForm = new FormGroup({
     title: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(120)] }),
@@ -201,7 +194,6 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
     categoryName: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(64)] }),
     avatarImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
     avatarBgStart: new FormControl<string>('#30D0FF', { nonNullable: true, validators: [Validators.maxLength(32)] }),
-    avatarUseGradient: new FormControl<boolean>(true, { nonNullable: true }),
     avatarBgEnd: new FormControl<string>('#2F86FF', { nonNullable: true, validators: [Validators.maxLength(32)] }),
     avatarTextColor: new FormControl<string>('#0A0E1C', { nonNullable: true, validators: [Validators.maxLength(32)] }),
     questionTimeLimitSeconds: new FormControl<number | null>(15),
@@ -880,7 +872,7 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
       categoryName: this.quizForm.controls.categoryName.value || null,
       avatarImageUrl: this.quizForm.controls.avatarImageUrl.value || null,
       avatarBgStart: this.quizForm.controls.avatarBgStart.value || null,
-      avatarBgEnd: this.quizForm.controls.avatarUseGradient.value ? (this.quizForm.controls.avatarBgEnd.value || null) : null,
+      avatarBgEnd: this.quizForm.controls.avatarBgEnd.value || null,
       avatarTextColor: this.quizForm.controls.avatarTextColor.value || null,
       questionTimeLimitSeconds: this.normalizeNumber(this.quizForm.controls.questionTimeLimitSeconds.value),
       questionsPerGame: this.normalizeNumber(this.quizForm.controls.questionsPerGame.value),
@@ -1325,24 +1317,6 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
     this.closeImagePreview();
   }
 
-  avatarGradientEnabled(): boolean {
-    return !!this.quizForm.controls.avatarUseGradient.value;
-  }
-
-  setAvatarGradient(enabled: boolean): void {
-    this.quizForm.controls.avatarUseGradient.setValue(!!enabled);
-  }
-
-  applyAvatarSwatch(sw: { start: string; end?: string; text: string }): void {
-    const hasGradient = !!sw.end;
-    this.quizForm.patchValue({
-      avatarBgStart: this.normalizeHex(sw.start, '#30D0FF'),
-      avatarBgEnd: this.normalizeHex(sw.end ?? sw.start, '#2F86FF'),
-      avatarTextColor: this.normalizeHex(sw.text, '#0A0E1C'),
-      avatarUseGradient: hasGradient,
-    });
-  }
-
   avatarColorText(field: 'avatarBgStart' | 'avatarBgEnd' | 'avatarTextColor'): string {
     const value = this.quizForm.controls[field].value ?? '';
     return this.normalizeHex(value, this.defaultAvatarColor(field));
@@ -1449,13 +1423,11 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
     avatarImageUrl?: string | null;
     avatarBgStart?: string | null;
     avatarBgEnd?: string | null;
-    avatarUseGradient?: boolean | null;
     avatarTextColor?: string | null;
   } | null | undefined): Record<string, string> {
     const img = (q?.avatarImageUrl ?? '').trim();
     const start = (q?.avatarBgStart ?? '').trim() || '#30D0FF';
-    const end = (q?.avatarBgEnd ?? '').trim();
-    const useGradient = q?.avatarUseGradient == null ? !!end : !!q.avatarUseGradient;
+    const end = (q?.avatarBgEnd ?? '').trim() || '#2F86FF';
     const text = (q?.avatarTextColor ?? '').trim() || '#0A0E1C';
     if (img) {
       return {
@@ -1465,14 +1437,8 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
         color: text,
       };
     }
-    if (useGradient && end) {
-      return {
-        'background-image': `linear-gradient(180deg, ${start}, ${end})`,
-        color: text,
-      };
-    }
     return {
-      background: start,
+      'background-image': `linear-gradient(180deg, ${start}, ${end})`,
       color: text,
     };
   }
@@ -1500,7 +1466,6 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
       categoryName: '',
       avatarImageUrl: null,
       avatarBgStart: '#30D0FF',
-      avatarUseGradient: true,
       avatarBgEnd: '#2F86FF',
       avatarTextColor: '#0A0E1C',
       questionTimeLimitSeconds: defaultTime,
@@ -1515,7 +1480,6 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
       categoryName: quiz.categoryName ?? '',
       avatarImageUrl: quiz.avatarImageUrl ?? null,
       avatarBgStart: quiz.avatarBgStart ?? '#30D0FF',
-      avatarUseGradient: !!quiz.avatarBgEnd,
       avatarBgEnd: quiz.avatarBgEnd ?? '#2F86FF',
       avatarTextColor: quiz.avatarTextColor ?? '#0A0E1C',
       questionTimeLimitSeconds: this.normalizeTimeLimit(quiz.questionTimeLimitSeconds ?? DEFAULT_TIME_LIMIT_SECONDS),
