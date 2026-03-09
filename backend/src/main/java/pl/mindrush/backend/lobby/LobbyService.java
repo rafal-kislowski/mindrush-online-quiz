@@ -14,6 +14,7 @@ import pl.mindrush.backend.lobby.chat.LobbySystemMessageService;
 import pl.mindrush.backend.lobby.events.LobbyEventPublisher;
 import pl.mindrush.backend.quiz.Quiz;
 import pl.mindrush.backend.quiz.QuizRepository;
+import pl.mindrush.backend.quiz.QuizSource;
 import pl.mindrush.backend.quiz.QuizVisibilityRules;
 
 import java.security.SecureRandom;
@@ -363,12 +364,17 @@ public class LobbyService {
         if (normalizedQuizId != null) {
             Quiz quiz = quizRepository.findById(normalizedQuizId)
                     .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
-            boolean selectable = QuizVisibilityRules.canUserPlay(quiz, guestSession.getUserId());
+            boolean selectable = QuizVisibilityRules.isPubliclyVisible(quiz);
             if (!selectable) {
                 throw new ResponseStatusException(NOT_FOUND, "Quiz not found");
             }
-            if (nextRankingEnabled && !quiz.isIncludeInRanking()) {
-                throw new ResponseStatusException(CONFLICT, "Selected quiz is not eligible for ranked games");
+            if (nextRankingEnabled) {
+                if (quiz.getSource() != QuizSource.OFFICIAL) {
+                    throw new ResponseStatusException(CONFLICT, "Ranked games support official quizzes only");
+                }
+                if (!quiz.isIncludeInRanking()) {
+                    throw new ResponseStatusException(CONFLICT, "Selected quiz is not eligible for ranked games");
+                }
             }
             selectedCategoryLabel = quiz.getCategory() == null || quiz.getCategory().getName() == null || quiz.getCategory().getName().isBlank()
                     ? "Uncategorized"

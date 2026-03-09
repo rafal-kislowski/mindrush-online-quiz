@@ -47,12 +47,6 @@ public class QuizService {
             visibleById.put(quiz.getId(), quiz);
         }
 
-        if (viewerUserId != null) {
-            for (Quiz quiz : quizRepository.findAllOwnedVisibleByUserId(viewerUserId)) {
-                visibleById.put(quiz.getId(), quiz);
-            }
-        }
-
         Set<Long> favoriteIds = favoriteQuizIds(viewerUserId);
 
         return visibleById.values().stream()
@@ -64,7 +58,7 @@ public class QuizService {
                         q.getCategory() == null ? null : q.getCategory().getName(),
                         q.getSource().name().toLowerCase(),
                         favoriteIds.contains(q.getId()),
-                        isInLibraryForViewer(q, viewerUserId, favoriteIds),
+                        isInLibraryForViewer(q, viewerUserId),
                         QuizVisibilityRules.isOwnedBy(q, viewerUserId),
                         QuizVisibilityRules.isPubliclyVisible(q),
                         q.getAvatarImageUrl(),
@@ -92,9 +86,10 @@ public class QuizService {
         return ids;
     }
 
-    private boolean isInLibraryForViewer(Quiz quiz, Long viewerUserId, Set<Long> favoriteIds) {
+    private boolean isInLibraryForViewer(Quiz quiz, Long viewerUserId) {
         if (viewerUserId == null) return false;
-        return QuizVisibilityRules.isOwnedBy(quiz, viewerUserId) || favoriteIds.contains(quiz.getId());
+        return QuizVisibilityRules.isOwnedBy(quiz, viewerUserId)
+                && QuizVisibilityRules.isPubliclyVisible(quiz);
     }
 
     public QuizDetailDto getQuiz(Long quizId) {

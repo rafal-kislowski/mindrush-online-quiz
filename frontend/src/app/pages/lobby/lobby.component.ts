@@ -45,6 +45,8 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   matchType: 'CASUAL' | 'RANKED' = 'CASUAL';
 
   pickerScope: 'official' | 'custom' | 'library' = 'official';
+  private pickerListTransition: 'forward' | 'backward' = 'forward';
+  private pickerListAnimFlip = false;
   pickerSort: 'az' | 'za' = 'az';
   sortMenuOpen = false;
   categorySelected: string[] = [];
@@ -211,6 +213,17 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
 
   get matchTypeControlsBusy(): boolean {
     return this.selectedQuizSaving || this.matchTypeRequestInFlight;
+  }
+
+  get matchTypeSyncInFlight(): boolean {
+    return this.matchTypeRequestInFlight;
+  }
+
+  get pickerListAnimClass(): string {
+    if (this.pickerListTransition === 'backward') {
+      return this.pickerListAnimFlip ? 'picker-list--scope-back-a' : 'picker-list--scope-back-b';
+    }
+    return this.pickerListAnimFlip ? 'picker-list--scope-forward-a' : 'picker-list--scope-forward-b';
   }
 
   get readyActionLabel(): string {
@@ -1225,6 +1238,16 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
 
   setPickerScope(scope: 'official' | 'custom' | 'library'): void {
     if (this.matchType === 'RANKED' && scope !== 'official') return;
+    if (this.pickerScope !== scope) {
+      const order: Record<'official' | 'custom' | 'library', number> = {
+        official: 0,
+        custom: 1,
+        library: 2,
+      };
+      this.triggerPickerListTransition(
+        order[scope] >= order[this.pickerScope] ? 'forward' : 'backward'
+      );
+    }
     this.pickerScope = scope;
   }
 
@@ -1262,10 +1285,25 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
+    if (this.matchType !== next) {
+      const order: Record<'CASUAL' | 'RANKED', number> = {
+        CASUAL: 0,
+        RANKED: 1,
+      };
+      this.triggerPickerListTransition(
+        order[next] >= order[this.matchType] ? 'forward' : 'backward'
+      );
+    }
+
     this.pendingMatchType = next;
     this.matchType = next;
     if (next === 'RANKED') this.pickerScope = 'official';
     this.scheduleMatchTypeCommit();
+  }
+
+  private triggerPickerListTransition(direction: 'forward' | 'backward'): void {
+    this.pickerListTransition = direction;
+    this.pickerListAnimFlip = !this.pickerListAnimFlip;
   }
 
   private scheduleMatchTypeCommit(): void {
@@ -1399,7 +1437,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       const inLibrary = q.inLibrary === true || normalizedSource === 'library';
       const publicAvailable = q.publicAvailable !== false;
 
-      if (scope === 'library') return inLibrary;
+      if (scope === 'library') return inLibrary && publicAvailable;
       if (scope === 'official') return normalizedSource === 'official' && publicAvailable;
       if (scope === 'custom') return normalizedSource === 'custom' && publicAvailable;
       return false;
@@ -1580,6 +1618,13 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private syncMatchTypeFromLobby(lobby: LobbyDto | null): void {
+    // During local mode switch (debounced or in-flight request), keep optimistic UI state.
+    // Otherwise websocket snapshots with stale ranking flag can briefly flip the mode back.
+    if (this.pendingMatchType != null || this.matchTypeRequestInFlight) {
+      if (this.pendingMatchType === 'RANKED') this.pickerScope = 'official';
+      return;
+    }
+
     const explicitRanking = lobby?.rankingEnabled;
     let next: 'CASUAL' | 'RANKED';
     if (explicitRanking != null) {
@@ -1737,6 +1782,8 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.quizzes = [];
     this.categorySelected = [];
     this.pickerScope = 'official';
+    this.pickerListTransition = 'forward';
+    this.pickerListAnimFlip = false;
     this.pickerSort = 'az';
     this.quizSearch = '';
     this.categoryOptions = [];
@@ -1967,6 +2014,10 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   private chatMessageKey(msg: LobbyChatMessageDto): string {
     const kind = String(msg.kind ?? 'USER').trim().toUpperCase();
     return `${msg.serverTime}:${kind}:${msg.displayName}:${msg.text}`;
+  }
+
+  trackQuizCard(_: number, quiz: QuizListItemDto): number {
+    return quiz?.id ?? -1;
   }
 
   private emitJoinSystemMessagesFromLobbyDiff(previous: LobbyDto | null, current: LobbyDto | null): void {

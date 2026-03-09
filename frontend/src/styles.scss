@@ -2462,13 +2462,89 @@ input[type="color"]::-moz-color-swatch {
   margin-top: 12px;
   padding: 14px 14px 18px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  flex: 1;
-  min-height: calc((3 * 96px) + (2 * 12px));
-  max-height: clamp(340px, 50vh, 520px);
+  --mr-picker-list-h: clamp(340px, 50vh, 520px);
+  flex: 0 0 var(--mr-picker-list-h);
+  height: var(--mr-picker-list-h);
+  min-height: var(--mr-picker-list-h);
+  max-height: var(--mr-picker-list-h);
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: rgba(56, 189, 248, 0.35) transparent;
+}
+
+.lobby-page .picker-list.picker-list--scope-forward-a,
+.lobby-page .picker-list.picker-list--scope-forward-b {
+  animation-duration: 260ms;
+  animation-timing-function: var(--lobby-ease-out, ease);
+  animation-fill-mode: both;
+}
+
+.lobby-page .picker-list.picker-list--scope-forward-a {
+  animation-name: lobbyPickerEnterForwardA;
+}
+
+.lobby-page .picker-list.picker-list--scope-forward-b {
+  animation-name: lobbyPickerEnterForwardB;
+}
+
+.lobby-page .picker-list.picker-list--scope-back-a,
+.lobby-page .picker-list.picker-list--scope-back-b {
+  animation-duration: 260ms;
+  animation-timing-function: var(--lobby-ease-out, ease);
+  animation-fill-mode: both;
+}
+
+.lobby-page .picker-list.picker-list--scope-back-a {
+  animation-name: lobbyPickerEnterBackA;
+}
+
+.lobby-page .picker-list.picker-list--scope-back-b {
+  animation-name: lobbyPickerEnterBackB;
+}
+
+@keyframes lobbyPickerEnterForwardA {
+  from {
+    opacity: 0;
+    transform: translateX(22px) scale(0.996);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes lobbyPickerEnterForwardB {
+  from {
+    opacity: 0;
+    transform: translateX(22px) scale(0.996);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes lobbyPickerEnterBackA {
+  from {
+    opacity: 0;
+    transform: translateX(-22px) scale(0.996);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes lobbyPickerEnterBackB {
+  from {
+    opacity: 0;
+    transform: translateX(-22px) scale(0.996);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
 }
 
 @media (max-width: 920px) {
@@ -2476,8 +2552,7 @@ input[type="color"]::-moz-color-swatch {
     /* Make quiz cards span wider on mobile/tablet. */
     margin-top: 10px;
     padding: 12px 4px 16px;
-    min-height: calc((3 * 86px) + (2 * 10px));
-    max-height: clamp(280px, 46vh, 460px);
+    --mr-picker-list-h: clamp(280px, 46vh, 460px);
   }
 
   /* Mobile: remove heavy card shadows in picker grid (looks cramped on small screens). */

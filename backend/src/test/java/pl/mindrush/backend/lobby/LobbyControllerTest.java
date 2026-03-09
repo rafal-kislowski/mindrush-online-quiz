@@ -11,6 +11,11 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import pl.mindrush.backend.guest.GuestSessionRepository;
+import pl.mindrush.backend.quiz.Quiz;
+import pl.mindrush.backend.quiz.QuizModerationStatus;
+import pl.mindrush.backend.quiz.QuizRepository;
+import pl.mindrush.backend.quiz.QuizSource;
+import pl.mindrush.backend.quiz.QuizStatus;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -49,6 +54,9 @@ class LobbyControllerTest {
 
     @Autowired
     private LobbyService lobbyService;
+
+    @Autowired
+    private QuizRepository quizRepository;
 
     @BeforeEach
     void setUp() {
@@ -1129,6 +1137,77 @@ class LobbyControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.players[0].ready").value(false))
                 .andExpect(jsonPath("$.players[1].ready").value(false));
+    }
+
+    @Test
+    void setSelectedQuiz_rejectsOwnerPendingCustomQuiz() throws Exception {
+        Cookie accessCookie = registerAndGetAccessCookie();
+        String ownerSessionId = createGuestSession(accessCookie);
+
+        MvcResult created = mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String code = jsonValue(created.getResponse().getContentAsString(), "\"code\":\"", "\"").orElseThrow();
+
+        Long ownerUserId = guestSessionRepository.findById(ownerSessionId)
+                .map(s -> s.getUserId())
+                .orElseThrow();
+
+        Quiz pendingQuiz = new Quiz("Owner pending", "desc", null);
+        pendingQuiz.setSource(QuizSource.CUSTOM);
+        pendingQuiz.setOwnerUserId(ownerUserId);
+        pendingQuiz.setStatus(QuizStatus.ACTIVE);
+        pendingQuiz.setModerationStatus(QuizModerationStatus.PENDING);
+        pendingQuiz = quizRepository.save(pendingQuiz);
+
+        try {
+            mockMvc.perform(post("/api/lobbies/" + code + "/selected-quiz")
+                            .cookie(new Cookie("guestSessionId", ownerSessionId))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"quizId\":" + pendingQuiz.getId() + "}"))
+                    .andExpect(status().isNotFound());
+        } finally {
+            quizRepository.deleteById(pendingQuiz.getId());
+        }
+    }
+
+    @Test
+    void setSelectedQuiz_whenRankingEnabled_rejectsCustomQuiz() throws Exception {
+        Cookie accessCookie = registerAndGetAccessCookie();
+        String ownerSessionId = createGuestSession(accessCookie);
+
+        MvcResult created = mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String code = jsonValue(created.getResponse().getContentAsString(), "\"code\":\"", "\"").orElseThrow();
+
+        Long ownerUserId = guestSessionRepository.findById(ownerSessionId)
+                .map(s -> s.getUserId())
+                .orElseThrow();
+
+        Quiz approvedCustom = new Quiz("Owner approved custom", "desc", null);
+        approvedCustom.setSource(QuizSource.CUSTOM);
+        approvedCustom.setOwnerUserId(ownerUserId);
+        approvedCustom.setStatus(QuizStatus.ACTIVE);
+        approvedCustom.setModerationStatus(QuizModerationStatus.APPROVED);
+        approvedCustom.setIncludeInRanking(true);
+        approvedCustom = quizRepository.save(approvedCustom);
+
+        try {
+            mockMvc.perform(post("/api/lobbies/" + code + "/selected-quiz")
+                            .cookie(new Cookie("guestSessionId", ownerSessionId))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"quizId\":" + approvedCustom.getId() + ",\"rankingEnabled\":true}"))
+                    .andExpect(status().isConflict());
+        } finally {
+            quizRepository.deleteById(approvedCustom.getId());
+        }
     }
 
     @Test

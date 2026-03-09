@@ -25,6 +25,7 @@ import java.nio.file.Path;
 import java.util.Optional;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -230,6 +231,55 @@ class LibraryQuizControllerTest {
     }
 
     @Test
+    void listQuizzes_hidesUnapprovedCustomAndLibraryContainsOnlyOwnedPublic() throws Exception {
+        Cookie viewerCookie = loginAsUser("viewer-list@example.com");
+        AppUser viewer = userRepository.findByEmailIgnoreCase("viewer-list@example.com").orElseThrow();
+        AppUser otherOwner = createUser("owner-list@example.com");
+
+        Quiz ownedApproved = new Quiz("Owned approved", "desc", null);
+        ownedApproved.setSource(QuizSource.CUSTOM);
+        ownedApproved.setOwnerUserId(viewer.getId());
+        ownedApproved.setStatus(QuizStatus.ACTIVE);
+        ownedApproved.setModerationStatus(QuizModerationStatus.APPROVED);
+        ownedApproved = quizRepository.save(ownedApproved);
+
+        Quiz ownedPending = new Quiz("Owned pending", "desc", null);
+        ownedPending.setSource(QuizSource.CUSTOM);
+        ownedPending.setOwnerUserId(viewer.getId());
+        ownedPending.setStatus(QuizStatus.ACTIVE);
+        ownedPending.setModerationStatus(QuizModerationStatus.PENDING);
+        ownedPending = quizRepository.save(ownedPending);
+
+        Quiz otherApproved = new Quiz("Other approved", "desc", null);
+        otherApproved.setSource(QuizSource.CUSTOM);
+        otherApproved.setOwnerUserId(otherOwner.getId());
+        otherApproved.setStatus(QuizStatus.ACTIVE);
+        otherApproved.setModerationStatus(QuizModerationStatus.APPROVED);
+        otherApproved = quizRepository.save(otherApproved);
+
+        favoriteRepository.save(QuizFavorite.create(viewer.getId(), otherApproved.getId(), clock.instant()));
+
+        MvcResult listRes = mockMvc.perform(get("/api/quizzes").cookie(viewerCookie))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode rows = objectMapper.readTree(listRes.getResponse().getContentAsString());
+        JsonNode ownedApprovedRow = quizRowById(rows, ownedApproved.getId());
+        JsonNode ownedPendingRow = quizRowById(rows, ownedPending.getId());
+        JsonNode otherApprovedRow = quizRowById(rows, otherApproved.getId());
+
+        assertThat(ownedApprovedRow).isNotNull();
+        assertThat(ownedApprovedRow.path("inLibrary").asBoolean(false)).isTrue();
+        assertThat(ownedApprovedRow.path("publicAvailable").asBoolean(false)).isTrue();
+
+        assertThat(ownedPendingRow).isNull();
+
+        assertThat(otherApprovedRow).isNotNull();
+        assertThat(otherApprovedRow.path("favorite").asBoolean(false)).isTrue();
+        assertThat(otherApprovedRow.path("inLibrary").asBoolean(true)).isFalse();
+    }
+
+    @Test
     void mediaUpload_requiresAuthenticationAndStoresImage() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
                 "file",
@@ -311,6 +361,16 @@ class LibraryQuizControllerTest {
     }
 
     private record Login(String email, String password) {}
+
+    private JsonNode quizRowById(JsonNode rows, Long id) {
+        if (rows == null || !rows.isArray() || id == null) return null;
+        for (JsonNode row : rows) {
+            if (row.path("id").asLong(-1) == id) {
+                return row;
+            }
+        }
+        return null;
+    }
 
     private static Optional<String> cookieValueFromSetCookie(String setCookie, String cookieName) {
         if (setCookie == null || setCookie.isBlank()) return Optional.empty();

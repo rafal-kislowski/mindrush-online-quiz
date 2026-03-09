@@ -1121,61 +1121,63 @@
                     </div>
                   </div>
 
-                  <div class="picker-list" role="region" aria-label="Quiz list">
-                    <div class="quiz-grid quiz-grid--picker">
-                      <button
-                        class="quiz-card"
-                        *ngFor="let q of filteredQuizzes"
-                        type="button"
-                        [class.active]="selectedQuizId === q.id"
-                        (click)="selectQuiz(q.id)"
-                        [disabled]="selectedQuizSaving"
-                      >
-                        <div
-                          class="quiz-card__avatar"
-                          [ngStyle]="quizAvatarStyle(q)"
+                  <div class="picker-list" [ngClass]="pickerListAnimClass" role="region" aria-label="Quiz list">
+                    <ng-container *ngIf="filteredQuizzes as visibleQuizzes">
+                      <div class="quiz-grid quiz-grid--picker">
+                        <button
+                          class="quiz-card"
+                          *ngFor="let q of visibleQuizzes; trackBy: trackQuizCard"
+                          type="button"
+                          [class.active]="selectedQuizId === q.id"
+                          (click)="selectQuiz(q.id)"
+                          [disabled]="selectedQuizSaving && !matchTypeSyncInFlight"
                         >
-                          <span
-                            class="quiz-card__txt"
-                            aria-hidden="true"
-                            *ngIf="!q.avatarImageUrl"
-                            >{{ quizInitials(q.title) }}</span
-                          >
-                        </div>
-                        <div class="quiz-card__body">
                           <div
-                            class="quiz-card__title"
-                            [attr.title]="q.title"
-                            #quizTitle
+                            class="quiz-card__avatar"
+                            [ngStyle]="quizAvatarStyle(q)"
                           >
-                            <span class="quiz-card__titleMarquee">
-                              <span class="quiz-card__titleOnce">{{
-                                q.title
-                              }}</span>
-                              <span
-                                class="quiz-card__titleGap"
-                                aria-hidden="true"
-                              ></span>
-                              <span
-                                class="quiz-card__titleOnce"
-                                aria-hidden="true"
-                                >{{ q.title }}</span
-                              >
-                            </span>
+                            <span
+                              class="quiz-card__txt"
+                              aria-hidden="true"
+                              *ngIf="!q.avatarImageUrl"
+                              >{{ quizInitials(q.title) }}</span
+                            >
                           </div>
-                          <div class="quiz-card__meta muted">
-                            {{ q.categoryName ?? "Uncategorized" }}
+                          <div class="quiz-card__body">
+                            <div
+                              class="quiz-card__title"
+                              [attr.title]="q.title"
+                              #quizTitle
+                            >
+                              <span class="quiz-card__titleMarquee">
+                                <span class="quiz-card__titleOnce">{{
+                                  q.title
+                                }}</span>
+                                <span
+                                  class="quiz-card__titleGap"
+                                  aria-hidden="true"
+                                ></span>
+                                <span
+                                  class="quiz-card__titleOnce"
+                                  aria-hidden="true"
+                                  >{{ q.title }}</span
+                                >
+                              </span>
+                            </div>
+                            <div class="quiz-card__meta muted">
+                              {{ q.categoryName ?? "Uncategorized" }}
+                            </div>
                           </div>
-                        </div>
-                      </button>
-                    </div>
+                        </button>
+                      </div>
 
-                    <div
-                      class="muted picker-empty"
-                      *ngIf="!filteredQuizzes.length"
-                    >
-                      No quizzes match your filters.
-                    </div>
+                      <div
+                        class="muted picker-empty"
+                        *ngIf="!visibleQuizzes.length && !matchTypeSyncInFlight"
+                      >
+                        No quizzes match your filters.
+                      </div>
+                    </ng-container>
                   </div>
                 </section>
               </div>

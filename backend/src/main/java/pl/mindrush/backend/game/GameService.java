@@ -150,6 +150,10 @@ public class GameService {
         return QuizVisibilityRules.canUserPlay(quiz, userId);
     }
 
+    private boolean isLobbyQuizPlayable(Quiz quiz) {
+        return QuizVisibilityRules.isPubliclyVisible(quiz);
+    }
+
     private boolean normalizeRankingRequested(Boolean ranked, boolean fallback) {
         return ranked == null ? fallback : ranked;
     }
@@ -161,6 +165,9 @@ public class GameService {
         }
         if (quiz == null || !quiz.isIncludeInRanking()) {
             throw new ResponseStatusException(CONFLICT, "Selected quiz is not eligible for ranked games");
+        }
+        if (quiz.getSource() != QuizSource.OFFICIAL) {
+            throw new ResponseStatusException(CONFLICT, "Ranked games support official quizzes only");
         }
     }
 
@@ -245,7 +252,7 @@ public class GameService {
         }
 
         Quiz quiz = quizRepository.findById(quizId).orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Quiz not found"));
-        if (!isQuizPlayableForUser(quiz, guestSession.getUserId())) {
+        if (!isLobbyQuizPlayable(quiz)) {
             throw new ResponseStatusException(CONFLICT, "Quiz is not active");
         }
 
@@ -341,9 +348,7 @@ public class GameService {
         }
 
         Quiz quiz = quizRepository.findById(lobby.getSelectedQuizId()).orElse(null);
-        GuestSession ownerSession = guestSessionRepository.findById(lobby.getOwnerGuestSessionId()).orElse(null);
-        Long ownerUserId = ownerSession == null ? null : ownerSession.getUserId();
-        if (!isQuizPlayableForUser(quiz, ownerUserId)) return Optional.empty();
+        if (!isLobbyQuizPlayable(quiz)) return Optional.empty();
         long questionCount = questionRepository.countByQuizId(quiz.getId());
         if (questionCount == 0) return Optional.empty();
 

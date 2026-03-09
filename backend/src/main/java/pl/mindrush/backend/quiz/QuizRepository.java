@@ -30,16 +30,6 @@ public interface QuizRepository extends JpaRepository<Quiz, Long> {
             select q
             from Quiz q
             left join fetch q.category
-            where q.ownerUserId = :ownerUserId
-              and q.status <> pl.mindrush.backend.quiz.QuizStatus.TRASHED
-            order by q.id desc
-            """)
-    List<Quiz> findAllOwnedVisibleByUserId(Long ownerUserId);
-
-    @Query("""
-            select q
-            from Quiz q
-            left join fetch q.category
             where q.id in :ids
               and q.status = pl.mindrush.backend.quiz.QuizStatus.ACTIVE
             """)
