@@ -99,14 +99,62 @@ Authentication uses a short-lived access JWT + a long-lived refresh token, both 
 - `refreshToken` (random token, server-side persisted and rotatable)
 
 Endpoints:
-- `POST /api/auth/register` -> creates a user (email + nickname) and logs in (sets cookies)
+- `POST /api/auth/register` -> creates a user (email + nickname) and sends verification email
 - `POST /api/auth/login` -> logs in (sets cookies)
 - `POST /api/auth/refresh` -> rotates refresh token + issues a new access token (sets cookies)
 - `POST /api/auth/logout` -> revokes refresh token and clears cookies
 - `GET /api/auth/me` -> current authenticated user
+- `POST /api/auth/verification/resend` -> sends verification email again (generic response, no account enumeration)
+- `POST /api/auth/verify-email` -> verifies account email using one-time token
+- `POST /api/auth/password/forgot` -> sends password reset email (generic response, no account enumeration)
+- `POST /api/auth/password/reset` -> sets a new password using one-time reset token
 
 Notes:
 - The UI shows `displayName` (nickname) in game/lobby instead of email.
+- Verification and reset emails are rendered with Thymeleaf HTML templates (`backend/src/main/resources/templates/mail/*`).
+- Password reset and email verification tokens are hashed server-side and stored in `auth_action_tokens`.
+- Login/refresh for unverified accounts is blocked by default (`app.auth.require-verified-email=true`).
+
+Mail configuration (example):
+```properties
+app.mail.enabled=true
+app.mail.from=no-reply@mindrush.example
+app.mail.support-email=support@mindrush.example
+app.mail.frontend-base-url=https://app.mindrush.example
+app.mail.verify-path=/verify-email
+app.mail.reset-path=/reset-password
+app.mail.verify-ttl=PT24H
+app.mail.reset-ttl=PT30M
+app.mail.verify-resend-cooldown=PT2M
+app.mail.reset-request-cooldown=PT2M
+spring.mail.host=smtp.example.com
+spring.mail.port=587
+spring.mail.username=...
+spring.mail.password=...
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true
+```
+
+Local Gmail quick start (development):
+- Create a Google App Password (recommended for SMTP) and use that password, not your normal account password.
+- Set variables before starting backend (PowerShell example):
+
+```powershell
+$env:APP_MAIL_ENABLED="true"
+$env:APP_MAIL_FROM="your-address@gmail.com"
+$env:APP_MAIL_SUPPORT="your-address@gmail.com"
+$env:APP_FRONTEND_BASE_URL="http://localhost:4200"
+$env:APP_MAIL_VERIFY_RESEND_COOLDOWN="PT2M"
+$env:APP_MAIL_RESET_REQUEST_COOLDOWN="PT2M"
+$env:SMTP_HOST="smtp.gmail.com"
+$env:SMTP_PORT="587"
+$env:SMTP_USERNAME="your-address@gmail.com"
+$env:SMTP_PASSWORD="your-16-char-app-password"
+$env:SMTP_AUTH="true"
+$env:SMTP_STARTTLS="true"
+```
+
+- If you need temporary local behavior without mandatory activation, set `APP_AUTH_REQUIRE_VERIFIED_EMAIL=false`.
 
 ## API error format
 Validation and business errors return a consistent JSON body:
@@ -209,9 +257,11 @@ Endpoints for authenticated users:
 
 Notes:
 - Limits are enforced on backend and configurable in `application.properties` under `app.library.policy.*` (`user` and `premium` tiers).
-- Default `USER` limits: `20` owned quizzes, `5` published quizzes, `3` pending submissions, `50` max questions/quiz.
+- Default `USER` limits: `20` owned quizzes, `5` published quizzes, `3` pending submissions, `50` max questions/quiz, `10` question images/quiz.
 - Submission requires at least `5` questions by default.
 - User media URLs in library flows must reference stored files (`/media/...`) and avatar colors must be valid HEX values.
+- User-created quiz answer options are text-only (option images are currently disabled for library/user flows).
+- Question image limit per tier is configurable via `app.library.policy.<tier>.max-question-images-per-quiz`.
 - Upload limits and MIME whitelist are controlled by `app.library.policy.media.*` (default max upload `2MB`).
 - Favorite operations are available only for publicly visible quizzes.
 
@@ -241,6 +291,10 @@ Admin-only submission moderation endpoints:
 - `DELETE /api/admin/quiz-submissions/{id}/questions/{questionId}/image` -> remove question image
 - `DELETE /api/admin/quiz-submissions/{id}/questions/{questionId}/options/{optionId}/image` -> remove answer option image
 
+Notes:
+- Approve/reject sends both an in-app notification and an email with deep-link to moderation context in library view.
+- If quiz becomes unavailable before user opens the link, frontend falls back to dashboard with warning toast.
+
 ## User notifications
 Persistent user notifications are stored in DB table `user_notifications` and exposed via REST + SSE.
 
@@ -262,6 +316,21 @@ Notes:
 - Frontend uses SSE to refresh navbar badge/list without page reload.
 - Clicking a notification marks it as read and can navigate to target route (for moderation: library with relevant query params).
 - Deleting notification is an explicit action (with confirmation in UI) and maps to `dismiss` API.
+
+## Achievements
+Authenticated player achievements are calculated from finished games and creator activity.
+
+Endpoints:
+- `GET /api/achievements/me` -> achievement catalog with unlock/progress state for current user
+
+Response highlights:
+- `title`, `description`
+- `totalCount`, `unlockedCount`, `completionPct`
+- `items[]` with `key`, `title`, `description`, `icon`, `category`, `tier`, `tierColor`, `target`, `progress`, `unlocked`, `unlockedAt`
+
+Notes:
+- Unlocks are persisted in `user_achievement_unlocks`.
+- Achievement unlock emits a `reward` notification for the player.
 
 Optional dev seed data:
 - Seed is enabled by default for local development (`app.seed.enabled=true`) and runs only when there are no quizzes in DB.
