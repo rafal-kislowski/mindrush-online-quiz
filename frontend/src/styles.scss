@@ -3809,8 +3809,7 @@ input[type="color"]::-moz-color-swatch {
     0 10px 22px rgba(5, 16, 30, 0.24);
 }
 
-.lobby-page .players-panel .row-item.is-me,
-.lobby-page .players-panel .row-item.is-ready.is-me {
+.lobby-page .players-panel .row-item.is-me:not(.is-ready) {
   background: linear-gradient(
     90deg,
     rgba(31, 74, 142, 0.5),
@@ -3848,7 +3847,7 @@ input[type="color"]::-moz-color-swatch {
 
 }
 
-.lobby-page .players-panel .row-item.has-actions.is-me:hover {
+.lobby-page .players-panel .row-item.has-actions.is-me:not(.is-ready):hover {
   background: linear-gradient(
     90deg,
     rgba(31, 74, 142, 0.56),
