@@ -24,6 +24,7 @@ import { rankForPoints } from '../../core/progression/progression';
 import { AuthService } from '../../core/auth/auth.service';
 import { SessionService } from '../../core/session/session.service';
 import { PlayerAvatarComponent } from '../../core/ui/player-avatar.component';
+import { PremiumBadgeComponent } from '../../core/ui/premium-badge.component';
 import { ToastService } from '../../core/ui/toast.service';
 import { GameEventsService } from '../../core/ws/game-events.service';
 import { LobbyChatMessageDto, LobbyChatService } from '../../core/ws/lobby-chat.service';
@@ -33,7 +34,7 @@ import { StompClientService } from '../../core/ws/stomp-client.service';
 @Component({
   selector: 'app-lobby',
   standalone: true,
-  imports: [CommonModule, FormsModule, PlayerAvatarComponent],
+  imports: [CommonModule, FormsModule, PlayerAvatarComponent, PremiumBadgeComponent],
   templateUrl: './lobby.component.html',
   styleUrl: './lobby.component.scss',
 })
@@ -104,6 +105,8 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   private hasLiveLobbySnapshot = false;
   private lobbySnapshotFetchInFlight = false;
   private quizzesLoaded = false;
+  private quizzesLoadInFlight = false;
+  private quizzesReloadPending = false;
   private autoJoinInFlight = false;
   private autoJoinFailed = false;
   private autoJoinBlocked = false;
@@ -494,8 +497,15 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     this.syncMatchTypeFromLobby(lobby);
-    if (prevSelectedQuizId !== (this.selectedQuizId ?? null) || prevMatchType !== this.matchType) {
+    const nextSelectedQuizId = this.selectedQuizId ?? null;
+    if (prevSelectedQuizId !== nextSelectedQuizId || prevMatchType !== this.matchType) {
       this.scheduleMarqueeMeasure();
+    }
+    const selectedQuizClearedByServer = prevSelectedQuizId != null
+      && nextSelectedQuizId == null
+      && !this.selectedQuizSaving;
+    if (selectedQuizClearedByServer) {
+      this.loadQuizzes(true);
     }
 
     if (this.view === 'picker' && !lobby.isOwner) {
@@ -535,8 +545,8 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     if (!this.quizzesLoaded) {
-      this.loadQuizzes();
       this.quizzesLoaded = true;
+      this.loadQuizzes();
     }
 
     if (
@@ -968,18 +978,29 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  private loadQuizzes(): void {
+  private loadQuizzes(forceRefresh = false): void {
+    if (this.quizzesLoadInFlight) {
+      if (forceRefresh) {
+        this.quizzesReloadPending = true;
+      }
+      return;
+    }
+    this.quizzesLoadInFlight = true;
     this.quizApi.list().subscribe({
       next: (quizzes) => {
         this.quizzes = quizzes;
         this.recomputeCategoryOptions();
         this.syncMatchTypeFromLobby(this.lobby);
         this.quizzesReady = true;
+        this.quizzesLoadInFlight = false;
+        this.flushPendingQuizReload();
       },
       error: () => {
         this.quizzes = [];
         this.categoryOptions = [];
         this.quizzesReady = true;
+        this.quizzesLoadInFlight = false;
+        this.flushPendingQuizReload();
       },
     });
   }
@@ -989,6 +1010,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.cancelPrivacyPinEdit();
     this.hasViewSwitched = true;
     this.view = 'picker';
+    this.loadQuizzes(true);
     this.categoryMenuOpen = false;
     this.categoryMenuSearch = '';
     this.sortMenuOpen = false;
@@ -1777,6 +1799,8 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.chatEventsSubscription = null;
     this.lobbyDiffInitialized = false;
     this.quizzesLoaded = false;
+    this.quizzesLoadInFlight = false;
+    this.quizzesReloadPending = false;
     this.quizzesReady = false;
     this.initialLobbyReady = false;
     this.quizzes = [];
@@ -1796,6 +1820,12 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       this.matchTypeDebounceTimer = null;
     }
     this.readySaving = false;
+  }
+
+  private flushPendingQuizReload(): void {
+    if (!this.quizzesReloadPending) return;
+    this.quizzesReloadPending = false;
+    this.loadQuizzes(true);
   }
 
   private updateInitialLoadingOverlayPreference(nextCode: string): void {

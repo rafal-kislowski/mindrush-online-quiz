@@ -73,8 +73,8 @@
 
           <div class="profile-card__identity">
             <div class="user__nameRow">
-              <div class="user__name">{{ p.displayName }}</div>
-              <span class="role-badge" *ngIf="p.isAdmin">Admin</span>
+              <app-premium-badge *ngIf="p.isPremium" [size]="18"></app-premium-badge>
+              <div class="user__name" [class.mr-premium-name]="p.isPremium">{{ p.displayName }}</div>
             </div>
           </div>
 
@@ -401,7 +401,16 @@
 
             <div class="app-notifications__menu" *ngIf="notificationsOpen" role="menu" aria-label="Notifications">
               <div class="app-notifications__head">
-                <div class="app-notifications__titlebar">Notifications</div>
+                <div class="app-notifications__titlebar">Notifications ({{ notificationTitleCount }})</div>
+                <button
+                  class="app-notifications__clear-all"
+                  type="button"
+                  (click)="clearAllNotifications($event)"
+                  [disabled]="!notificationTitleCount"
+                  aria-label="Clear all notifications"
+                >
+                  Clear all
+                </button>
               </div>
 
               <div class="app-notifications__empty" *ngIf="!visibleNotifications.length">
@@ -424,16 +433,19 @@
                   <button class="app-notifications__item-main" type="button" role="menuitem" (click)="openNotification(item)">
                     <span
                       class="app-notifications__avatar"
+                      [class.app-notifications__avatar--reward]="item.category === 'reward'"
                       [ngStyle]="notificationQuizAvatarStyle(item)"
                       aria-hidden="true"
                     >
-                      <span class="app-notifications__avatar-initials" *ngIf="!item.avatarImageUrl">
+                      <i class="app-notifications__avatar-icon fa-solid fa-trophy" *ngIf="item.category === 'reward'"></i>
+                      <span class="app-notifications__avatar-initials" *ngIf="!item.avatarImageUrl && item.category !== 'reward'">
                         {{ notificationInitials(item.subtitle || item.title) }}
                       </span>
                     </span>
 
                     <span class="app-notifications__item-content">
                       <span class="app-notifications__item-top">
+                        <span class="app-notifications__item-unread-dot" *ngIf="isNotificationUnread(item)" aria-hidden="true"></span>
                         <span class="app-notifications__item-title">{{ item.title }}</span>
                         <span
                           class="app-notifications__item-status"
@@ -461,8 +473,48 @@
               </div>
             </div>
           </div>
-          <span class="topbar__user">{{ user.displayName }}</span>
-          <button class="btn" type="button" (click)="logout()">Logout</button>
+
+          <div class="topbar-profile" #profileMenu>
+            <button
+              class="btn topbar-profile__trigger"
+              type="button"
+              (click)="toggleProfileMenu($event)"
+              [attr.aria-expanded]="profileMenuOpen"
+              aria-haspopup="menu"
+              aria-label="User menu"
+            >
+              <app-player-avatar
+                class="topbar-profile__avatar"
+                [displayName]="user.displayName"
+                [isAuthenticated]="true"
+                [size]="34"
+                [decorative]="true"
+              ></app-player-avatar>
+            </button>
+
+            <div class="topbar-profile__menu" *ngIf="profileMenuOpen" role="menu" aria-label="User menu">
+              <div class="topbar-profile__name">
+                <app-premium-badge *ngIf="user.roles.includes('PREMIUM')" [size]="16"></app-premium-badge>
+                <span [class.mr-premium-name]="user.roles.includes('PREMIUM')">{{ user.displayName }}</span>
+              </div>
+              <div class="topbar-profile__divider" aria-hidden="true"></div>
+
+              <button class="topbar-profile__item" type="button" role="menuitem" (click)="openProfile($event)">
+                My profile
+              </button>
+              <button class="topbar-profile__item" type="button" role="menuitem" (click)="openSettings($event)">
+                Settings
+              </button>
+              <button
+                class="topbar-profile__item topbar-profile__item--danger"
+                type="button"
+                role="menuitem"
+                (click)="logoutFromProfileMenu($event)"
+              >
+                Log out
+              </button>
+            </div>
+          </div>
         </ng-container>
         <ng-template #guestActions>
           <a class="btn secondary" routerLink="/login">Login</a>

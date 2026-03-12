@@ -15,9 +15,11 @@ import {
   GameStateDto,
 } from '../../core/models/game.models';
 import { rankForPoints } from '../../core/progression/progression';
+import { ProfileInsightsService } from '../../core/profile/profile-insights.service';
 import { SessionService } from '../../core/session/session.service';
 import { ConfettiService } from '../../core/ui/confetti.service';
 import { PlayerAvatarComponent } from '../../core/ui/player-avatar.component';
+import { PremiumBadgeComponent } from '../../core/ui/premium-badge.component';
 import { ToastService } from '../../core/ui/toast.service';
 import { GameEventsService } from '../../core/ws/game-events.service';
 import { StompClientService } from '../../core/ws/stomp-client.service';
@@ -25,7 +27,7 @@ import { StompClientService } from '../../core/ws/stomp-client.service';
 @Component({
   selector: 'app-game',
   standalone: true,
-  imports: [CommonModule, PlayerAvatarComponent],
+  imports: [CommonModule, PlayerAvatarComponent, PremiumBadgeComponent],
   templateUrl: './game.component.html',
   styleUrl: './game.component.scss',
 })
@@ -89,6 +91,7 @@ export class GameComponent implements OnInit, OnDestroy {
     private readonly sessionService: SessionService,
     private readonly stompClient: StompClientService,
     private readonly authService: AuthService,
+    private readonly profileInsights: ProfileInsightsService,
     private readonly confettiService: ConfettiService,
     private readonly toast: ToastService
   ) {}
@@ -174,8 +177,7 @@ export class GameComponent implements OnInit, OnDestroy {
     this.stateRequest$().subscribe({
       next: (state) => {
         this.syncServerClock(state, requestStartedAtMs, Date.now());
-        this.state = state;
-        this.onStateUpdated(state);
+        this.applyStateIfFresh(state);
       },
       error: (err) => this.handleStateLoadError(err, false),
     });
@@ -189,8 +191,7 @@ export class GameComponent implements OnInit, OnDestroy {
       next: (state) => {
         this.silentRefreshInFlight = false;
         this.syncServerClock(state, requestStartedAtMs, Date.now());
-        this.state = state;
-        this.onStateUpdated(state);
+        this.applyStateIfFresh(state);
       },
       error: (err) => {
         this.silentRefreshInFlight = false;
@@ -216,8 +217,7 @@ export class GameComponent implements OnInit, OnDestroy {
     request$.subscribe({
       next: (state) => {
         this.submittingAnswer = false;
-        this.state = state;
-        this.onStateUpdated(state);
+        this.applyStateIfFresh(state);
       },
       error: (err) => {
         this.submittingAnswer = false;
@@ -237,8 +237,7 @@ export class GameComponent implements OnInit, OnDestroy {
     request$.subscribe({
       next: (state) => {
         this.endingGame = false;
-        this.state = state;
-        this.onStateUpdated(state);
+        this.applyStateIfFresh(state);
       },
       error: (err) => {
         this.endingGame = false;
@@ -691,6 +690,12 @@ export class GameComponent implements OnInit, OnDestroy {
     if (stageChanged && state.stage === 'FINISHED') {
       this.sessionService.refresh().subscribe({ error: () => {} });
       this.authService.reloadMe().subscribe({ error: () => {} });
+      const me = this.resolveCurrentPlayerFromResults(state.players ?? []);
+      const correctAnswers = this.safeInt(me?.correctAnswers);
+      const won = me?.winner === true;
+      const mode = this.isSoloFlow ? 'SOLO' : 'LOBBY';
+      const gameKey = this.finishedGameKey(state);
+      this.profileInsights.trackFinishedGame(mode, gameKey, correctAnswers, won);
       this.playWinnerConfettiIfEligible(state);
     }
 
@@ -1023,20 +1028,13 @@ export class GameComponent implements OnInit, OnDestroy {
   private isDrawTopPlayer(player: GamePlayerDto): boolean {
     const players = this.state?.players ?? [];
     if (players.length < 2) return false;
-
-    // For result icon UX treat equal top score as a draw group,
-    // even if sort tiebreakers (correct/time) still determine row order.
-    let topScore = Number.NEGATIVE_INFINITY;
-    for (const p of players) {
-      const score = this.safeInt(p.score);
-      if (score > topScore) topScore = score;
-    }
-    if (!Number.isFinite(topScore)) return false;
-
-    const topScorePlayers = players.filter((p) => this.safeInt(p.score) === topScore);
-    if (topScorePlayers.length < 2) return false;
-
-    return this.safeInt(player.score) === topScore;
+    const sorted = this.sortPlayersForResults(players);
+    const top = sorted[0];
+    if (!top) return false;
+    const topSignature = this.playerResultSignature(top);
+    const topGroupSize = this.countPlayersWithSameResult(sorted, top);
+    if (topGroupSize < 2) return false;
+    return this.playerResultSignature(player) === topSignature;
   }
 
   private resolveMyFinishedPlacement(players: readonly GamePlayerDto[]): number | null {
@@ -1078,5 +1076,83 @@ export class GameComponent implements OnInit, OnDestroy {
 
   private normalizedName(value: string | null | undefined): string {
     return String(value ?? '').trim().toLowerCase();
+  }
+
+  private applyStateIfFresh(state: GameStateDto): void {
+    if (!this.shouldApplyIncomingState(this.state, state)) return;
+    this.state = state;
+    this.onStateUpdated(state);
+  }
+
+  private shouldApplyIncomingState(
+    current: GameStateDto | null,
+    incoming: GameStateDto
+  ): boolean {
+    if (!current) return true;
+    const currentSessionId = String(current.gameSessionId ?? '').trim();
+    const incomingSessionId = String(incoming.gameSessionId ?? '').trim();
+    if (currentSessionId !== incomingSessionId) return true;
+
+    const progressCmp = this.compareStateProgress(current, incoming);
+    if (progressCmp < 0) return false;
+    if (progressCmp > 0) return true;
+
+    const currentServerTime = this.parseServerTimeMs(current.serverTime);
+    const incomingServerTime = this.parseServerTimeMs(incoming.serverTime);
+    if (currentServerTime != null && incomingServerTime != null) {
+      return incomingServerTime >= currentServerTime;
+    }
+    return true;
+  }
+
+  private compareStateProgress(current: GameStateDto, incoming: GameStateDto): number {
+    const currentIndex = Math.max(0, this.safeInt(current.questionIndex));
+    const incomingIndex = Math.max(0, this.safeInt(incoming.questionIndex));
+    if (incomingIndex !== currentIndex) {
+      return incomingIndex > currentIndex ? 1 : -1;
+    }
+
+    const currentStageRank = this.stageRank(current.stage);
+    const incomingStageRank = this.stageRank(incoming.stage);
+    if (incomingStageRank !== currentStageRank) {
+      return incomingStageRank > currentStageRank ? 1 : -1;
+    }
+
+    // Within the same reveal state, prefer the richer payload with known correct option.
+    if (
+      current.stage === 'REVEAL' &&
+      incoming.stage === 'REVEAL' &&
+      current.correctOptionId != null &&
+      incoming.correctOptionId == null
+    ) {
+      return -1;
+    }
+    return 0;
+  }
+
+  private stageRank(stage: string | null | undefined): number {
+    const normalized = String(stage ?? '').trim().toUpperCase();
+    if (normalized === 'PRE_COUNTDOWN') return 0;
+    if (normalized === 'QUESTION') return 1;
+    if (normalized === 'REVEAL') return 2;
+    if (normalized === 'FINISHED') return 3;
+    if (normalized === 'NO_GAME') return 4;
+    return 0;
+  }
+
+  private parseServerTimeMs(value: string | null | undefined): number | null {
+    const raw = String(value ?? '').trim();
+    if (!raw) return null;
+    const ms = new Date(raw).getTime();
+    return Number.isFinite(ms) ? ms : null;
+  }
+
+  private finishedGameKey(state: GameStateDto): string {
+    const sessionId = String(state.gameSessionId ?? '').trim();
+    if (sessionId) return `${this.isSoloFlow ? 'SOLO' : 'LOBBY'}:${sessionId}`;
+
+    const modePrefix = this.isSoloFlow ? 'SOLO' : 'LOBBY';
+    const scope = this.isSoloFlow ? this.soloSessionId : this.code;
+    return `${modePrefix}:${scope}:${state.totalQuestions}:${state.questionIndex}`;
   }
 }

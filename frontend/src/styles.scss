@@ -428,6 +428,29 @@ a {
   color: #ff5a7a;
 }
 
+/* Shared premium nickname sparkle (used with the diamond badge across views). */
+.mr-premium-name {
+  position: relative;
+  z-index: 0;
+  display: inline-block;
+  isolation: isolate;
+  color: inherit;
+  text-shadow: none;
+}
+
+.mr-premium-name::after {
+  content: "";
+  position: absolute;
+  inset: -0.14em -0.22em;
+  border-radius: 999px;
+  background: url('/dashboard/stars.gif') center / auto auto repeat;
+  opacity: 0.44;
+  mix-blend-mode: screen;
+  filter: saturate(1.1) contrast(1.06);
+  pointer-events: none;
+  z-index: 1;
+}
+
 .mr-flow-overlay {
   position: fixed;
   inset: 0;
@@ -3549,14 +3572,20 @@ input[type="color"]::-moz-color-swatch {
 }
 
 .lobby-page .name {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-weight: 950;
   font-size: 15px;
   line-height: 1.2;
+  min-width: 0;
+  transition: color 180ms ease, opacity 180ms ease, filter 180ms ease;
+}
+
+.lobby-page .name .name-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 0;
-  transition: color 180ms ease, opacity 180ms ease, filter 180ms ease;
 }
 
 .lobby-page .name.name--owner {
@@ -3888,10 +3917,17 @@ input[type="color"]::-moz-color-swatch {
 }
 
 .lobby-page .chat-line .nick {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-weight: 900;
   color: rgba(56, 189, 248, 0.95);
   white-space: nowrap;
   text-shadow: 0 10px 22px rgba(0, 0, 0, 0.25);
+}
+
+.lobby-page .chat-line .nick .nick-text {
+  white-space: nowrap;
 }
 
 .lobby-page .chat-line .nick.me {
@@ -5389,4 +5425,36 @@ input[type="color"]::-moz-color-swatch {
     min-height: 150px;
     max-height: 220px;
   }
+}
+
+/* Shared responsive behavior for top "Back" buttons across pages.
+   On small screens keep a compact circular icon-only variant. */
+@media (max-width: 480px) {
+  .mr-back-btn {
+    width: 38px !important;
+    min-width: 38px;
+    height: 38px !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    border-radius: 999px;
+    justify-content: center;
+  }
+
+  .mr-back-btn span {
+    display: none !important;
+  }
+}
+
+/* Settings: global interface preferences */
+body.mr-hide-particles #particles-js {
+  display: none !important;
+}
+
+body.mr-reduce-motion *,
+body.mr-reduce-motion *::before,
+body.mr-reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }

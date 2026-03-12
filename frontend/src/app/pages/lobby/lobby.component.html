@@ -66,13 +66,14 @@
         [class.lobby-actions--picker]="view === 'picker'"
       >
         <button
-          class="btn secondary"
+          class="btn secondary mr-back-btn"
           type="button"
           (click)="closeQuizSelection()"
           *ngIf="view === 'picker'"
           aria-label="Back to lobby"
         >
-          Back
+          <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+          <span>Back</span>
         </button>
         <button
           class="btn secondary leave-btn"
@@ -628,7 +629,8 @@
                             [decorative]="true"
                           ></app-player-avatar>
                           <span class="name" [class.name--away]="p.away" [class.name--owner]="p.isOwner">
-                            {{ p.displayName }}<span class="name-away" *ngIf="p.away"> (Away)</span>
+                            <app-premium-badge *ngIf="p.isPremium" [size]="16"></app-premium-badge>
+                            <span class="name-text" [class.mr-premium-name]="p.isPremium">{{ p.displayName }}</span><span class="name-away" *ngIf="p.away"> (Away)</span>
                           </span>
                           <span
                             class="rank-pill"
@@ -749,7 +751,7 @@
                         <span
                           class="nick"
                           [class.me]="m.displayName === meDisplayName"
-                          >{{ m.displayName }}:</span
+                          ><app-premium-badge *ngIf="m.isPremium" [size]="15"></app-premium-badge><span class="nick-text" [class.mr-premium-name]="m.isPremium">{{ m.displayName }}:</span></span
                         >
                         <span class="text">{{ m.text }}</span>
                       </ng-template>

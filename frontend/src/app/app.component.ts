@@ -7,7 +7,7 @@ import {
   RouterLinkActive,
   RouterOutlet,
 } from '@angular/router';
-import { Subscription, catchError, combineLatest, distinctUntilChanged, filter, finalize, interval, map, of, startWith, switchMap } from 'rxjs';
+import { Subscription, catchError, combineLatest, distinctUntilChanged, filter, finalize, forkJoin, interval, map, of, startWith, switchMap } from 'rxjs';
 import { AuthService } from './core/auth/auth.service';
 import { GameApi } from './core/api/game.api';
 import { LobbyApi } from './core/api/lobby.api';
@@ -18,6 +18,7 @@ import { SessionService } from './core/session/session.service';
 import { computeLevelProgress, levelTheme, rankForPoints } from './core/progression/progression';
 import { ParticlesService } from './core/ui/particles.service';
 import { PlayerAvatarComponent } from './core/ui/player-avatar.component';
+import { PremiumBadgeComponent } from './core/ui/premium-badge.component';
 import { ToastService } from './core/ui/toast.service';
 import { ToastViewportComponent } from './core/ui/toast-viewport.component';
 import { LobbyEventDto, LobbyEventsService } from './core/ws/lobby-events.service';
@@ -84,7 +85,7 @@ interface AppNotification {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, AsyncPipe, NgIf, NgFor, NgClass, NgStyle, RouterLink, RouterLinkActive, ToastViewportComponent, PlayerAvatarComponent],
+  imports: [RouterOutlet, AsyncPipe, NgIf, NgFor, NgClass, NgStyle, RouterLink, RouterLinkActive, ToastViewportComponent, PlayerAvatarComponent, PremiumBadgeComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
 })
@@ -109,7 +110,7 @@ export class AppComponent implements OnInit, OnDestroy {
       const isAuthenticated = !!user;
       const displayName = user?.displayName ?? session?.displayName ?? 'Guest';
       const roles = user?.roles ?? [];
-      const isAdmin = roles.includes('ADMIN');
+      const isPremium = roles.includes('PREMIUM');
 
       const rankPoints = user?.rankPoints ?? session?.rankPoints ?? 0;
       const xp = user?.xp ?? session?.xp ?? 0;
@@ -121,9 +122,9 @@ export class AppComponent implements OnInit, OnDestroy {
 
       return {
         isAuthenticated,
-        isAdmin,
         displayName,
         roles,
+        isPremium,
         rankPoints,
         rankName: rank.name,
         rankColor: rank.color,
@@ -156,7 +157,12 @@ export class AppComponent implements OnInit, OnDestroy {
   notifications: AppNotification[] = [];
   notificationFilter: 'all' | 'unread' = 'all';
   notificationsOpen = false;
+  profileMenuOpen = false;
   private unreadNotificationCountValue = 0;
+  private readonly dismissedNotificationIds = new Set<number>();
+  private readonly dismissInFlightNotificationIds = new Set<number>();
+  private readonly locallyReadNotificationIds = new Set<number>();
+  private readonly readInFlightNotificationIds = new Set<number>();
   private notificationStream: EventSource | null = null;
   private notificationStreamReconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private notificationStreamReconnectDelayMs = 0;
@@ -170,6 +176,9 @@ export class AppComponent implements OnInit, OnDestroy {
 
   @ViewChild('notificationsMenu')
   private notificationsMenuRef?: ElementRef<HTMLElement>;
+
+  @ViewChild('profileMenu')
+  private profileMenuRef?: ElementRef<HTMLElement>;
 
   readonly menuItems: Array<{
     label: string;
@@ -202,6 +211,7 @@ export class AppComponent implements OnInit, OnDestroy {
         .subscribe(() => {
           this.sidebarOpen = false;
           this.notificationsOpen = false;
+          this.profileMenuOpen = false;
           this.updateContentFlags(this.router.url);
           this.resetViewScrollToTop();
           this.refreshCurrentLobby();
@@ -243,6 +253,8 @@ export class AppComponent implements OnInit, OnDestroy {
       path === '/' ||
       path.startsWith('/play-solo') ||
       path.startsWith('/solo-game') ||
+      path.startsWith('/profile') ||
+      path.startsWith('/settings') ||
       path.startsWith('/leaderboards') ||
       path.startsWith('/lobbies') ||
       path.startsWith('/library') ||
@@ -270,6 +282,7 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   logout(): void {
+    this.profileMenuOpen = false;
     this.authService.logout().subscribe(() => {
       this.currentLobby = null;
       this.currentGame = null;
@@ -288,13 +301,50 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   get visibleNotifications(): AppNotification[] {
-    if (this.notificationFilter !== 'unread') return this.notifications;
-    return this.notifications.filter((item) => this.isNotificationUnread(item));
+    const base = this.notificationFilter !== 'unread'
+      ? this.notifications
+      : this.notifications.filter((item) => this.isNotificationUnread(item));
+    return base.filter((item) => !this.dismissedNotificationIds.has(item.id));
+  }
+
+  get notificationTitleCount(): number {
+    return this.visibleNotifications.length;
   }
 
   toggleNotifications(event?: Event): void {
     event?.stopPropagation();
-    this.notificationsOpen = !this.notificationsOpen;
+    const willOpen = !this.notificationsOpen;
+    this.notificationsOpen = willOpen;
+    if (willOpen) {
+      this.profileMenuOpen = false;
+    }
+  }
+
+  toggleProfileMenu(event?: Event): void {
+    event?.stopPropagation();
+    const willOpen = !this.profileMenuOpen;
+    this.profileMenuOpen = willOpen;
+    if (willOpen) {
+      this.notificationsOpen = false;
+    }
+  }
+
+  openProfile(event?: Event): void {
+    event?.stopPropagation();
+    this.profileMenuOpen = false;
+    void this.router.navigate(['/profile']);
+  }
+
+  openSettings(event?: Event): void {
+    event?.stopPropagation();
+    this.profileMenuOpen = false;
+    void this.router.navigate(['/settings']);
+  }
+
+  logoutFromProfileMenu(event?: Event): void {
+    event?.stopPropagation();
+    this.profileMenuOpen = false;
+    this.logout();
   }
 
   setNotificationFilter(filter: 'all' | 'unread', event?: Event): void {
@@ -302,8 +352,8 @@ export class AppComponent implements OnInit, OnDestroy {
     this.notificationFilter = filter;
   }
 
-  isNotificationUnread(item: Pick<AppNotification, 'readAt'>): boolean {
-    return !item.readAt;
+  isNotificationUnread(item: Pick<AppNotification, 'id' | 'readAt'>): boolean {
+    return !item.readAt && !this.locallyReadNotificationIds.has(item.id);
   }
 
   openNotification(item: AppNotification): void {
@@ -317,9 +367,50 @@ export class AppComponent implements OnInit, OnDestroy {
 
   removeNotification(item: AppNotification, event?: Event): void {
     event?.stopPropagation();
+    if (this.dismissInFlightNotificationIds.has(item.id)) return;
     const confirmed = window.confirm('Delete this notification permanently?');
     if (!confirmed) return;
     this.dismissNotification(item.id);
+  }
+
+  clearAllNotifications(event?: Event): void {
+    event?.stopPropagation();
+    const ids = this.notifications
+      .map((item) => item.id)
+      .filter((id) => !this.dismissInFlightNotificationIds.has(id));
+    if (!ids.length) return;
+
+    const confirmed = window.confirm('Delete all notifications permanently?');
+    if (!confirmed) return;
+
+    const idsSet = new Set(ids);
+    const removedUnread = this.notifications.reduce((count, item) => {
+      if (idsSet.has(item.id) && this.isNotificationUnread(item)) {
+        return count + 1;
+      }
+      return count;
+    }, 0);
+
+    for (const id of ids) {
+      this.dismissedNotificationIds.add(id);
+      this.dismissInFlightNotificationIds.add(id);
+    }
+
+    this.notifications = this.notifications.filter((item) => !idsSet.has(item.id));
+    this.unreadNotificationCountValue = Math.max(0, this.unreadNotificationCountValue - removedUnread);
+
+    forkJoin(
+      ids.map((id) =>
+        this.notificationApi.dismiss(id).pipe(
+          catchError(() => of(void 0)),
+          finalize(() => {
+            this.dismissInFlightNotificationIds.delete(id);
+          })
+        )
+      )
+    ).subscribe(() => {
+      this.refreshNotifications();
+    });
   }
 
   notificationCategoryLabel(category: AppNotificationCategory): string {
@@ -606,8 +697,52 @@ export class AppComponent implements OnInit, OnDestroy {
         this.notificationRefreshInFlight = false;
       })
     ).subscribe((response) => {
-      this.notifications = this.sortNotifications((response.items ?? []).map((item) => this.mapNotification(item)));
-      this.unreadNotificationCountValue = Math.max(0, Number(response.unreadCount ?? 0));
+      const mapped = (response.items ?? []).map((item) => this.mapNotification(item));
+      const optimisticReadNowIso = new Date().toISOString();
+      const normalized = mapped.map((item) => {
+        if (!item.readAt && this.locallyReadNotificationIds.has(item.id)) {
+          return {
+            ...item,
+            readAt: optimisticReadNowIso,
+          };
+        }
+        return item;
+      });
+      const serverIds = new Set<number>(mapped.map((item) => item.id));
+      for (const id of this.dismissedNotificationIds) {
+        if (!serverIds.has(id) && !this.dismissInFlightNotificationIds.has(id)) {
+          this.dismissedNotificationIds.delete(id);
+        }
+      }
+      for (const id of this.locallyReadNotificationIds) {
+        if (!serverIds.has(id)) {
+          this.locallyReadNotificationIds.delete(id);
+        }
+      }
+      for (const item of mapped) {
+        if (item.readAt) {
+          this.locallyReadNotificationIds.delete(item.id);
+        }
+      }
+
+      const visibleItems = normalized.filter((item) => !this.dismissedNotificationIds.has(item.id));
+      const hiddenUnread = normalized.reduce((count, item) => {
+        if (this.dismissedNotificationIds.has(item.id) && this.isNotificationUnread(item)) {
+          return count + 1;
+        }
+        return count;
+      }, 0);
+      const optimisticStillUnread = mapped.reduce((count, item) => {
+        if (this.locallyReadNotificationIds.has(item.id) && !item.readAt) {
+          return count + 1;
+        }
+        return count;
+      }, 0);
+      this.notifications = this.sortNotifications(visibleItems);
+      this.unreadNotificationCountValue = Math.max(
+        0,
+        Number(response.unreadCount ?? 0) - hiddenUnread - optimisticStillUnread
+      );
       if (!this.notifications.length) {
         this.notificationsOpen = false;
       }
@@ -744,15 +879,24 @@ export class AppComponent implements OnInit, OnDestroy {
   private resetNotificationsState(): void {
     this.notifications = [];
     this.unreadNotificationCountValue = 0;
+    this.dismissedNotificationIds.clear();
+    this.dismissInFlightNotificationIds.clear();
+    this.locallyReadNotificationIds.clear();
+    this.readInFlightNotificationIds.clear();
     this.notificationsOpen = false;
     this.notificationFilter = 'all';
   }
 
   private dismissNotification(notificationId: number): void {
+    if (this.dismissInFlightNotificationIds.has(notificationId)) return;
     const target = this.notifications.find((item) => item.id === notificationId);
     if (!target) return;
     const unread = this.isNotificationUnread(target);
 
+    this.dismissedNotificationIds.add(notificationId);
+    this.dismissInFlightNotificationIds.add(notificationId);
+    this.locallyReadNotificationIds.delete(notificationId);
+    this.readInFlightNotificationIds.delete(notificationId);
     this.notifications = this.notifications.filter((item) => item.id !== notificationId);
     if (!this.notifications.length) this.notificationsOpen = false;
     if (unread && this.unreadNotificationCountValue > 0) {
@@ -760,20 +904,29 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     this.notificationApi.dismiss(notificationId)
-      .pipe(catchError(() => {
-        this.refreshNotifications();
-        return of(void 0);
-      }))
+      .pipe(
+        catchError(() => {
+          this.dismissedNotificationIds.delete(notificationId);
+          this.refreshNotifications();
+          return of(void 0);
+        }),
+        finalize(() => {
+          this.dismissInFlightNotificationIds.delete(notificationId);
+        })
+      )
       .subscribe();
   }
 
   private markNotificationRead(notificationId: number): void {
+    if (this.readInFlightNotificationIds.has(notificationId)) return;
     const index = this.notifications.findIndex((item) => item.id === notificationId);
     if (index < 0) return;
 
     const current = this.notifications[index];
     if (!this.isNotificationUnread(current)) return;
 
+    this.locallyReadNotificationIds.add(notificationId);
+    this.readInFlightNotificationIds.add(notificationId);
     const next = [...this.notifications];
     next[index] = {
       ...current,
@@ -785,10 +938,16 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     this.notificationApi.markRead(notificationId)
-      .pipe(catchError(() => {
-        this.refreshNotifications();
-        return of(null);
-      }))
+      .pipe(
+        catchError(() => {
+          this.locallyReadNotificationIds.delete(notificationId);
+          this.refreshNotifications();
+          return of(null);
+        }),
+        finalize(() => {
+          this.readInFlightNotificationIds.delete(notificationId);
+        })
+      )
       .subscribe((updated) => {
         if (!updated) return;
         const updatedIndex = this.notifications.findIndex((item) => item.id === notificationId);
@@ -796,6 +955,9 @@ export class AppComponent implements OnInit, OnDestroy {
         const patched = [...this.notifications];
         patched[updatedIndex] = this.mapNotification(updated);
         this.notifications = patched;
+        if (patched[updatedIndex]?.readAt) {
+          this.locallyReadNotificationIds.delete(notificationId);
+        }
       });
   }
 
@@ -811,19 +973,31 @@ export class AppComponent implements OnInit, OnDestroy {
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent): void {
-    if (!this.notificationsOpen) return;
-    const host = this.notificationsMenuRef?.nativeElement;
-    if (!host) {
-      this.notificationsOpen = false;
-      return;
-    }
+    if (!this.notificationsOpen && !this.profileMenuOpen) return;
     const target = event.target;
-    if (target instanceof Node && host.contains(target)) return;
-    this.notificationsOpen = false;
+
+    if (this.notificationsOpen) {
+      const notificationsHost = this.notificationsMenuRef?.nativeElement;
+      if (!notificationsHost) {
+        this.notificationsOpen = false;
+      } else if (!(target instanceof Node && notificationsHost.contains(target))) {
+        this.notificationsOpen = false;
+      }
+    }
+
+    if (this.profileMenuOpen) {
+      const profileHost = this.profileMenuRef?.nativeElement;
+      if (!profileHost) {
+        this.profileMenuOpen = false;
+      } else if (!(target instanceof Node && profileHost.contains(target))) {
+        this.profileMenuOpen = false;
+      }
+    }
   }
 
   @HostListener('document:keydown.escape')
   onDocumentEscape(): void {
     this.notificationsOpen = false;
+    this.profileMenuOpen = false;
   }
 }

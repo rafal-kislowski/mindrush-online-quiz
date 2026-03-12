@@ -14,6 +14,7 @@ import {
 import { AuthService } from '../../core/auth/auth.service';
 import { rankForPoints } from '../../core/progression/progression';
 import { PlayerAvatarComponent } from '../../core/ui/player-avatar.component';
+import { PremiumBadgeComponent } from '../../core/ui/premium-badge.component';
 import { ToastService } from '../../core/ui/toast.service';
 
 type LeaderboardRowVm = LeaderboardEntryDto & {
@@ -24,7 +25,7 @@ type LeaderboardRowVm = LeaderboardEntryDto & {
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, PlayerAvatarComponent],
+  imports: [CommonModule, FormsModule, RouterLink, PlayerAvatarComponent, PremiumBadgeComponent],
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss',
 })

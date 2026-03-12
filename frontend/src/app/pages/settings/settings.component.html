@@ -1,0 +1,171 @@
+﻿<section class="settings-page">
+  <ng-container *ngIf="!loadingUser && currentUser as user; else settingsLoading">
+    <article class="settings-frame" aria-label="Account settings">
+      <svg class="svg-defs" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient
+            id="mrTitleGradSettings"
+            x1="0"
+            y1="0"
+            x2="0"
+            y2="20"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop offset="0" style="stop-color: rgba(255, 205, 77, 0.85)" />
+            <stop offset="1" style="stop-color: rgba(56, 189, 248, 0.85)" />
+          </linearGradient>
+          <symbol id="mrTitleMarkSettings" viewBox="0 0 10 20">
+            <path
+              d="M5 1c2.1 0 3.2 1.6 3.2 3.5v11C8.2 17.4 7.1 19 5 19S1.8 17.4 1.8 15.5v-11C1.8 2.6 2.9 1 5 1Z"
+              fill="url(#mrTitleGradSettings)"
+            />
+          </symbol>
+        </defs>
+      </svg>
+
+      <header class="settings-head">
+        <div class="settings-title">
+          <h1>
+            <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+            Settings
+          </h1>
+     
+        </div>
+
+        <button class="settings-back mr-back-btn" type="button" (click)="goBack()" aria-label="Back to dashboard">
+          <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+          <span>Back</span>
+        </button>
+      </header>
+
+      <section class="settings-overview" aria-label="Settings overview">
+        <h2 class="section-title">
+          <svg class="section-title__mark" aria-hidden="true" focusable="false">
+            <use href="#mrTitleMarkSettings"></use>
+          </svg>
+          Security center
+        </h2>
+        <p class="section-hint">Update account details, change password and control active sessions from one place.</p>
+      </section>
+
+      <section class="settings-grid">
+        <article class="settings-panel settings-panel--account" aria-label="Account information">
+          <header class="settings-panel__header">
+            <h2>Account</h2>
+            <span class="status-badge" [class.status-badge--ok]="user.emailVerified">
+              {{ user.emailVerified ? 'Verified' : 'Unverified' }}
+            </span>
+          </header>
+
+          <dl class="settings-info-list">
+            <div class="settings-info">
+              <dt>Email</dt>
+              <dd>{{ user.email }}</dd>
+            </div>
+            <div class="settings-info settings-info--nickname">
+              <dt>Current nickname</dt>
+              <dd>
+                <span class="nickname-cell">
+                  <span class="nickname-cell__value">{{ user.displayName }}</span>
+                </span>
+              </dd>
+            </div>
+            <div class="settings-info">
+              <dt>Created</dt>
+              <dd>{{ formatDateTimeLabel(user.createdAt) }}</dd>
+            </div>
+            <div class="settings-info">
+              <dt>Last login</dt>
+              <dd>{{ formatDateTimeLabel(user.lastLoginAt) }}</dd>
+            </div>
+          </dl>
+
+          <button
+            class="action-btn action-btn--ghost"
+            type="button"
+            *ngIf="!user.emailVerified"
+            [disabled]="resendingVerification || resendCooldownSeconds > 0"
+            (click)="resendVerificationEmail()"
+          >
+            <span *ngIf="resendCooldownSeconds <= 0; else cooldownLabel">Resend verification email</span>
+            <ng-template #cooldownLabel>Resend in {{ resendCooldownSeconds }}s</ng-template>
+          </button>
+
+          <div class="account-security">
+            <p class="account-security__hint">Need to secure the account on all devices?</p>
+            <button class="action-btn action-btn--danger" type="button" [disabled]="revokingSessions" (click)="revokeAllSessions()">
+              {{ revokingSessions ? 'Processing...' : 'Sign out all devices' }}
+            </button>
+          </div>
+        </article>
+
+        <article class="settings-panel settings-panel--password" aria-label="Change password">
+          <header class="settings-panel__header">
+            <h2>Password</h2>
+          </header>
+
+          <form class="settings-form" [formGroup]="passwordForm" (ngSubmit)="savePassword()">
+            <label class="field" [class.has-error]="!!currentPasswordError" for="settings-current-password">
+              <span class="field__label">Current password</span>
+              <input
+                id="settings-current-password"
+                type="password"
+                formControlName="currentPassword"
+                autocomplete="current-password"
+                placeholder="Current password"
+              />
+              <span class="field__meta">
+                <span class="field__error" [class.is-visible]="!!currentPasswordError">
+                  {{ currentPasswordError || '' }}
+                </span>
+              </span>
+            </label>
+
+            <label class="field" [class.has-error]="!!newPasswordError" for="settings-new-password">
+              <span class="field__label">New password</span>
+              <input
+                id="settings-new-password"
+                type="password"
+                formControlName="newPassword"
+                autocomplete="new-password"
+                placeholder="New password"
+              />
+              <span class="field__meta">
+                <span class="field__error" [class.is-visible]="!!newPasswordError">
+                  {{ newPasswordError || '' }}
+                </span>
+              </span>
+            </label>
+
+            <label class="field" [class.has-error]="!!confirmPasswordError" for="settings-confirm-password">
+              <span class="field__label">Confirm password</span>
+              <input
+                id="settings-confirm-password"
+                type="password"
+                formControlName="confirmPassword"
+                autocomplete="new-password"
+                placeholder="Confirm new password"
+              />
+              <span class="field__meta">
+                <span class="field__error" [class.is-visible]="!!confirmPasswordError">
+                  {{ confirmPasswordError || '' }}
+                </span>
+              </span>
+            </label>
+
+            <button class="action-btn action-btn--security" type="submit" [disabled]="!canSavePassword">
+              {{ savingPassword ? 'Updating...' : 'Change password' }}
+            </button>
+          </form>
+        </article>
+      </section>
+    </article>
+  </ng-container>
+
+  <ng-template #settingsLoading>
+    <article class="settings-frame settings-frame--loading" aria-label="Loading settings">
+      Loading settings...
+    </article>
+  </ng-template>
+</section>
+

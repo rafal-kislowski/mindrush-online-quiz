@@ -186,8 +186,12 @@ export class CasualComponent implements OnInit, AfterViewInit, OnDestroy {
       const normalizedSource = source === 'user' ? 'custom' : source;
       const inLibrary = q.inLibrary === true || normalizedSource === 'library';
       const publicAvailable = q.publicAvailable !== false;
+      const ownedPrivateCustom =
+        normalizedSource === 'custom' &&
+        q.ownedByViewer === true &&
+        !publicAvailable;
 
-      if (scope === 'library') return inLibrary && publicAvailable;
+      if (scope === 'library') return (inLibrary && publicAvailable) || ownedPrivateCustom;
       if (scope === 'official') return normalizedSource === 'official' && publicAvailable;
       if (scope === 'custom') return normalizedSource === 'custom' && publicAvailable;
       return false;

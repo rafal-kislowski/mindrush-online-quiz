@@ -1,4 +1,4 @@
-<div class="quiz">
+﻿<div class="quiz">
   <ng-container *ngIf="state as s; else loading">
     
     <div class="quiz-precountdown" *ngIf="s.stage === 'PRE_COUNTDOWN'">
@@ -266,7 +266,7 @@
                 </h1>
               </div>
 
-              <button class="mr-game-results-back" type="button" (click)="backToLobby()">
+              <button class="mr-game-results-back mr-back-btn" type="button" (click)="backToLobby()">
                 <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
                 <span>Back</span>
               </button>
@@ -318,7 +318,8 @@
 
                     <span class="mr-game-results-name-wrap">
                       <span class="mr-game-results-name">
-                        <span class="mr-game-results-name-text">{{ p.displayName }}</span>
+                        <app-premium-badge *ngIf="p.isPremium" [size]="16"></app-premium-badge>
+                        <span class="mr-game-results-name-text" [class.mr-premium-name]="p.isPremium">{{ p.displayName }}</span>
                         <span
                           class="mr-game-results-rank-pill"
                           [style.--rank-color]="playerRankColor(p)"
@@ -401,3 +402,4 @@
     </div>
   </ng-template>
 </div>
+

@@ -28,6 +28,7 @@ const DEFAULT_POLICY: LibraryPolicyDto = {
   maxPendingSubmissions: 3,
   minQuestionsToSubmit: 5,
   maxQuestionsPerQuiz: 50,
+  maxQuestionImagesPerQuiz: 10,
   minQuestionTimeLimitSeconds: 5,
   maxQuestionTimeLimitSeconds: 180,
   maxQuestionsPerGame: 50,
@@ -205,13 +206,9 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
     imageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
     correctIndex: new FormControl(0, { nonNullable: true }),
     o1: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
-    o1ImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
     o2: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
-    o2ImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
     o3: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
-    o3ImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
     o4: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
-    o4ImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
   });
 
   constructor(
@@ -398,6 +395,32 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
   get maxUploadMbLabel(): string {
     const mb = Math.max(1, Math.round((this.policy.maxUploadBytes ?? DEFAULT_POLICY.maxUploadBytes) / BYTES_PER_MB));
     return `${mb}MB`;
+  }
+
+  get questionImageLimitPerQuiz(): number {
+    const limit = Number(this.policy.maxQuestionImagesPerQuiz);
+    if (!Number.isFinite(limit) || limit < 0) {
+      return DEFAULT_POLICY.maxQuestionImagesPerQuiz;
+    }
+    return Math.trunc(limit);
+  }
+
+  get questionImageCountInQuiz(): number {
+    const questions = this.selectedQuiz?.questions ?? [];
+    return questions.reduce((count, question) => (
+      this.hasImageUrl(question.imageUrl) ? count + 1 : count
+    ), 0);
+  }
+
+  get questionImageUsageLabel(): string {
+    return `${this.questionImageCountInQuiz}/${this.questionImageLimitPerQuiz}`;
+  }
+
+  get questionImageUploadBlocked(): boolean {
+    // Replacing an existing image in the currently edited question does not increase usage.
+    if (this.hasImageUrl(this.questionForm.controls.imageUrl.value)) return false;
+    if (this.hasImageUrl(this.selectedQuestion?.imageUrl ?? null)) return false;
+    return this.questionImageCountInQuiz >= this.questionImageLimitPerQuiz;
   }
 
   get allowedUploadMimeTypes(): string[] {
@@ -794,7 +817,7 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
   openEdit(
     quizId: number,
     targetTab: 'details' | 'questions' = 'details',
-    options?: { reopenModerationBanner?: boolean }
+    options?: { reopenModerationBanner?: boolean; fromModerationLink?: boolean }
   ): void {
     if (this.loadingQuiz) return;
     this.error = null;
@@ -833,6 +856,10 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
       },
       error: (err) => {
         this.loadingQuiz = false;
+        if (options?.fromModerationLink && this.isNotFoundLikeError(err)) {
+          this.handleMissingModerationQuizTarget();
+          return;
+        }
         this.error = apiErrorMessage(err, 'Failed to load quiz');
       },
     });
@@ -1042,13 +1069,9 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
       imageUrl: question.imageUrl ?? null,
       correctIndex,
       o1: options[0]?.text ?? '',
-      o1ImageUrl: options[0]?.imageUrl ?? null,
       o2: options[1]?.text ?? '',
-      o2ImageUrl: options[1]?.imageUrl ?? null,
       o3: options[2]?.text ?? '',
-      o3ImageUrl: options[2]?.imageUrl ?? null,
       o4: options[3]?.text ?? '',
-      o4ImageUrl: options[3]?.imageUrl ?? null,
     });
     this.queueQuestionsPaneResize();
   }
@@ -1126,7 +1149,7 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const options = this.buildOptionsPayload();
     if (!this.optionsHaveContent(options)) {
-      this.error = 'Each answer option must have text or image.';
+      this.error = 'Each answer option must have text.';
       return;
     }
 
@@ -1149,7 +1172,7 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
         options: options.map((opt, idx) => ({
           id: existing[idx]?.id ?? 0,
           text: opt.text,
-          imageUrl: opt.imageUrl,
+          imageUrl: null,
           correct: opt.correct,
         })),
       }).subscribe({
@@ -1228,10 +1251,15 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  uploadQuestionImage(ev: Event, target: 'prompt' | 1 | 2 | 3 | 4): void {
+  uploadQuestionImage(ev: Event): void {
     const input = ev.target as HTMLInputElement | null;
     const file = input?.files?.[0];
     if (!file) {
+      this.resetFileInput(input);
+      return;
+    }
+    if (this.questionImageUploadBlocked) {
+      this.error = `Question image limit reached (${this.questionImageUsageLabel}).`;
       this.resetFileInput(input);
       return;
     }
@@ -1244,14 +1272,7 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
     this.error = null;
     this.api.uploadImage(file).subscribe({
       next: (res) => {
-        if (target === 'prompt') {
-          this.questionForm.controls.imageUrl.setValue(res.url);
-        } else {
-          const textKey = (`o${target}`) as 'o1' | 'o2' | 'o3' | 'o4';
-          const key = (`o${target}ImageUrl`) as 'o1ImageUrl' | 'o2ImageUrl' | 'o3ImageUrl' | 'o4ImageUrl';
-          this.questionForm.controls[textKey].setValue('');
-          this.questionForm.controls[key].setValue(res.url);
-        }
+        this.questionForm.controls.imageUrl.setValue(res.url);
         this.resetFileInput(input);
       },
       error: (err) => {
@@ -1302,18 +1323,6 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
 
   clearQuestionImage(): void {
     this.questionForm.controls.imageUrl.setValue(null);
-    this.closeImagePreview();
-  }
-
-  optionImageUrl(index: number): string | null {
-    const key = (`o${index}ImageUrl`) as 'o1ImageUrl' | 'o2ImageUrl' | 'o3ImageUrl' | 'o4ImageUrl';
-    const url = (this.questionForm.controls[key].value ?? '').trim();
-    return url || null;
-  }
-
-  clearOptionImage(index: number): void {
-    const key = (`o${index}ImageUrl`) as 'o1ImageUrl' | 'o2ImageUrl' | 'o3ImageUrl' | 'o4ImageUrl';
-    this.questionForm.controls[key].setValue(null);
     this.closeImagePreview();
   }
 
@@ -1524,13 +1533,9 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
       imageUrl: null,
       correctIndex: 0,
       o1: '',
-      o1ImageUrl: null,
       o2: '',
-      o2ImageUrl: null,
       o3: '',
-      o3ImageUrl: null,
       o4: '',
-      o4ImageUrl: null,
     });
   }
 
@@ -1576,19 +1581,21 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
     const correct = this.questionForm.controls.correctIndex.value;
     return [1, 2, 3, 4].map((idx) => {
       const textKey = (`o${idx}`) as 'o1' | 'o2' | 'o3' | 'o4';
-      const imageKey = (`o${idx}ImageUrl`) as 'o1ImageUrl' | 'o2ImageUrl' | 'o3ImageUrl' | 'o4ImageUrl';
-      const imageUrl = (this.questionForm.controls[imageKey].value ?? '').trim();
-      const text = imageUrl ? '' : (this.questionForm.controls[textKey].value ?? '').trim();
+      const text = (this.questionForm.controls[textKey].value ?? '').trim();
       return {
         text: text || null,
-        imageUrl: imageUrl || null,
+        imageUrl: null,
         correct: correct === (idx - 1),
       };
     });
   }
 
   private optionsHaveContent(options: Array<{ text: string | null; imageUrl: string | null }>): boolean {
-    return options.every((o) => !!(o.text ?? '').trim() || !!(o.imageUrl ?? '').trim());
+    return options.every((o) => !!(o.text ?? '').trim());
+  }
+
+  private hasImageUrl(value: string | null | undefined): boolean {
+    return !!(value ?? '').trim();
   }
 
   private normalizeNumber(value: number | null | undefined): number | null {
@@ -1684,11 +1691,28 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const found = this.myQuizzes.some((quiz) => quiz.id === request.quizId);
     if (!found) {
-      this.toast.warning('Selected moderation notification is no longer available.', { title: 'Library' });
+      this.handleMissingModerationQuizTarget();
       return;
     }
 
-    this.openEdit(request.quizId, request.tab, { reopenModerationBanner: request.reopen });
+    this.openEdit(request.quizId, request.tab, {
+      reopenModerationBanner: request.reopen,
+      fromModerationLink: true,
+    });
+  }
+
+  private handleMissingModerationQuizTarget(): void {
+    this.toast.warning('This quiz is no longer available.', {
+      title: 'Library',
+      dedupeKey: 'library:moderation:quiz-missing',
+    });
+    void this.router.navigate(['/']);
+  }
+
+  private isNotFoundLikeError(err: unknown): boolean {
+    const rawStatus = (err as { status?: unknown } | null)?.status;
+    const status = Number(rawStatus);
+    return status === 404 || status === 410;
   }
 
   private loadDismissedModerationSignatures(): void {

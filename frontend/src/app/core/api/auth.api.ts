@@ -74,4 +74,28 @@ export class AuthApi {
       { withCredentials: true }
     );
   }
+
+  updateDisplayName(displayName: string): Observable<AuthUserDto> {
+    return this.http.post<AuthUserDto>(
+      '/api/auth/profile/display-name',
+      { displayName },
+      { withCredentials: true }
+    );
+  }
+
+  changePassword(currentPassword: string, newPassword: string, confirmPassword: string): Observable<AuthUserDto> {
+    return this.http.post<AuthUserDto>(
+      '/api/auth/password/change',
+      { currentPassword, newPassword, confirmPassword },
+      { withCredentials: true }
+    );
+  }
+
+  revokeAllSessions(): Observable<AuthActionResponseDto> {
+    return this.http.post<AuthActionResponseDto>(
+      '/api/auth/sessions/revoke-all',
+      {},
+      { withCredentials: true }
+    );
+  }
 }

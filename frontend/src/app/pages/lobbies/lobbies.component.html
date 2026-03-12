@@ -1,4 +1,4 @@
-<section class="page">
+﻿<section class="page">
   <div class="frame">
     <div class="card" aria-label="Active lobbies">
       <svg class="svg-defs" aria-hidden="true" focusable="false">
@@ -48,7 +48,7 @@
           </h1>
         </div>
 
-        <button class="back" type="button" (click)="goHome()" aria-label="Back">
+        <button class="back mr-back-btn" type="button" (click)="goHome()" aria-label="Back">
           <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
           <span>Back</span>
         </button>
@@ -234,7 +234,10 @@
             />
             <span class="leader-meta">
               <span class="leader-name-row">
-                <span class="leader-name">{{ row.leaderDisplayName }}</span>
+                <span class="leader-name">
+                  <app-premium-badge *ngIf="row.leaderIsPremium" [size]="16"></app-premium-badge>
+                  <span [class.mr-premium-name]="row.leaderIsPremium">{{ row.leaderDisplayName }}</span>
+                </span>
                 <span class="rank-pill rank-pill--lobby" [style.--rank-color]="row.leaderRankColor">
                   {{ row.leaderRankName }}
                 </span>
@@ -345,3 +348,4 @@
     </div>
   </div>
 </section>
+

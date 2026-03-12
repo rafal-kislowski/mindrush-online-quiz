@@ -1,0 +1,586 @@
+﻿<section class="page">
+  <ng-container *ngIf="vm$ | async as vm; else profileUnavailable">
+    <div class="frame">
+      <article class="card" aria-label="My profile">
+        <div class="card__top">
+          <div class="profile-title">
+            <h1>
+              <i class="fa-regular fa-user" aria-hidden="true"></i>
+              My Profile
+            </h1>
+          </div>
+
+          <button class="back mr-back-btn" type="button" (click)="goBack()" aria-label="Back">
+            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+            <span>Back</span>
+          </button>
+        </div>
+
+        <section
+          class="profile-tab-view"
+          #profileTabView
+          [ngClass]="[tabTransitionClass, 'profile-tab-view--' + tab]"
+          [style.height.px]="tab === 'achievements' && statsTabHeightPx ? statsTabHeightPx : null"
+        >
+          <ng-container [ngSwitch]="tab">
+            <section class="profile-stats-view" *ngSwitchCase="'stats'">
+              <section class="profile-shell" aria-label="Profile overview">
+                <section class="profile-main" aria-label="Profile identity">
+                  <div
+                    class="user__avatar"
+                    [style.--p]="vm.progress"
+                    [style.--rank-color]="vm.rankColor"
+                    [style.--rank-color-2]="vm.rankColor2"
+                    [style.--rank-soft]="vm.rankSoft"
+                    [style.--rank-glow]="vm.rankGlow"
+                    [style.--ring-dim]="vm.ringDim"
+                  >
+                    <div class="ring" aria-hidden="true"></div>
+                    <div class="face" aria-hidden="true">
+                      <app-player-avatar
+                        class="profile-avatar"
+                        [displayName]="vm.displayName"
+                        [isAuthenticated]="true"
+                        [size]="92"
+                        [decorative]="true"
+                      ></app-player-avatar>
+
+                      <div class="face__overlay">
+                        <div class="face__overlayLabel">
+                          <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                          <span>XP</span>
+                        </div>
+                        <div class="face__overlayValue" *ngIf="!vm.maxLevel">
+                          {{ vm.xpInLevel | number }}/{{ vm.levelXpNeeded | number }}
+                        </div>
+                        <div class="face__overlayValue" *ngIf="vm.maxLevel">MAX</div>
+                        <div class="face__overlaySub" *ngIf="!vm.maxLevel">
+                          {{ vm.xpToNext | number }} to lvl {{ vm.level + 1 }}
+                        </div>
+                      </div>
+                    </div>
+                    <div class="level">{{ vm.level }}</div>
+                  </div>
+
+                  <div class="profile-main__content">
+                    <div class="profile-main__head">
+                      <div class="profile-identity">
+                        <div class="profile-name-row">
+                          <div class="profile-name-main">
+                            <app-premium-badge *ngIf="vm.isPremium" [size]="22"></app-premium-badge>
+                            <div class="profile-name" [class.is-premium]="vm.isPremium" [attr.title]="vm.displayName" #profileName>
+                              <span class="profile-name__clip">
+                                <span class="profile-name__marquee">
+                                  <span class="profile-name__once">{{ vm.displayName }}</span>
+                                  <span class="profile-name__gap" aria-hidden="true"></span>
+                                  <span class="profile-name__once" aria-hidden="true">{{ vm.displayName }}</span>
+                                </span>
+                              </span>
+                            </div>
+                            <button
+                              class="profile-name-edit"
+                              type="button"
+                              aria-label="Edit nickname"
+                              title="Edit nickname"
+                              (click)="openDisplayNameModal()"
+                            >
+                              <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                            </button>
+                          </div>
+                          <span class="rank-pill" [style.--rank-color]="vm.rankColor">
+                            {{ vm.rankName }}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div class="profile-info-inline" aria-label="Account info">
+                        <article class="profile-info-box profile-info-box--created" aria-label="Account created at">
+                          <div class="profile-info-box__label">
+                            <i class="fa-regular fa-calendar-plus" aria-hidden="true"></i>
+                            Account created
+                          </div>
+                          <div class="profile-info-box__value">{{ vm.accountCreatedLabel }}</div>
+                        </article>
+                      </div>
+                    </div>
+
+                    <article
+                      class="xp-card xp-card--inline"
+                      aria-label="Experience progress"
+                      [style.--xp-fill-start]="vm.rankColor2"
+                      [style.--xp-fill-end]="vm.rankColor"
+                    >
+                      <div class="xp-card__values">
+                        <span class="xp-card__main-value">
+                          <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                          {{ vm.xpInLevel | number }} / {{ vm.levelXpNeeded | number }} XP
+                        </span>
+                        <span class="xp-card__percent">{{ vm.progressPct }}%</span>
+                      </div>
+
+                      <div class="xp-card__track" role="progressbar" [attr.aria-valuenow]="vm.progressPct" aria-valuemin="0" aria-valuemax="100">
+                        <div class="xp-card__fill" [style.width.%]="vm.progressPct"></div>
+                      </div>
+                    </article>
+                  </div>
+
+                  <aside class="profile-resources" aria-label="Profile resources">
+                    <article class="profile-resource-card profile-resource-card--xp">
+                      <div class="profile-resource-card__icon"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></div>
+                      <div class="profile-resource-card__text">
+                        <div class="profile-resource-card__label">XP</div>
+                        <div class="profile-resource-card__value">{{ vm.totalXp | number }}</div>
+                      </div>
+                    </article>
+
+                    <article class="profile-resource-card profile-resource-card--coin">
+                      <div class="profile-resource-card__icon"><i class="fa-solid fa-coins" aria-hidden="true"></i></div>
+                      <div class="profile-resource-card__text">
+                        <div class="profile-resource-card__label">Gold Coin</div>
+                        <div class="profile-resource-card__value">{{ vm.coins | number }}</div>
+                      </div>
+                    </article>
+                  </aside>
+                </section>
+              </section>
+
+              <section class="profile-stats-head" aria-label="Statistics overview">
+                <header class="profile-tabs-row__intro">
+                  <span class="profile-tabs-row__mark" aria-hidden="true"></span>
+                    <div class="profile-tabs-row__text">
+                      <div class="profile-tabs-row__title">Statistics overview</div>
+                      <div class="profile-tabs-row__subtitle">Overview of your key gameplay stats and progress.</div>
+                    </div>
+                  </header>
+              </section>
+
+              <section class="stats-grid" aria-label="Profile stats">
+                <article class="stat-card stat-card--games">
+                  <div class="stat-icon"><i class="fa-solid fa-gamepad" aria-hidden="true"></i></div>
+                  <div class="stat-content">
+                    <div class="stat-label">Games played</div>
+                    <div class="stat-value">{{ vm.gamesPlayed | number }}</div>
+                  </div>
+                </article>
+
+                <article class="stat-card stat-card--wins">
+                  <div class="stat-icon"><i class="fa-solid fa-trophy" aria-hidden="true"></i></div>
+                  <div class="stat-content">
+                    <div class="stat-label">Total wins</div>
+                    <div class="stat-value">{{ vm.winsTotal | number }}</div>
+                  </div>
+                </article>
+
+                <article class="stat-card stat-card--win">
+                  <div class="stat-icon"><i class="fa-solid fa-percent" aria-hidden="true"></i></div>
+                  <div class="stat-content">
+                    <div class="stat-label">Win ratio</div>
+                    <div class="stat-value">{{ vm.winRatioPct | number }}%</div>
+                  </div>
+                </article>
+
+                <article class="stat-card stat-card--correct">
+                  <div class="stat-icon"><i class="fa-solid fa-bullseye" aria-hidden="true"></i></div>
+                  <div class="stat-content">
+                    <div class="stat-label">Correct answers</div>
+                    <div class="stat-value">{{ vm.correctAnswers | number }}</div>
+                  </div>
+                </article>
+
+                <article class="stat-card stat-card--rank">
+                  <div class="stat-icon"><i class="fa-solid fa-chart-line" aria-hidden="true"></i></div>
+                  <div class="stat-content">
+                    <div class="stat-label">Rank points</div>
+                    <div class="stat-value">{{ vm.rankPoints | number }}</div>
+                  </div>
+                </article>
+              </section>
+
+              <section class="profile-achievements" aria-label="Achievements">
+                <header class="profile-tabs-row profile-achievements__head">
+                  <div class="profile-tabs-row__intro">
+                    <span class="profile-tabs-row__mark" aria-hidden="true"></span>
+                    <div class="profile-tabs-row__text">
+                      <div class="profile-tabs-row__title">
+                        {{ vm.achievementsTitle }}
+                        <span class="profile-tabs-row__count">({{ vm.achievementsUnlocked | number }}/{{ vm.achievementsTotal | number }})</span>
+                      </div>
+                      <div class="profile-tabs-row__subtitle">{{ vm.achievementsDescription }}</div>
+                    </div>
+                  </div>
+
+                  <button class="profile-achievements__show-all" type="button" (click)="showAllAchievements()">
+                    <span>Show all</span>
+                  
+                  </button>
+                </header>
+
+                <section class="achievements-preview-grid" aria-label="Achievement preview list">
+                  <article
+                    class="achievement-card"
+                    *ngFor="let achievement of vm.achievementPreviewItems; trackBy: trackByAchievement"
+                    [class.is-unlocked]="achievement.unlocked"
+                    [attr.aria-label]="achievement.title + (achievement.unlocked ? ' unlocked' : ' locked')"
+                    [style.--achievement-fill-start]="achievementTierStart(achievement)"
+                    [style.--achievement-fill-end]="achievementTierEnd(achievement)"
+                  >
+                    <div class="achievement-card__icon" aria-hidden="true">
+                      <i [class]="achievementIconClasses(achievement.icon)"></i>
+                    </div>
+
+                    <div class="achievement-card__content">
+                      <div class="achievement-card__top">
+                        <div class="achievement-card__title">{{ achievement.title }}</div>
+                        <div class="achievement-card__badge" *ngIf="achievement.unlocked">Unlocked</div>
+                      </div>
+
+                      <div class="achievement-card__desc">{{ achievement.description }}</div>
+
+                      <div class="achievement-card__meta">
+                        <span>{{ achievement.progress | number }} / {{ achievement.target | number }}</span>
+                        <span>{{ achievementProgressPct(achievement) | number }}%</span>
+                      </div>
+
+                      <div class="achievement-card__track" role="progressbar" [attr.aria-valuenow]="achievementProgressPct(achievement)" aria-valuemin="0" aria-valuemax="100">
+                        <div class="achievement-card__fill" [style.width.%]="achievementProgressPct(achievement)"></div>
+                      </div>
+
+                      <div class="achievement-card__unlock-time" *ngIf="achievementUnlockedLabel(achievement.unlockedAt) as unlockedLabel">
+                        {{ unlockedLabel }}
+                      </div>
+                    </div>
+                  </article>
+                </section>
+
+              </section>
+            </section>
+
+            <section class="profile-achievements-view" *ngSwitchCase="'achievements'" aria-label="All achievements">
+              <header class="profile-tabs-row__intro profile-achievements__head">
+                <span class="profile-tabs-row__mark" aria-hidden="true"></span>
+                <div class="profile-tabs-row__text">
+                  <div class="profile-tabs-row__title">
+                    {{ vm.achievementsTitle }}
+                    <span class="profile-tabs-row__count">({{ vm.achievementsUnlocked | number }}/{{ vm.achievementsTotal | number }})</span>
+                  </div>
+                  <div class="profile-tabs-row__subtitle">
+                    Unlocked {{ vm.achievementsUnlocked | number }} / {{ vm.achievementsTotal | number }}
+                  </div>
+                </div>
+              </header>
+
+              <section class="profile-achievements-view__list-wrap">
+                <section class="achievements-grid" aria-label="All achievements list">
+                  <article
+                    class="achievement-card"
+                    *ngFor="let achievement of vm.achievementsItems; trackBy: trackByAchievement"
+                    [class.is-unlocked]="achievement.unlocked"
+                    [attr.aria-label]="achievement.title + (achievement.unlocked ? ' unlocked' : ' locked')"
+                    [style.--achievement-fill-start]="achievementTierStart(achievement)"
+                    [style.--achievement-fill-end]="achievementTierEnd(achievement)"
+                  >
+                    <div class="achievement-card__icon" aria-hidden="true">
+                      <i [class]="achievementIconClasses(achievement.icon)"></i>
+                    </div>
+
+                    <div class="achievement-card__content">
+                      <div class="achievement-card__top">
+                        <div class="achievement-card__title">{{ achievement.title }}</div>
+                        <div class="achievement-card__badge" *ngIf="achievement.unlocked">Unlocked</div>
+                      </div>
+
+                      <div class="achievement-card__desc">{{ achievement.description }}</div>
+
+                      <div class="achievement-card__meta">
+                        <span>{{ achievement.progress | number }} / {{ achievement.target | number }}</span>
+                        <span>{{ achievementProgressPct(achievement) | number }}%</span>
+                      </div>
+
+                      <div class="achievement-card__track" role="progressbar" [attr.aria-valuenow]="achievementProgressPct(achievement)" aria-valuemin="0" aria-valuemax="100">
+                        <div class="achievement-card__fill" [style.width.%]="achievementProgressPct(achievement)"></div>
+                      </div>
+
+                      <div class="achievement-card__unlock-time" *ngIf="achievementUnlockedLabel(achievement.unlockedAt) as unlockedLabel">
+                        {{ unlockedLabel }}
+                      </div>
+                    </div>
+                  </article>
+                </section>
+              </section>
+            </section>
+
+            <section class="user-quizzes" aria-label="Approved user quizzes" *ngSwitchCase="'quizzes'" (click)="closeQuizMenu()">
+              <ng-container *ngIf="quizListState(vm.approvedQuizzes) as list">
+                <section class="user-quizzes__filters" aria-label="Quiz filters">
+                  <input
+                    class="user-quizzes__search"
+                    type="text"
+                    placeholder="Search quizzes..."
+                    [value]="quizSearchQuery"
+                    (input)="onQuizSearchInput($event)"
+                  />
+
+                  <div class="mr-select-wrap" (click)="$event.stopPropagation()">
+                    <button
+                      class="mr-select"
+                      type="button"
+                      aria-label="Filter by category"
+                      [attr.aria-expanded]="openQuizFilterMenu === 'category'"
+                      (click)="toggleQuizFilterMenu('category', $event)"
+                    >
+                      <span class="mr-select__left">
+                        <span class="mr-select__icon" aria-hidden="true">
+                          <i class="fa-solid fa-filter"></i>
+                        </span>
+                        <span class="mr-select__value">{{ quizCategoryLabel }}</span>
+                      </span>
+                      <span class="mr-select__caret" aria-hidden="true"></span>
+                    </button>
+                    <div class="mr-select__menu" *ngIf="openQuizFilterMenu === 'category'" role="listbox" (click)="$event.stopPropagation()">
+                      <button class="mr-select__item" type="button" [class.active]="quizCategory === 'all'" (click)="setQuizCategory('all', $event)">All categories</button>
+                      <button
+                        class="mr-select__item"
+                        type="button"
+                        *ngFor="let category of quizCategoryOptions(vm.approvedQuizzes)"
+                        [class.active]="quizCategory === category"
+                        (click)="setQuizCategory(category, $event)"
+                      >
+                        {{ category }}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="mr-select-wrap picker-sort" (click)="$event.stopPropagation()">
+                    <button
+                      class="mr-select mr-select--purple"
+                      type="button"
+                      aria-label="Sort quizzes"
+                      [attr.aria-expanded]="openQuizFilterMenu === 'sort'"
+                      (click)="toggleQuizFilterMenu('sort', $event)"
+                    >
+                      <span class="mr-select__left">
+                        <span class="mr-select__icon" aria-hidden="true">
+                          <i class="fa-solid fa-arrow-down-a-z"></i>
+                        </span>
+                        <span class="mr-select__value">{{ quizSortLabel }}</span>
+                      </span>
+                      <span class="mr-select__caret" aria-hidden="true"></span>
+                    </button>
+                    <div class="mr-select__menu" *ngIf="openQuizFilterMenu === 'sort'" role="listbox" (click)="$event.stopPropagation()">
+                      <button class="mr-select__item" type="button" [class.active]="quizSort === 'nameAsc'" (click)="setQuizSort('nameAsc', $event)">Name A-Z</button>
+                      <button class="mr-select__item" type="button" [class.active]="quizSort === 'nameDesc'" (click)="setQuizSort('nameDesc', $event)">Name Z-A</button>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="user-quizzes__list-wrap">
+                  <section class="user-quizzes__list" *ngIf="list.paged.length; else noApprovedQuizzes">
+                    <article
+                      class="user-quiz-row"
+                      *ngFor="let quiz of list.paged; trackBy: trackByQuizId"
+                    >
+                      <span class="user-quiz-row__avatar" [ngStyle]="quizAvatarStyle(quiz)" aria-hidden="true">
+                        <ng-container *ngIf="!hasQuizAvatarImage(quiz)">{{ titleInitial(quiz.title) }}</ng-container>
+                      </span>
+
+                      <div class="user-quiz-row__text">
+                        <div class="user-quiz-row__title">{{ quiz.title }}</div>
+                        <div class="user-quiz-row__desc">{{ quiz.description || 'No description' }}</div>
+                      </div>
+
+                      <div class="user-quiz-row__meta">
+                        <span class="user-quiz-row__meta-item">
+                          <i class="fa-regular fa-clock" aria-hidden="true"></i>
+                          {{ quizTimeLabel(quiz) }}
+                        </span>
+                        <span class="user-quiz-row__meta-sep" aria-hidden="true">|</span>
+                        <span class="user-quiz-row__meta-item">
+                          <i class="fa-regular fa-circle-check" aria-hidden="true"></i>
+                          {{ quiz.questionCount | number }}
+                        </span>
+                      </div>
+
+                      <div class="user-quiz-row__actions" (click)="$event.stopPropagation()">
+                        <button
+                          class="user-quiz-row__dots"
+                          type="button"
+                          aria-label="Quiz actions"
+                          [attr.aria-expanded]="openQuizMenuId === quiz.id"
+                          (click)="toggleQuizMenu(quiz.id, $event)"
+                        >
+                          <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
+                        </button>
+                        <div class="user-quiz-row__menu" *ngIf="openQuizMenuId === quiz.id">
+                          <button type="button" (click)="openQuizPreview(quiz, $event)">
+                            <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                            Preview quiz
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  </section>
+                </section>
+
+                <section class="user-quizzes__footer" *ngIf="list.totalCount > 0">
+                  <div class="user-quizzes__pager">
+                    <button
+                      class="user-quizzes__pager-btn"
+                      type="button"
+                      aria-label="Previous page"
+                      [disabled]="list.page <= 1"
+                      (click)="prevQuizPage()"
+                    >
+                      <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                    </button>
+                    <span>Page {{ list.page }} / {{ list.totalPages }}</span>
+                    <button
+                      class="user-quizzes__pager-btn"
+                      type="button"
+                      aria-label="Next page"
+                      [disabled]="list.page >= list.totalPages"
+                      (click)="nextQuizPage(list.totalPages)"
+                    >
+                      <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                  <div class="user-quizzes__entries">
+                    Showing {{ list.from }} to {{ list.to }} of {{ list.totalCount }} entries
+                  </div>
+                </section>
+              </ng-container>
+
+              <ng-template #noApprovedQuizzes>
+                <section class="empty-state">No approved quizzes yet.</section>
+              </ng-template>
+            </section>
+          </ng-container>
+        </section>
+
+        <section class="quiz-preview-backdrop" *ngIf="previewQuiz as preview" (click)="closeQuizPreview()">
+          <article class="quiz-preview-card" (click)="$event.stopPropagation()" aria-label="Quiz preview">
+            <header class="quiz-preview-card__head">
+              <div class="quiz-preview-card__title">{{ preview.title }}</div>
+              <button class="quiz-preview-card__close" type="button" aria-label="Close preview" (click)="closeQuizPreview()">
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+              </button>
+            </header>
+
+            <div class="quiz-preview-card__desc">{{ preview.description || 'No description available.' }}</div>
+
+            <div class="quiz-preview-card__meta">
+              <span><i class="fa-solid fa-filter" aria-hidden="true"></i> {{ preview.categoryName || 'Uncategorized' }}</span>
+              <span><i class="fa-regular fa-clock" aria-hidden="true"></i> {{ quizTimeLabel(preview) }}</span>
+              <span><i class="fa-regular fa-circle-check" aria-hidden="true"></i> {{ preview.questionCount | number }} questions</span>
+            </div>
+
+            <div class="quiz-preview-card__actions">
+              <button type="button" (click)="openQuizInLibrary(preview)">Open in library</button>
+            </div>
+          </article>
+        </section>
+
+        <div
+          class="feedback-modal-backdrop"
+          *ngIf="displayNameModalOpen"
+          (click)="closeDisplayNameModal()"
+          aria-hidden="true"
+        ></div>
+
+        <section
+          class="feedback-modal feedback-modal--display-name"
+          *ngIf="displayNameModalOpen"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Change nickname"
+          (click)="$event.stopPropagation()"
+        >
+          <header class="feedback-modal__head">
+            <div>
+              <h3>Change nickname</h3>
+              <p class="muted">Choose a new nickname for your profile.</p>
+            </div>
+            <button class="profile-name-modal__close" type="button" (click)="closeDisplayNameModal()" aria-label="Close change nickname modal">
+              <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+          </header>
+
+          <div class="feedback-modal__body">
+            <div class="profile-name-modal__meta">
+              <div class="profile-name-modal__meta-item">
+                <span class="profile-name-modal__meta-label">Cost</span>
+                <span class="profile-name-modal__meta-value profile-name-modal__meta-value--coin">
+                  <i class="fa-solid fa-coins profile-name-modal__coin-icon" aria-hidden="true"></i>
+                  {{ vm.displayNameChangeCost | number }}
+                </span>
+              </div>
+              <div class="profile-name-modal__meta-item">
+                <span class="profile-name-modal__meta-label">Cooldown</span>
+                <span class="profile-name-modal__meta-value">Once every 7 days</span>
+              </div>
+            </div>
+
+            <div class="profile-name-modal__notices" *ngIf="vm.displayNameCooldownActive || !vm.displayNameCanAfford">
+              <div class="profile-name-modal__notice profile-name-modal__notice--warning" *ngIf="vm.displayNameCooldownActive && vm.displayNameNextChangeLabel as nextChangeLabel">
+                <i class="fa-regular fa-clock" aria-hidden="true"></i>
+                <span>Next change available on {{ nextChangeLabel }}.</span>
+              </div>
+              <div class="profile-name-modal__notice profile-name-modal__notice--warning" *ngIf="!vm.displayNameCanAfford">
+                <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                <span>Missing {{ (vm.displayNameChangeCost - vm.coins) | number }} coins to change nickname.</span>
+              </div>
+            </div>
+
+            <label class="profile-name-modal__field" aria-label="New nickname">
+              <span class="profile-name-modal__label">New nickname</span>
+              <input
+                class="profile-name-modal__input"
+                type="text"
+                [value]="displayNameDraft"
+                maxlength="32"
+                autocomplete="nickname"
+                (input)="onDisplayNameDraftInput($event)"
+                [disabled]="displayNameSubmitting"
+              />
+              <span class="profile-name-modal__hint">Allowed: letters, numbers, spaces, underscore, dash (3-32 chars).</span>
+            </label>
+
+          </div>
+
+          <footer class="feedback-modal__actions">
+            <button class="btn ghost" type="button" (click)="closeDisplayNameModal()" [disabled]="displayNameSubmitting">Cancel</button>
+            <button
+              class="btn primary"
+              type="button"
+              (click)="submitDisplayNameChange()"
+              [disabled]="displayNameSubmitting || !vm.displayNameCanChangeNow"
+            >
+              {{ displayNameSubmitting ? 'Buying...' : 'Buy' }}
+            </button>
+          </footer>
+        </section>
+      </article>
+    </div>
+  </ng-container>
+
+  <ng-template #profileUnavailable>
+    <div class="frame">
+      <article class="card" aria-label="Profile unavailable">
+        <div class="card__top">
+          <div class="profile-title">
+            <h1>
+              <i class="fa-regular fa-user" aria-hidden="true"></i>
+              My Profile
+            </h1>
+          </div>
+          <button class="back mr-back-btn" type="button" (click)="goBack()" aria-label="Back">
+            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+            <span>Back</span>
+          </button>
+        </div>
+
+        <section class="empty-state">Profile data is currently unavailable.</section>
+      </article>
+    </div>
+  </ng-template>
+</section>
+

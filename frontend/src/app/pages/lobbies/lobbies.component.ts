@@ -9,6 +9,7 @@ import { LobbyApi } from '../../core/api/lobby.api';
 import { ActiveLobbyDto, LobbyOwnerType } from '../../core/models/lobby.models';
 import { rankForPoints } from '../../core/progression/progression';
 import { PlayerAvatarComponent } from '../../core/ui/player-avatar.component';
+import { PremiumBadgeComponent } from '../../core/ui/premium-badge.component';
 import { ToastService } from '../../core/ui/toast.service';
 
 type LobbySort = 'newest' | 'oldest' | 'playersDesc' | 'playersAsc';
@@ -23,7 +24,7 @@ type ActiveLobbyRowVm = ActiveLobbyDto & {
 @Component({
   selector: 'app-lobbies',
   standalone: true,
-  imports: [CommonModule, FormsModule, PlayerAvatarComponent],
+  imports: [CommonModule, FormsModule, PlayerAvatarComponent, PremiumBadgeComponent],
   templateUrl: './lobbies.component.html',
   styleUrl: './lobbies.component.scss',
 })

@@ -79,6 +79,7 @@ export interface LibraryPolicyDto {
   maxPendingSubmissions: number;
   minQuestionsToSubmit: number;
   maxQuestionsPerQuiz: number;
+  maxQuestionImagesPerQuiz: number;
   minQuestionTimeLimitSeconds: number;
   maxQuestionTimeLimitSeconds: number;
   maxQuestionsPerGame: number;

@@ -15,12 +15,13 @@ import {
   AdminQuizSubmissionListItemDto,
 } from '../../core/api/admin-quiz.api';
 import { PlayerAvatarComponent } from '../../core/ui/player-avatar.component';
+import { PremiumBadgeComponent } from '../../core/ui/premium-badge.component';
 import { ToastService } from '../../core/ui/toast.service';
 
 @Component({
   selector: 'app-admin-quiz-submissions',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, PlayerAvatarComponent],
+  imports: [CommonModule, ReactiveFormsModule, PlayerAvatarComponent, PremiumBadgeComponent],
   templateUrl: './admin-quiz-submissions.component.html',
   styleUrl: './admin-quiz-submissions.component.scss',
 })
@@ -1089,13 +1090,14 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
   submissionTimestampLabel(item: AdminQuizSubmissionListItemDto): string {
     const timestamp = this.submissionTimestampValue(item);
     if (!Number.isFinite(timestamp)) return 'Date unavailable';
-    return new Intl.DateTimeFormat(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(timestamp));
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return 'Date unavailable';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${day}.${month}.${year} | ${hours}:${minutes}`;
   }
 
   trackBySubmissionId(_: number, item: AdminQuizSubmissionListItemDto): number {

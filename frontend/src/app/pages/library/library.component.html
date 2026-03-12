@@ -1,4 +1,4 @@
-<section class="page casual-page lobby-page">
+﻿<section class="page casual-page lobby-page">
   <div class="frame">
     <div class="card" aria-label="Quiz Library">
       <svg class="svg-defs" aria-hidden="true" focusable="false">
@@ -55,7 +55,7 @@
           </h1>
         </div>
 
-        <button class="back" type="button" (click)="onTopBack()" aria-label="Back">
+        <button class="back mr-back-btn" type="button" (click)="onTopBack()" aria-label="Back">
           <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
           <span>Back</span>
         </button>
@@ -957,8 +957,9 @@
                     #questionImageInput
                     type="file"
                     [attr.accept]="allowedUploadMimeTypes.join(',')"
+                    [disabled]="questionImageUploadBlocked"
                     hidden
-                    (change)="uploadQuestionImage($event, 'prompt')"
+                    (change)="uploadQuestionImage($event)"
                   />
                   <div class="media-file media-file--question" [class.is-empty]="!questionImageUrl()">
                     <ng-container *ngIf="questionImageUrl() as url; else questionImageAdd">
@@ -976,12 +977,22 @@
                       <button
                         class="media-file__name media-file__name--full media-file__name--muted"
                         type="button"
+                        [disabled]="questionImageUploadBlocked"
                         (click)="questionImageInput.value=''; questionImageInput.click()"
-                        aria-label="Upload question image"
+                        [attr.aria-label]="questionImageUploadBlocked ? 'Question image limit reached' : 'Upload question image'"
                       >
                         <i class="fa-solid fa-upload" aria-hidden="true"></i>
-                        <span class="media-file__upload-label">Add question image</span>
-                        <small class="media-file__upload-meta">Max {{ maxUploadMbLabel }}</small>
+                        <span class="media-file__upload-label">
+                          {{ questionImageUploadBlocked ? 'Question image limit reached' : 'Add question image' }}
+                        </span>
+                        <small class="media-file__upload-meta">
+                          <ng-container *ngIf="questionImageUploadBlocked; else questionImageMetaDefault">
+                            {{ questionImageUsageLabel }} images used
+                          </ng-container>
+                          <ng-template #questionImageMetaDefault>
+                            Max {{ maxUploadMbLabel }} | {{ questionImageUsageLabel }} images
+                          </ng-template>
+                        </small>
                       </button>
                     </ng-template>
                     <button
@@ -995,7 +1006,6 @@
                     </button>
                   </div>
                 </div>
-
                 <div class="options">
                   <div class="opt" *ngFor="let idx of [1, 2, 3, 4]">
                     <label class="opt__radio">
@@ -1009,50 +1019,10 @@
 
                     <div class="opt__content">
                       <div class="opt__top">
-                        <ng-container *ngIf="optionImageUrl(idx) as optUrl; else optionTextInput">
-                          <div class="media-file media-file--inline">
-                            <button
-                              class="media-file__name media-file__name--full"
-                              type="button"
-                              (click)="openImagePreview(optUrl, 'Answer option image')"
-                              [attr.aria-label]="'Open option ' + idx + ' image preview'"
-                            >
-                              <i class="fa-regular fa-image" aria-hidden="true"></i>
-                              <span>Option {{ idx }} image</span>
-                            </button>
-                          </div>
-                        </ng-container>
-                        <ng-template #optionTextInput>
-                          <input
-                            [formControlName]="'o' + idx"
-                            [placeholder]="'Option ' + idx"
-                          />
-                        </ng-template>
-
                         <input
-                          #optImageInput
-                          type="file"
-                          [attr.accept]="allowedUploadMimeTypes.join(',')"
-                          hidden
-                          (change)="uploadQuestionImage($event, $any(idx))"
+                          [formControlName]="'o' + idx"
+                          [placeholder]="'Option ' + idx"
                         />
-                        <button
-                          class="icon-btn"
-                          type="button"
-                          (click)="optImageInput.value=''; optImageInput.click()"
-                        >
-                          <i class="fa-solid fa-image" aria-hidden="true"></i>
-                          <span class="sr-only">Upload option image</span>
-                        </button>
-                        <button
-                          class="icon-btn danger"
-                          type="button"
-                          *ngIf="optionImageUrl(idx)"
-                          (click)="clearOptionImage(idx)"
-                        >
-                          <i class="fa-solid fa-trash" aria-hidden="true"></i>
-                          <span class="sr-only">Remove option image</span>
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -1113,3 +1083,4 @@
     </div>
   </div>
 </section>
+

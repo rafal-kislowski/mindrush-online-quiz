@@ -6,6 +6,7 @@ export interface LeaderboardEntryDto {
   userId: number;
   displayName: string;
   rankPoints: number;
+  isPremium: boolean;
 }
 
 export interface LeaderboardStatsDto {
@@ -19,6 +20,7 @@ export interface LeaderboardMeDto {
   displayName: string;
   rankPoints: number;
   position: number;
+  isPremium: boolean;
 }
 
 @Injectable({ providedIn: 'root' })

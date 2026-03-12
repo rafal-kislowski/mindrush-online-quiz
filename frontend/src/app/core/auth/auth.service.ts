@@ -95,6 +95,36 @@ export class AuthService {
     return this.api.resetPassword(token, password, confirmPassword);
   }
 
+  updateDisplayName(displayName: string): Observable<AuthUserDto> {
+    return this.api.updateDisplayName(displayName).pipe(
+      tap((u) => {
+        this.loaded = true;
+        this.userSubject.next(u);
+        this.sessionService.refresh().subscribe({ error: () => {} });
+      })
+    );
+  }
+
+  changePassword(currentPassword: string, newPassword: string, confirmPassword: string): Observable<AuthUserDto> {
+    return this.api.changePassword(currentPassword, newPassword, confirmPassword).pipe(
+      tap((u) => {
+        this.loaded = true;
+        this.userSubject.next(u);
+        this.sessionService.refresh().subscribe({ error: () => {} });
+      })
+    );
+  }
+
+  revokeAllSessions(): Observable<AuthActionResponseDto> {
+    return this.api.revokeAllSessions().pipe(
+      tap(() => {
+        this.loaded = true;
+        this.userSubject.next(null);
+        this.sessionService.clearAndRefresh().subscribe({ error: () => {} });
+      })
+    );
+  }
+
   refreshOnce(): Observable<AuthUserDto> {
     if (this.refreshInFlight) return this.refreshInFlight;
     this.refreshInFlight = this.api.refresh().pipe(

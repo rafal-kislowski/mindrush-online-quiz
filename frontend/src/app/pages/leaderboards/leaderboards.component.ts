@@ -12,6 +12,7 @@ import {
 import { AuthService } from '../../core/auth/auth.service';
 import { rankForPoints } from '../../core/progression/progression';
 import { PlayerAvatarComponent } from '../../core/ui/player-avatar.component';
+import { PremiumBadgeComponent } from '../../core/ui/premium-badge.component';
 import { ToastService } from '../../core/ui/toast.service';
 
 type LeaderboardRowVm = LeaderboardEntryDto & {
@@ -27,7 +28,7 @@ type LeaderboardMeVm = LeaderboardMeDto & {
 @Component({
   selector: 'app-leaderboards',
   standalone: true,
-  imports: [CommonModule, RouterLink, PlayerAvatarComponent],
+  imports: [CommonModule, RouterLink, PlayerAvatarComponent, PremiumBadgeComponent],
   templateUrl: './leaderboards.component.html',
   styleUrl: './leaderboards.component.scss',
 })

@@ -47,11 +47,18 @@
 }
 
 .mr-avatar__initials {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-weight: 950;
   letter-spacing: 0.01em;
   line-height: 1;
+  text-align: center;
   text-transform: uppercase;
   font-size: calc(var(--mr-avatar-size) * 0.42);
+  transform: translateY(0.02em);
 }
 
 .mr-avatar__guest-icon {

@@ -627,14 +627,20 @@
 }
 
 .leader-row__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 15px;
   line-height: 1.2;
   font-weight: 950;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.leader-row__name > span {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: 1 1 auto;
-  min-width: 0;
 }
 
 .leader-row__meta {

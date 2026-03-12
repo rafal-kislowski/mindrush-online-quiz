@@ -1,4 +1,4 @@
-<main class="submissions-dashboard lobby-page">
+﻿<main class="submissions-dashboard lobby-page">
   <section class="submissions-grid">
     <article class="submissions-shell" aria-label="Quiz submissions">
       <div class="submissions-shell__inner">
@@ -49,7 +49,7 @@
           </h1>
         </div>
 
-        <button class="back" type="button" (click)="handleBack()" aria-label="Back">
+        <button class="back mr-back-btn" type="button" (click)="handleBack()" aria-label="Back">
           <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
           <span>Back</span>
         </button>
@@ -209,7 +209,8 @@
                               <div class="title__meta title__meta--owner">
                                 <span class="mr-meta-row">
                                   <i class="fa-regular fa-user" aria-hidden="true"></i>
-                                  <span class="title__category">{{ item.ownerDisplayName || 'Unknown user' }}</span>
+                                  <app-premium-badge class="owner-premium-badge" *ngIf="item.ownerIsPremium" [size]="14"></app-premium-badge>
+                                  <span class="title__category" [class.mr-premium-name]="item.ownerIsPremium">{{ item.ownerDisplayName || 'Unknown user' }}</span>
                                 </span>
                               </div>
                             </div>
@@ -515,7 +516,10 @@
                         [decorative]="true"
                       ></app-player-avatar>
                       <div class="owner-card__meta">
-                        <div class="owner-card__name">{{ detail.ownerDisplayName || detail.ownerEmail || 'Unknown user' }}</div>
+                        <div class="owner-card__name-row">
+                          <app-premium-badge *ngIf="(detail.ownerRoles ?? []).includes('PREMIUM')" [size]="16"></app-premium-badge>
+                          <div class="owner-card__name" [class.mr-premium-name]="detail.ownerRoles.includes('PREMIUM')">{{ detail.ownerDisplayName || detail.ownerEmail || 'Unknown user' }}</div>
+                        </div>
                         <div class="owner-card__id">
                           ID: {{ detail.ownerUserId || 'N/A' }} &middot; {{ selectedOwnerRolesLabel }}
                         </div>
@@ -928,3 +932,4 @@
     </article>
   </section>
 </main>
+

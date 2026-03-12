@@ -245,15 +245,18 @@
 }
 
 .row.is-me::before {
-  opacity: 0.34;
+  opacity: 1;
   transform: scale(1);
-  background:
-    radial-gradient(128% 150% at 15% 50%, color-mix(in srgb, var(--accent, #38bdf8) 22%, transparent), transparent 76%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(0, 0, 0, 0.08));
+  background: linear-gradient(
+    90deg,
+    rgba(31, 74, 142, 0.5),
+    rgba(29, 57, 98, 0.22) 68%,
+    rgba(29, 57, 98, 0.05)
+  );
 }
 
 .row.is-me:hover::before {
-  opacity: 0.44;
+  opacity: 1;
   transform: scaleX(1);
 }
 
@@ -305,26 +308,49 @@
 }
 
 .name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 900;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   max-width: 320px;
   min-width: 0;
 }
 
+.name > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.identity {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  align-self: center;
+}
+
 .rank-pill {
   --rank-color: rgba(255, 255, 255, 0.7);
-  padding: 4px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 19px;
+  padding: 0 9px;
   border-radius: 999px;
   font-weight: 900;
-  font-size: 10px;
+  font-size: 11px;
+  line-height: 1;
+  text-align: center;
   color: var(--rank-color);
+  background: color-mix(in srgb, var(--rank-color) 10%, transparent);
   border: 1px solid var(--rank-color);
-  background: transparent;
-  box-shadow: none;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 8px 18px rgba(0, 0, 0, 0.24);
   flex: 0 0 auto;
-  text-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
 }
 
 .right {

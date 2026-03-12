@@ -16,6 +16,7 @@ export interface GameQuestionDto {
 export interface GamePlayerDto {
   displayName: string;
   isAuthenticated?: boolean;
+  isPremium?: boolean;
   answered: boolean;
   correct: boolean | null;
   score: number;

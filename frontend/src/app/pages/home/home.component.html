@@ -485,7 +485,7 @@
                 <div class="leader__sub muted">Top 5 players</div>
               </div>
               <a class="leader__more" routerLink="/leaderboards" aria-label="See more leaderboards">
-                <span>See more</span>
+                <span>Show all</span>
               </a>
             </header>
 
@@ -538,7 +538,10 @@
 
                     <div class="leader-row__main">
                       <div class="leader-row__nameWrap">
-                        <div class="leader-row__name">{{ p.displayName }}</div>
+                        <div class="leader-row__name">
+                          <app-premium-badge *ngIf="p.isPremium" [size]="16"></app-premium-badge>
+                          <span [class.mr-premium-name]="p.isPremium">{{ p.displayName }}</span>
+                        </div>
                         <span class="rank-pill" [style.--rank-color]="p.rankColor">{{ p.rankName }}</span>
                       </div>
                       <div class="leader-row__meta">

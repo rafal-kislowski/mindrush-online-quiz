@@ -548,9 +548,17 @@
   color: rgba(214, 231, 252, 0.86);
 }
 
+.title__meta--owner .mr-meta-row {
+  gap: 7px;
+}
+
 .title__meta--owner .mr-meta-row i {
   font-size: 11px;
   opacity: 0.82;
+}
+
+.title__meta--owner .owner-premium-badge {
+  flex: 0 0 auto;
 }
 
 .title__category {
@@ -1862,7 +1870,15 @@
   gap: 1px;
 }
 
+.owner-card__name-row {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
 .owner-card__name {
+  min-width: 0;
   font-size: 13px;
   font-weight: 900;
   color: rgba(242, 248, 255, 0.96);

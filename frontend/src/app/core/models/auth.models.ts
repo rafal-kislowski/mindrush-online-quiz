@@ -7,4 +7,7 @@ export interface AuthUserDto {
   xp: number;
   coins: number;
   emailVerified: boolean;
+  createdAt?: string | null;
+  lastLoginAt?: string | null;
+  lastDisplayNameChangeAt?: string | null;
 }

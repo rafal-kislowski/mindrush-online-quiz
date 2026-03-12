@@ -2,6 +2,7 @@ export interface LobbyPlayerDto {
   participantId?: number;
   displayName: string;
   isAuthenticated?: boolean;
+  isPremium?: boolean;
   joinedAt: string;
   ready?: boolean;
   away?: boolean;
@@ -35,6 +36,7 @@ export interface ActiveLobbyDto {
   playerCount: number;
   leaderDisplayName: string;
   leaderRankPoints?: number;
+  leaderIsPremium?: boolean;
   ownerType: LobbyOwnerType;
   isOwner: boolean;
   isParticipant: boolean;

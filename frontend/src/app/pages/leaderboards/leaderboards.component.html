@@ -1,4 +1,4 @@
-<section class="page">
+﻿<section class="page">
   <div class="frame">
     <div class="card" aria-label="Leaderboards">
       <svg class="svg-defs" aria-hidden="true" focusable="false">
@@ -49,7 +49,7 @@
           </h1>
         </div>
 
-        <button class="back" type="button" (click)="goHome()" aria-label="Back">
+        <button class="back mr-back-btn" type="button" (click)="goHome()" aria-label="Back">
           <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
           <span>Back</span>
         </button>
@@ -73,7 +73,6 @@
         <div
           class="row"
           *ngFor="let p of rows; let i = index"
-          [style.--accent]="p.rankColor"
           [class.is-me]="me?.userId === p.userId"
         >
           <div class="left">
@@ -95,10 +94,15 @@
               [decorative]="true"
             ></app-player-avatar>
 
-            <span class="name">{{ p.displayName }}</span>
-            <span class="rank-pill" [style.--rank-color]="p.rankColor">
-              {{ p.rankName }}
-            </span>
+            <div class="identity">
+              <span class="name">
+                <app-premium-badge *ngIf="p.isPremium" [size]="17"></app-premium-badge>
+                <span [class.mr-premium-name]="p.isPremium">{{ p.displayName }}</span>
+              </span>
+              <span class="rank-pill" [style.--rank-color]="p.rankColor">
+                {{ p.rankName }}
+              </span>
+            </div>
           </div>
 
           <div class="right">
@@ -107,7 +111,7 @@
         </div>
 
         <ng-container *ngIf="me as meVm">
-          <div class="row is-me" *ngIf="showMeRow" [style.--accent]="meVm.rankColor">
+          <div class="row is-me" *ngIf="showMeRow">
             <div class="left">
               <span class="pos" aria-hidden="true">
                 <i
@@ -127,12 +131,15 @@
                 [decorative]="true"
               ></app-player-avatar>
 
-              <span class="name">
-                {{ meVm.displayName }}
-              </span>
-              <span class="rank-pill" [style.--rank-color]="meVm.rankColor">
-                {{ meVm.rankName }}
-              </span>
+              <div class="identity">
+                <span class="name">
+                  <app-premium-badge *ngIf="meVm.isPremium" [size]="17"></app-premium-badge>
+                  <span [class.mr-premium-name]="meVm.isPremium">{{ meVm.displayName }}</span>
+                </span>
+                <span class="rank-pill" [style.--rank-color]="meVm.rankColor">
+                  {{ meVm.rankName }}
+                </span>
+              </div>
             </div>
 
             <div class="right">
@@ -189,3 +196,4 @@
     </div>
   </div>
 </section>
+

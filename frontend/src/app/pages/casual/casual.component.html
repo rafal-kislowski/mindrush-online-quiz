@@ -1,4 +1,4 @@
-<section class="page casual-page lobby-page">
+﻿<section class="page casual-page lobby-page">
   <div class="frame">
     <div class="card" aria-label="Casual mode">
       <svg class="svg-defs" aria-hidden="true" focusable="false">
@@ -53,7 +53,7 @@
 
         <ng-container *ngIf="selectionView === 'picker'; else backToDashboard">
           <button
-            class="back"
+            class="back mr-back-btn"
             type="button"
             (click)="closePicker()"
             aria-label="Back to casual"
@@ -63,7 +63,7 @@
           </button>
         </ng-container>
         <ng-template #backToDashboard>
-          <a class="back" routerLink="/" aria-label="Back to dashboard">
+          <a class="back mr-back-btn" routerLink="/" aria-label="Back to dashboard">
             <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
             <span>Back</span>
           </a>
@@ -603,3 +603,4 @@
     </div>
   </div>
 </section>
+
