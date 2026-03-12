@@ -52,9 +52,6 @@
         <article class="settings-panel settings-panel--account" aria-label="Account information">
           <header class="settings-panel__header">
             <h2>Account</h2>
-            <span class="status-badge" [class.status-badge--ok]="user.emailVerified">
-              {{ user.emailVerified ? 'Verified' : 'Unverified' }}
-            </span>
           </header>
 
           <dl class="settings-info-list">
@@ -90,6 +87,24 @@
             <span *ngIf="resendCooldownSeconds <= 0; else cooldownLabel">Resend verification email</span>
             <ng-template #cooldownLabel>Resend in {{ resendCooldownSeconds }}s</ng-template>
           </button>
+
+          <section class="account-audio-inline" aria-label="Sound settings">
+            <header class="account-audio-inline__header">
+              <h3>Audio</h3>
+              <span class="status-badge" [class.status-badge--ok]="!soundMuted">
+                {{ soundMuted ? 'Muted' : 'Enabled' }}
+              </span>
+            </header>
+
+            <label class="audio-toggle">
+              <input
+                type="checkbox"
+                [checked]="soundMuted"
+                (change)="onSoundMutedChange($any($event.target).checked)"
+              />
+              <span>Mute all sounds in app</span>
+            </label>
+          </section>
 
           <div class="account-security">
             <p class="account-security__hint">Need to secure the account on all devices?</p>
@@ -158,6 +173,7 @@
             </button>
           </form>
         </article>
+
       </section>
     </article>
   </ng-container>

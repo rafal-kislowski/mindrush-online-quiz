@@ -6,6 +6,7 @@ import { Subscription } from 'rxjs';
 import { apiErrorMessage } from '../../core/api/api-error.util';
 import { AuthService } from '../../core/auth/auth.service';
 import { AuthUserDto } from '../../core/models/auth.models';
+import { SoundEffectsService } from '../../core/ui/sound-effects.service';
 import { ToastService } from '../../core/ui/toast.service';
 
 @Component({
@@ -22,6 +23,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
 
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly soundEffects = inject(SoundEffectsService);
   private readonly toast = inject(ToastService);
   private readonly subscriptions = new Subscription();
 
@@ -33,6 +35,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
   revokingSessions = false;
   resendCooldownSeconds = 0;
   private resendCooldownTimer: ReturnType<typeof setInterval> | null = null;
+  soundMuted = false;
 
   readonly passwordForm = new FormGroup({
     currentPassword: new FormControl('', {
@@ -51,6 +54,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.clearLegacyInterfacePreferences();
+    this.syncSoundPreferencesFromService();
 
     this.subscriptions.add(
       this.auth.user$.subscribe((user) => {
@@ -208,6 +212,11 @@ export class SettingsComponent implements OnInit, OnDestroy {
     void this.router.navigate(['/']);
   }
 
+  onSoundMutedChange(muted: boolean): void {
+    this.soundMuted = muted;
+    this.soundEffects.setEnabled(!muted);
+  }
+
   formatDateTimeLabel(value: string | null | undefined): string {
     const raw = String(value ?? '').trim();
     if (!raw) return 'No data';
@@ -247,6 +256,10 @@ export class SettingsComponent implements OnInit, OnDestroy {
     } catch {
       // ignore storage errors
     }
+  }
+
+  private syncSoundPreferencesFromService(): void {
+    this.soundMuted = !this.soundEffects.isEnabled();
   }
 
 }

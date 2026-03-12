@@ -414,6 +414,28 @@
   gap: 10px;
 }
 
+.account-audio-inline {
+  display: grid;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.account-audio-inline__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.account-audio-inline__header h3 {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(244, 250, 255, 0.95);
+  font-weight: 900;
+}
+
 .account-security__hint {
   margin: 0;
   color: rgba(208, 222, 242, 0.9);
@@ -426,6 +448,21 @@
   border-color: rgba(168, 154, 234, 0.48);
   background: linear-gradient(180deg, rgba(114, 120, 206, 0.28), rgba(92, 84, 164, 0.16));
   color: rgba(236, 240, 255, 0.97);
+}
+
+.audio-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(230, 241, 255, 0.95);
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.audio-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: rgba(86, 199, 255, 0.95);
 }
 
 @media (max-width: 980px) {
