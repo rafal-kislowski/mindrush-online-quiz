@@ -19,6 +19,7 @@ import { computeLevelProgress, levelTheme, rankForPoints } from './core/progress
 import { ParticlesService } from './core/ui/particles.service';
 import { PlayerAvatarComponent } from './core/ui/player-avatar.component';
 import { PremiumBadgeComponent } from './core/ui/premium-badge.component';
+import { SoundEffectsService } from './core/ui/sound-effects.service';
 import { ToastService } from './core/ui/toast.service';
 import { ToastViewportComponent } from './core/ui/toast-viewport.component';
 import { LobbyEventDto, LobbyEventsService } from './core/ws/lobby-events.service';
@@ -97,6 +98,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly notificationApi = inject(NotificationApi);
   private readonly lobbyApi = inject(LobbyApi);
   private readonly lobbyEvents = inject(LobbyEventsService);
+  private readonly soundEffects = inject(SoundEffectsService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
   private readonly subscriptions = new Subscription();
@@ -163,6 +165,8 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly dismissInFlightNotificationIds = new Set<number>();
   private readonly locallyReadNotificationIds = new Set<number>();
   private readonly readInFlightNotificationIds = new Set<number>();
+  private readonly knownNotificationIds = new Set<number>();
+  private notificationsHydrated = false;
   private notificationStream: EventSource | null = null;
   private notificationStreamReconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private notificationStreamReconnectDelayMs = 0;
@@ -698,6 +702,16 @@ export class AppComponent implements OnInit, OnDestroy {
       })
     ).subscribe((response) => {
       const mapped = (response.items ?? []).map((item) => this.mapNotification(item));
+      const incomingUnreadNewItems = mapped.filter(
+        (item) => !item.readAt && !this.knownNotificationIds.has(item.id)
+      );
+      const shouldPlayIncomingNotificationSound =
+        this.notificationsHydrated && incomingUnreadNewItems.length > 0;
+
+      for (const item of mapped) {
+        this.knownNotificationIds.add(item.id);
+      }
+
       const optimisticReadNowIso = new Date().toISOString();
       const normalized = mapped.map((item) => {
         if (!item.readAt && this.locallyReadNotificationIds.has(item.id)) {
@@ -746,6 +760,11 @@ export class AppComponent implements OnInit, OnDestroy {
       if (!this.notifications.length) {
         this.notificationsOpen = false;
       }
+
+      if (shouldPlayIncomingNotificationSound) {
+        void this.soundEffects.playEffect('notification');
+      }
+      this.notificationsHydrated = true;
     });
   }
 
@@ -883,6 +902,8 @@ export class AppComponent implements OnInit, OnDestroy {
     this.dismissInFlightNotificationIds.clear();
     this.locallyReadNotificationIds.clear();
     this.readInFlightNotificationIds.clear();
+    this.knownNotificationIds.clear();
+    this.notificationsHydrated = false;
     this.notificationsOpen = false;
     this.notificationFilter = 'all';
   }

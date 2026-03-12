@@ -25,6 +25,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { SessionService } from '../../core/session/session.service';
 import { PlayerAvatarComponent } from '../../core/ui/player-avatar.component';
 import { PremiumBadgeComponent } from '../../core/ui/premium-badge.component';
+import { SoundEffectsService } from '../../core/ui/sound-effects.service';
 import { ToastService } from '../../core/ui/toast.service';
 import { GameEventsService } from '../../core/ws/game-events.service';
 import { LobbyChatMessageDto, LobbyChatService } from '../../core/ws/lobby-chat.service';
@@ -279,6 +280,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     private readonly chat: LobbyChatService,
     private readonly lobbyEvents: LobbyEventsService,
     private readonly stompClient: StompClientService,
+    private readonly soundEffects: SoundEffectsService,
     private readonly toast: ToastService,
     private readonly el: ElementRef<HTMLElement>,
     @Inject(DOCUMENT) private readonly document: Document
@@ -845,7 +847,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.chatEventsSubscription = this.chat.subscribe(lobbyCode).subscribe({
       next: (msg) => {
         if (this.code !== lobbyCode) return;
-        this.appendChatMessage(msg);
+        this.appendChatMessage(msg, { playSound: true });
         this.scrollChatToBottomIfNearBottom();
       },
       error: () => {
@@ -1557,7 +1559,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     const text = raw.length > this.maxChatMessageLength ? raw.slice(0, this.maxChatMessageLength) : raw;
     this.chat.send(this.code, text).subscribe({
       next: (msg) => {
-        this.appendChatMessage(msg);
+        this.appendChatMessage(msg, { playSound: true });
         this.chatText = '';
         queueMicrotask(() => this.scrollChatToBottom());
       },
@@ -2021,7 +2023,10 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     el.scrollTop = el.scrollHeight;
   }
 
-  private appendChatMessage(msg: LobbyChatMessageDto): void {
+  private appendChatMessage(
+    msg: LobbyChatMessageDto,
+    options?: { playSound?: boolean }
+  ): void {
     if (this.isSystemChatMessage(msg) && this.hasRecentSystemMessageText(msg.text, 5000)) {
       return;
     }
@@ -2031,6 +2036,16 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.chatMessages.push(msg);
     this.chatMessageKeys.add(key);
+    if (options?.playSound) {
+      if (!this.isSystemChatMessage(msg)) {
+        void this.soundEffects.playEffect('chat');
+      } else {
+        const presenceEffect = this.resolvePresenceSoundEffect(msg);
+        if (presenceEffect) {
+          void this.soundEffects.playEffect(presenceEffect);
+        }
+      }
+    }
 
     if (this.chatMessages.length <= this.maxChatMessages) return;
 
@@ -2039,6 +2054,16 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     for (const item of removed) {
       this.chatMessageKeys.delete(this.chatMessageKey(item));
     }
+  }
+
+  private resolvePresenceSoundEffect(
+    msg: LobbyChatMessageDto
+  ): 'join_lobby' | 'leave_lobby' | null {
+    const text = String(msg?.text ?? '').trim().toLowerCase();
+    if (!text) return null;
+    if (text.includes('joined the lobby')) return 'join_lobby';
+    if (text.includes('left the lobby')) return 'leave_lobby';
+    return null;
   }
 
   private chatMessageKey(msg: LobbyChatMessageDto): string {
@@ -2061,6 +2086,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     const nextPlayers = current.players ?? [];
 
     const prevKeys = new Set(prevPlayers.map((p) => this.playerIdentityKey(p)));
+    const nextKeys = new Set(nextPlayers.map((p) => this.playerIdentityKey(p)));
 
     for (const player of nextPlayers) {
       const key = this.playerIdentityKey(player);
@@ -2080,7 +2106,30 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
           text,
           serverTime: new Date().toISOString(),
           kind: 'SYSTEM',
-        });
+        }, { playSound: true });
+        this.scrollChatToBottomIfNearBottom();
+        continue;
+      }
+    }
+
+    for (const player of prevPlayers) {
+      const key = this.playerIdentityKey(player);
+      const displayName = String(player.displayName ?? '').trim();
+      if (!displayName) continue;
+      if (!key) continue;
+
+      // Participant disappeared from the lobby snapshot.
+      if (!nextKeys.has(key)) {
+        if (this.isLobbyPlayerMe(player, prevPlayers)) continue;
+        const text = `${displayName} left the lobby.`;
+        if (this.hasRecentSystemMessageText(text)) continue;
+        this.appendChatMessage({
+          lobbyCode: (this.code ?? '').trim().toUpperCase(),
+          displayName: 'System',
+          text,
+          serverTime: new Date().toISOString(),
+          kind: 'SYSTEM',
+        }, { playSound: true });
         this.scrollChatToBottomIfNearBottom();
         continue;
       }

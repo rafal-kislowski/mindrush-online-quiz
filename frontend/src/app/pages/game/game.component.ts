@@ -20,6 +20,7 @@ import { SessionService } from '../../core/session/session.service';
 import { ConfettiService } from '../../core/ui/confetti.service';
 import { PlayerAvatarComponent } from '../../core/ui/player-avatar.component';
 import { PremiumBadgeComponent } from '../../core/ui/premium-badge.component';
+import { SoundEffectsService } from '../../core/ui/sound-effects.service';
 import { ToastService } from '../../core/ui/toast.service';
 import { GameEventsService } from '../../core/ws/game-events.service';
 import { StompClientService } from '../../core/ws/stomp-client.service';
@@ -93,6 +94,7 @@ export class GameComponent implements OnInit, OnDestroy {
     private readonly authService: AuthService,
     private readonly profileInsights: ProfileInsightsService,
     private readonly confettiService: ConfettiService,
+    private readonly soundEffects: SoundEffectsService,
     private readonly toast: ToastService
   ) {}
 
@@ -696,6 +698,7 @@ export class GameComponent implements OnInit, OnDestroy {
       const mode = this.isSoloFlow ? 'SOLO' : 'LOBBY';
       const gameKey = this.finishedGameKey(state);
       this.profileInsights.trackFinishedGame(mode, gameKey, correctAnswers, won);
+      this.playGameOverSoundIfEligible(state);
       this.playWinnerConfettiIfEligible(state);
     }
 
@@ -754,6 +757,7 @@ export class GameComponent implements OnInit, OnDestroy {
       const key = `${state.gameSessionId ?? 'none'}:${state.questionIndex}`;
       if (key !== this.revealKey) {
         this.revealKey = key;
+        this.playAnswerFeedbackSoundIfEligible(state);
         this.stopRevealPhaseTimer();
         this.revealPhase = 'feedback';
 
@@ -958,11 +962,26 @@ export class GameComponent implements OnInit, OnDestroy {
     if (this.celebratedGameSessionId === sessionKey) return;
     this.celebratedGameSessionId = sessionKey;
 
+    void this.soundEffects.playEffect('winner');
     void this.confettiService.makeItRain(2000);
   }
 
   private shouldCelebrateCurrentPlayerWin(state: GameStateDto): boolean {
     return this.resolveMyFinishedOutcome(state) === 'WIN';
+  }
+
+  private playGameOverSoundIfEligible(state: GameStateDto): void {
+    if (this.resolveMyFinishedOutcome(state) !== 'LOSE') return;
+    void this.soundEffects.playEffect('game_over');
+  }
+
+  private playAnswerFeedbackSoundIfEligible(state: GameStateDto): void {
+    if (state.stage !== 'REVEAL') return;
+    const me = this.resolveCurrentPlayerFromResults(state.players ?? []);
+    if (!me) return;
+
+    const effect: 'correct' | 'wrong' = me.correct === true ? 'correct' : 'wrong';
+    void this.soundEffects.playEffect(effect);
   }
 
   private sortPlayersForResults(players: readonly GamePlayerDto[]): GamePlayerDto[] {
