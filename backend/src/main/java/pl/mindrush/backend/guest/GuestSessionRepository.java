@@ -12,6 +12,13 @@ public interface GuestSessionRepository extends JpaRepository<GuestSession, Stri
     @Query("""
             select s.id
             from GuestSession s
+            where s.userId = :userId
+            """)
+    List<String> findIdsByUserId(@Param("userId") Long userId);
+
+    @Query("""
+            select s.id
+            from GuestSession s
             where s.revoked = true
                or s.expiresAt <= :now
                or s.lastSeenAt < :cutoff

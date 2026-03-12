@@ -42,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "app.library.policy.user.max-pending-submissions=1",
         "app.library.policy.user.min-questions-to-submit=2",
         "app.library.policy.user.max-questions-per-quiz=1",
+        "app.library.policy.user.max-question-images-per-quiz=0",
         "app.library.policy.user.min-question-time-limit-seconds=5",
         "app.library.policy.user.max-question-time-limit-seconds=120",
         "app.library.policy.user.max-questions-per-game=20",
@@ -116,6 +117,7 @@ class LibraryQuizControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.maxOwnedQuizzes").value(1))
                 .andExpect(jsonPath("$.maxQuestionsPerQuiz").value(1))
+                .andExpect(jsonPath("$.maxQuestionImagesPerQuiz").value(0))
                 .andExpect(jsonPath("$.minQuestionsToSubmit").value(2))
                 .andExpect(jsonPath("$.ownedCount").value(0))
                 .andExpect(jsonPath("$.pendingCount").value(0));
@@ -191,6 +193,53 @@ class LibraryQuizControllerTest {
     }
 
     @Test
+    void addQuestion_rejectsOptionImagesForUserQuizzes() throws Exception {
+        Cookie accessCookie = loginAsUser("user-option-image@example.com");
+        long quizId = createQuiz(accessCookie, "No option images quiz");
+
+        mockMvc.perform(post("/api/library/quizzes/" + quizId + "/questions")
+                        .cookie(accessCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "prompt": "Question with option image",
+                                  "options": [
+                                    { "text": "A", "imageUrl": "/media/abc.png", "correct": true },
+                                    { "text": "B", "correct": false },
+                                    { "text": "C", "correct": false },
+                                    { "text": "D", "correct": false }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Answer option images are disabled for user quizzes"));
+    }
+
+    @Test
+    void addQuestion_rejectsQuestionImageWhenTierLimitIsZero() throws Exception {
+        Cookie accessCookie = loginAsUser("user-question-image-limit@example.com");
+        long quizId = createQuiz(accessCookie, "Question image limit quiz");
+
+        mockMvc.perform(post("/api/library/quizzes/" + quizId + "/questions")
+                        .cookie(accessCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "prompt": "Question image blocked",
+                                  "imageUrl": "/media/question.png",
+                                  "options": [
+                                    { "text": "A", "correct": true },
+                                    { "text": "B", "correct": false },
+                                    { "text": "C", "correct": false },
+                                    { "text": "D", "correct": false }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Question image limit reached (0) for this quiz."));
+    }
+
+    @Test
     void toggleFavorite_updatesPublicAndFavoritesViews() throws Exception {
         Cookie viewerCookie = loginAsUser("viewer@example.com");
         AppUser owner = createUser("owner-public@example.com");
@@ -231,7 +280,7 @@ class LibraryQuizControllerTest {
     }
 
     @Test
-    void listQuizzes_hidesUnapprovedCustomAndLibraryContainsOnlyOwnedPublic() throws Exception {
+    void listQuizzes_showsOwnedUnapprovedForSoloAndKeepsOthersHidden() throws Exception {
         Cookie viewerCookie = loginAsUser("viewer-list@example.com");
         AppUser viewer = userRepository.findByEmailIgnoreCase("viewer-list@example.com").orElseThrow();
         AppUser otherOwner = createUser("owner-list@example.com");
@@ -250,6 +299,13 @@ class LibraryQuizControllerTest {
         ownedPending.setModerationStatus(QuizModerationStatus.PENDING);
         ownedPending = quizRepository.save(ownedPending);
 
+        Quiz otherPending = new Quiz("Other pending", "desc", null);
+        otherPending.setSource(QuizSource.CUSTOM);
+        otherPending.setOwnerUserId(otherOwner.getId());
+        otherPending.setStatus(QuizStatus.ACTIVE);
+        otherPending.setModerationStatus(QuizModerationStatus.PENDING);
+        otherPending = quizRepository.save(otherPending);
+
         Quiz otherApproved = new Quiz("Other approved", "desc", null);
         otherApproved.setSource(QuizSource.CUSTOM);
         otherApproved.setOwnerUserId(otherOwner.getId());
@@ -267,16 +323,22 @@ class LibraryQuizControllerTest {
         JsonNode ownedApprovedRow = quizRowById(rows, ownedApproved.getId());
         JsonNode ownedPendingRow = quizRowById(rows, ownedPending.getId());
         JsonNode otherApprovedRow = quizRowById(rows, otherApproved.getId());
+        JsonNode otherPendingRow = quizRowById(rows, otherPending.getId());
 
         assertThat(ownedApprovedRow).isNotNull();
         assertThat(ownedApprovedRow.path("inLibrary").asBoolean(false)).isTrue();
         assertThat(ownedApprovedRow.path("publicAvailable").asBoolean(false)).isTrue();
 
-        assertThat(ownedPendingRow).isNull();
+        assertThat(ownedPendingRow).isNotNull();
+        assertThat(ownedPendingRow.path("ownedByViewer").asBoolean(false)).isTrue();
+        assertThat(ownedPendingRow.path("publicAvailable").asBoolean(true)).isFalse();
+        assertThat(ownedPendingRow.path("inLibrary").asBoolean(true)).isFalse();
 
         assertThat(otherApprovedRow).isNotNull();
         assertThat(otherApprovedRow.path("favorite").asBoolean(false)).isTrue();
         assertThat(otherApprovedRow.path("inLibrary").asBoolean(true)).isFalse();
+
+        assertThat(otherPendingRow).isNull();
     }
 
     @Test

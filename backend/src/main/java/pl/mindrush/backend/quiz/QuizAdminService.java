@@ -23,6 +23,7 @@ public class QuizAdminService {
     private final QuizQuestionRepository questionRepository;
     private final QuizAnswerOptionRepository optionRepository;
     private final MediaStorageService mediaStorageService;
+    private final QuizUsageGuardService quizUsageGuardService;
 
     private static final java.util.regex.Pattern HEX_COLOR =
             java.util.regex.Pattern.compile("^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$");
@@ -39,13 +40,15 @@ public class QuizAdminService {
             QuizCategoryRepository categoryRepository,
             QuizQuestionRepository questionRepository,
             QuizAnswerOptionRepository optionRepository,
-            MediaStorageService mediaStorageService
+            MediaStorageService mediaStorageService,
+            QuizUsageGuardService quizUsageGuardService
     ) {
         this.quizRepository = quizRepository;
         this.categoryRepository = categoryRepository;
         this.questionRepository = questionRepository;
         this.optionRepository = optionRepository;
         this.mediaStorageService = mediaStorageService;
+        this.quizUsageGuardService = quizUsageGuardService;
     }
 
     public Quiz createQuiz(
@@ -281,6 +284,9 @@ public class QuizAdminService {
 
     public void deleteQuiz(Long quizId) {
         Quiz quiz = requireOfficialQuiz(quizId);
+        if (quiz.getStatus() == QuizStatus.ACTIVE) {
+            quizUsageGuardService.assertCanDeactivateOrDelete(quiz.getId(), "move this quiz to trash");
+        }
         quiz.setStatus(QuizStatus.TRASHED);
         quizRepository.save(quiz);
     }
@@ -289,6 +295,9 @@ public class QuizAdminService {
         if (status == null) throw new ResponseStatusException(BAD_REQUEST, "Status is required");
 
         Quiz quiz = requireOfficialQuizWithCategory(quizId);
+        if (quiz.getStatus() == QuizStatus.ACTIVE && status != QuizStatus.ACTIVE) {
+            quizUsageGuardService.assertCanDeactivateOrDelete(quiz.getId(), "change quiz status");
+        }
 
         if (status == QuizStatus.ACTIVE) {
             long questionCount = questionRepository.countByQuizId(quizId);
@@ -303,6 +312,7 @@ public class QuizAdminService {
 
     public void purgeQuiz(Long quizId) {
         Quiz quiz = requireOfficialQuiz(quizId);
+        quizUsageGuardService.assertCanDeactivateOrDelete(quiz.getId(), "delete this quiz");
 
         List<QuizQuestion> questions = questionRepository.findAllByQuizIdOrderByOrderIndexAsc(quizId);
         List<Long> qIds = questions.stream().map(QuizQuestion::getId).toList();

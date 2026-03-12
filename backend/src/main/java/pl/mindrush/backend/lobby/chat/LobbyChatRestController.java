@@ -11,7 +11,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import pl.mindrush.backend.AppRole;
+import pl.mindrush.backend.AppUserRepository;
 import pl.mindrush.backend.guest.GuestSession;
+import pl.mindrush.backend.guest.GuestSessionRepository;
 import pl.mindrush.backend.guest.GuestSessionService;
 import pl.mindrush.backend.lobby.Lobby;
 import pl.mindrush.backend.lobby.LobbyParticipant;
@@ -34,6 +37,8 @@ public class LobbyChatRestController {
     private static final int MAX_MESSAGE_LENGTH = 300;
 
     private final GuestSessionService guestSessionService;
+    private final GuestSessionRepository guestSessionRepository;
+    private final AppUserRepository appUserRepository;
     private final LobbyRepository lobbyRepository;
     private final LobbyParticipantRepository participantRepository;
     private final LobbyChatHistoryService chatHistoryService;
@@ -42,6 +47,8 @@ public class LobbyChatRestController {
 
     public LobbyChatRestController(
             GuestSessionService guestSessionService,
+            GuestSessionRepository guestSessionRepository,
+            AppUserRepository appUserRepository,
             LobbyRepository lobbyRepository,
             LobbyParticipantRepository participantRepository,
             LobbyChatHistoryService chatHistoryService,
@@ -49,6 +56,8 @@ public class LobbyChatRestController {
             Clock clock
     ) {
         this.guestSessionService = guestSessionService;
+        this.guestSessionRepository = guestSessionRepository;
+        this.appUserRepository = appUserRepository;
         this.lobbyRepository = lobbyRepository;
         this.participantRepository = participantRepository;
         this.chatHistoryService = chatHistoryService;
@@ -107,14 +116,29 @@ public class LobbyChatRestController {
             text = text.substring(0, MAX_MESSAGE_LENGTH);
         }
 
+        boolean premium = isPremiumGuestSessionId(guestSession.getId());
         LobbyChatMessageDto message = chatHistoryService.append(
                 lobbyCode,
                 participant.getDisplayName(),
                 text,
-                clock.instant()
+                clock.instant(),
+                premium
         );
         messagingTemplate.convertAndSend("/topic/lobbies/" + lobbyCode + "/chat", message);
         return ResponseEntity.ok(message);
+    }
+
+    private boolean isPremiumGuestSessionId(String guestSessionId) {
+        if (guestSessionId == null || guestSessionId.isBlank()) return false;
+        return guestSessionRepository.findById(guestSessionId)
+                .map(session -> {
+                    Long userId = session.getUserId();
+                    if (userId == null) return false;
+                    return appUserRepository.findById(userId)
+                            .map(user -> user.getRoles().contains(AppRole.PREMIUM))
+                            .orElse(false);
+                })
+                .orElse(false);
     }
 
     private static String normalizeCode(String code) {

@@ -30,4 +30,16 @@ public interface GameAnswerRepository extends JpaRepository<GameAnswer, Long> {
 
     @Query("select count(a.id) from GameAnswer a where a.gameSession.id = :gameSessionId and a.guestSessionId = :guestSessionId and a.correct = false")
     long countWrongByGameSessionIdAndGuestSessionId(@Param("gameSessionId") String gameSessionId, @Param("guestSessionId") String guestSessionId);
+
+    @Query("""
+            select count(a.id)
+            from GameAnswer a
+            where a.guestSessionId in :guestSessionIds
+              and a.gameSession.status = :status
+              and a.correct = true
+            """)
+    long countCorrectByGuestSessionIdsAndSessionStatus(
+            @Param("guestSessionIds") List<String> guestSessionIds,
+            @Param("status") GameStatus status
+    );
 }

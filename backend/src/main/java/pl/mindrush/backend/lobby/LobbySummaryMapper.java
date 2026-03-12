@@ -1,6 +1,7 @@
 package pl.mindrush.backend.lobby;
 
 import org.springframework.stereotype.Component;
+import pl.mindrush.backend.AppRole;
 import pl.mindrush.backend.AppUser;
 import pl.mindrush.backend.AppUserRepository;
 import pl.mindrush.backend.guest.GuestSession;
@@ -36,6 +37,7 @@ public class LobbySummaryMapper {
         List<LobbyParticipant> participants = participantRepository.findAllByLobbyIdOrderByJoinedAtAsc(lobby.getId());
         Map<String, GuestSession> sessionsByGuestSessionId = resolveGuestSessionsById(participants);
         Map<String, Boolean> authenticatedByGuestSessionId = resolveAuthenticatedByGuestSessionId(sessionsByGuestSessionId);
+        Map<String, Boolean> premiumByGuestSessionId = resolvePremiumByGuestSessionId(sessionsByGuestSessionId);
         Map<String, Integer> rankPointsByGuestSessionId = resolveRankPointsByGuestSessionId(sessionsByGuestSessionId);
         boolean isOwner = viewerGuestSessionId != null && viewerGuestSessionId.equals(lobby.getOwnerGuestSessionId());
         boolean isParticipant = viewerGuestSessionId != null
@@ -67,6 +69,7 @@ public class LobbySummaryMapper {
                     "joinedAt", p.getJoinedAt().toString(),
                     "ready", p.isReady(),
                     "away", away,
+                    "isPremium", premiumByGuestSessionId.getOrDefault(p.getGuestSessionId(), false),
                     "rankPoints", rankPointsByGuestSessionId.getOrDefault(p.getGuestSessionId(), 0),
                     "isOwner", p.getGuestSessionId().equals(lobby.getOwnerGuestSessionId()),
                     "isYou", isYou
@@ -98,6 +101,36 @@ public class LobbySummaryMapper {
         for (GuestSession session : guestSessionRepository.findAllById(ids)) {
             if (session == null || session.getId() == null) continue;
             out.put(session.getId(), session);
+        }
+        return out;
+    }
+
+    private Map<String, Boolean> resolvePremiumByGuestSessionId(
+            Map<String, GuestSession> sessionsByGuestSessionId
+    ) {
+        if (sessionsByGuestSessionId == null || sessionsByGuestSessionId.isEmpty()) return Map.of();
+
+        List<Long> userIds = sessionsByGuestSessionId.values().stream()
+                .map(GuestSession::getUserId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Map<Long, Boolean> premiumByUserId = new HashMap<>();
+        if (!userIds.isEmpty()) {
+            for (AppUser user : appUserRepository.findAllById(userIds)) {
+                if (user == null || user.getId() == null) continue;
+                premiumByUserId.put(user.getId(), user.getRoles().contains(AppRole.PREMIUM));
+            }
+        }
+
+        Map<String, Boolean> out = new HashMap<>();
+        for (Map.Entry<String, GuestSession> entry : sessionsByGuestSessionId.entrySet()) {
+            String guestSessionId = entry.getKey();
+            GuestSession session = entry.getValue();
+            if (guestSessionId == null || guestSessionId.isBlank() || session == null) continue;
+            Long userId = session.getUserId();
+            out.put(guestSessionId, userId != null && premiumByUserId.getOrDefault(userId, false));
         }
         return out;
     }

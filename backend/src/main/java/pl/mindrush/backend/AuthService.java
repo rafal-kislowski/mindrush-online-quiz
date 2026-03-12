@@ -21,6 +21,8 @@ import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 @Service
 @Transactional
 public class AuthService {
+    private static final int DISPLAY_NAME_CHANGE_COST_COINS = 50_000;
+    private static final Duration DISPLAY_NAME_CHANGE_COOLDOWN = Duration.ofDays(7);
 
     private final Clock clock;
     private final AppUserRepository userRepository;
@@ -208,12 +210,72 @@ public class AuthService {
         }
     }
 
+    public AuthUserDto updateDisplayName(long userId, String displayName) {
+        AppUser user = findActiveUserById(userId);
+        String nextDisplayName = normalizeDisplayName(displayName);
+        String currentDisplayName = String.valueOf(user.getDisplayName() == null ? "" : user.getDisplayName()).trim();
+        if (nextDisplayName.equalsIgnoreCase(currentDisplayName)) {
+            throw new ResponseStatusException(BAD_REQUEST, "New nickname must be different from current nickname");
+        }
+
+        Instant now = clock.instant();
+        Instant lastChangeAt = user.getLastDisplayNameChangeAt();
+        if (lastChangeAt != null) {
+            Instant nextAllowedAt = lastChangeAt.plus(DISPLAY_NAME_CHANGE_COOLDOWN);
+            if (nextAllowedAt.isAfter(now)) {
+                throw new ResponseStatusException(
+                        BAD_REQUEST,
+                        "Nickname can be changed once every 7 days. Next change available on " + nextAllowedAt
+                );
+            }
+        }
+
+        if (user.getCoins() < DISPLAY_NAME_CHANGE_COST_COINS) {
+            throw new ResponseStatusException(
+                    BAD_REQUEST,
+                    "Not enough coins. Nickname change costs " + DISPLAY_NAME_CHANGE_COST_COINS + " coins"
+            );
+        }
+
+        user.setCoins(user.getCoins() - DISPLAY_NAME_CHANGE_COST_COINS);
+        user.setDisplayName(nextDisplayName);
+        user.setLastDisplayNameChangeAt(now);
+        userRepository.save(user);
+        return toAuthUserDto(user);
+    }
+
+    public AuthResult changePassword(long userId, String currentPassword, String newPassword) {
+        AppUser user = findActiveUserById(userId);
+        String current = currentPassword == null ? "" : currentPassword;
+        if (!passwordEncoder.matches(current, user.getPasswordHash())) {
+            throw new ResponseStatusException(UNAUTHORIZED, "Current password is incorrect");
+        }
+
+        String normalizedPassword = normalizePassword(newPassword);
+        if (passwordEncoder.matches(normalizedPassword, user.getPasswordHash())) {
+            throw new ResponseStatusException(BAD_REQUEST, "New password must be different from current password");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(normalizedPassword));
+        userRepository.save(user);
+        refreshTokenRepository.deleteAllByUser_Id(user.getId());
+        return issueTokens(user);
+    }
+
+    public void revokeAllSessions(long userId) {
+        AppUser user = findActiveUserById(userId);
+        refreshTokenRepository.deleteAllByUser_Id(user.getId());
+    }
+
     private AuthResult issueTokens(AppUser user) {
         ensureNotBanned(user);
         ensureVerifiedForLogin(user);
+
         JwtService.Token access = jwtService.createAccessToken(user);
 
         Instant now = clock.instant();
+        user.setLastLoginAt(now);
+        userRepository.save(user);
         Instant refreshExpiresAt = now.plus(refreshTtl);
         String refreshValue = SecureTokenUtils.randomUrlSafeToken(32);
         RefreshToken refresh = new RefreshToken(user, SecureTokenUtils.sha256Hex(refreshValue), now, refreshExpiresAt);
@@ -254,6 +316,13 @@ public class AuthService {
         }
     }
 
+    private AppUser findActiveUserById(long userId) {
+        AppUser user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "Authentication is required"));
+        ensureNotBanned(user);
+        return user;
+    }
+
     private void ensureVerifiedForLogin(AppUser user) {
         if (user == null) {
             throw new ResponseStatusException(UNAUTHORIZED, "Invalid credentials");
@@ -284,7 +353,10 @@ public class AuthService {
                 user.getRankPoints(),
                 user.getXp(),
                 user.getCoins(),
-                user.isEmailVerified()
+                user.isEmailVerified(),
+                user.getCreatedAt(),
+                user.getLastLoginAt(),
+                user.getLastDisplayNameChangeAt()
         );
     }
 
@@ -334,7 +406,10 @@ public class AuthService {
             int rankPoints,
             int xp,
             int coins,
-            boolean emailVerified
+            boolean emailVerified,
+            Instant createdAt,
+            Instant lastLoginAt,
+            Instant lastDisplayNameChangeAt
     ) {}
 
     public record AuthResult(AuthUserDto user, ResponseCookies cookies) {}

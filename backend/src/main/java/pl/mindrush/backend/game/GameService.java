@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import pl.mindrush.backend.achievement.UserAchievementService;
+import pl.mindrush.backend.AppRole;
 import pl.mindrush.backend.AppUser;
 import pl.mindrush.backend.AppUserRepository;
 import pl.mindrush.backend.casual.CasualThreeLivesRecordService;
@@ -64,6 +66,7 @@ public class GameService {
     private final AppUserRepository appUserRepository;
     private final LobbySystemMessageService lobbySystemMessageService;
     private final CasualThreeLivesRecordService casualThreeLivesRecordService;
+    private final UserAchievementService userAchievementService;
 
     public GameService(
             Clock clock,
@@ -86,7 +89,8 @@ public class GameService {
             GuestSessionRepository guestSessionRepository,
             AppUserRepository appUserRepository,
             LobbySystemMessageService lobbySystemMessageService,
-            CasualThreeLivesRecordService casualThreeLivesRecordService
+            CasualThreeLivesRecordService casualThreeLivesRecordService,
+            UserAchievementService userAchievementService
     ) {
         this.clock = clock;
         this.guestQuestionDuration = guestQuestionDuration;
@@ -109,6 +113,7 @@ public class GameService {
         this.appUserRepository = appUserRepository;
         this.lobbySystemMessageService = lobbySystemMessageService;
         this.casualThreeLivesRecordService = casualThreeLivesRecordService;
+        this.userAchievementService = userAchievementService;
     }
 
     private Duration normalizeTrainingInactivityTimeout(Duration raw) {
@@ -606,6 +611,7 @@ public class GameService {
 
         applyRewardsIfNeeded(session, players, now);
         updateThreeLivesRecordIfNeeded(session, players, now);
+        refreshAchievementsForFinishedPlayers(players, now);
         publishFinalWinnerMessage(lobby, session, players);
 
         lobby.setStatus(LobbyStatus.OPEN);
@@ -817,6 +823,7 @@ public class GameService {
         List<GamePlayer> players = gamePlayerRepository.findAllByGameSessionIdOrderByOrderIndexAsc(session.getId());
         Map<String, PlayerTotals> totalsByGuest = computeTotalsByGuest(session.getId());
         Map<String, Boolean> authenticatedByGuestSessionId = resolveAuthenticatedByGuestSessionId(players);
+        Map<String, Boolean> premiumByGuestSessionId = resolvePremiumByGuestSessionId(players);
         Map<String, Integer> rankPointsByGuestSessionId = resolveRankPointsByGuestSessionId(players);
         GameSessionMode mode = sessionMode(session);
         long totalQuestions = countSessionQuestionPool(session);
@@ -839,6 +846,7 @@ public class GameService {
                         return new GamePlayerDto(
                                 p.getDisplayName(),
                                 authenticatedByGuestSessionId.getOrDefault(p.getGuestSessionId(), false),
+                                premiumByGuestSessionId.getOrDefault(p.getGuestSessionId(), false),
                                 false,
                                 null,
                                 t.totalPoints(),
@@ -882,6 +890,7 @@ public class GameService {
                         return new GamePlayerDto(
                                 p.getDisplayName(),
                                 authenticatedByGuestSessionId.getOrDefault(p.getGuestSessionId(), false),
+                                premiumByGuestSessionId.getOrDefault(p.getGuestSessionId(), false),
                                 false,
                                 null,
                                 t.totalPoints(),
@@ -935,6 +944,7 @@ public class GameService {
             return new GamePlayerDto(
                     p.getDisplayName(),
                     authenticatedByGuestSessionId.getOrDefault(p.getGuestSessionId(), false),
+                    premiumByGuestSessionId.getOrDefault(p.getGuestSessionId(), false),
                     answered,
                     correct,
                     t.totalPoints(),
@@ -1073,6 +1083,43 @@ public class GameService {
                     ? session.getRankPoints()
                     : rankPointsByUserId.getOrDefault(userId, session.getRankPoints());
             out.put(session.getId(), rankPoints);
+        }
+        return out;
+    }
+
+    private Map<String, Boolean> resolvePremiumByGuestSessionId(List<GamePlayer> players) {
+        if (players == null || players.isEmpty()) return Map.of();
+
+        List<String> ids = players.stream()
+                .map(GamePlayer::getGuestSessionId)
+                .filter(Objects::nonNull)
+                .filter(id -> !id.isBlank())
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) return Map.of();
+
+        List<GuestSession> sessions = guestSessionRepository.findAllById(ids);
+        if (sessions.isEmpty()) return Map.of();
+
+        List<Long> userIds = sessions.stream()
+                .map(GuestSession::getUserId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Map<Long, Boolean> premiumByUserId = new HashMap<>();
+        if (!userIds.isEmpty()) {
+            for (AppUser user : appUserRepository.findAllById(userIds)) {
+                if (user == null || user.getId() == null) continue;
+                premiumByUserId.put(user.getId(), user.getRoles().contains(AppRole.PREMIUM));
+            }
+        }
+
+        Map<String, Boolean> out = new HashMap<>();
+        for (GuestSession session : sessions) {
+            if (session == null || session.getId() == null) continue;
+            Long userId = session.getUserId();
+            out.put(session.getId(), userId != null && premiumByUserId.getOrDefault(userId, false));
         }
         return out;
     }
@@ -1561,6 +1608,22 @@ public class GameService {
 
         applyRewardsIfNeeded(session, players, now);
         updateThreeLivesRecordIfNeeded(session, players, now);
+        refreshAchievementsForFinishedPlayers(players, now);
+    }
+
+    private void refreshAchievementsForFinishedPlayers(List<GamePlayer> players, Instant now) {
+        if (players == null || players.isEmpty()) return;
+        Set<Long> userIds = new LinkedHashSet<>();
+        for (GamePlayer player : players) {
+            if (player == null || player.getGuestSessionId() == null) continue;
+            guestSessionRepository.findById(player.getGuestSessionId())
+                    .map(GuestSession::getUserId)
+                    .filter(Objects::nonNull)
+                    .ifPresent(userIds::add);
+        }
+        for (Long userId : userIds) {
+            userAchievementService.refreshForUser(userId, now);
+        }
     }
 
     private GameSession requireSoloSession(String gameSessionId) {

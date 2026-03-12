@@ -32,9 +32,10 @@ public class LobbyChatHistoryService {
             String lobbyCode,
             String displayName,
             String text,
-            Instant serverTime
+            Instant serverTime,
+            boolean isPremium
     ) {
-        return appendInternal(lobbyCode, displayName, text, serverTime, KIND_USER);
+        return appendInternal(lobbyCode, displayName, text, serverTime, KIND_USER, isPremium);
     }
 
     public LobbyChatMessageDto appendSystem(
@@ -42,7 +43,7 @@ public class LobbyChatHistoryService {
             String text,
             Instant serverTime
     ) {
-        return appendInternal(lobbyCode, DISPLAY_NAME_SYSTEM, text, serverTime, KIND_SYSTEM);
+        return appendInternal(lobbyCode, DISPLAY_NAME_SYSTEM, text, serverTime, KIND_SYSTEM, false);
     }
 
     private LobbyChatMessageDto appendInternal(
@@ -50,7 +51,8 @@ public class LobbyChatHistoryService {
             String displayName,
             String text,
             Instant serverTime,
-            String kind
+            String kind,
+            boolean isPremium
     ) {
         String normalizedCode = normalizeCode(lobbyCode);
         if (normalizedCode.isBlank()) {
@@ -67,7 +69,8 @@ public class LobbyChatHistoryService {
                 safeDisplayName,
                 safeText,
                 ts.toString(),
-                safeKind
+                safeKind,
+                isPremium && KIND_USER.equals(safeKind)
         );
 
         Deque<StoredMessage> deque = messagesByLobbyCode.computeIfAbsent(normalizedCode, __ -> new ArrayDeque<>());

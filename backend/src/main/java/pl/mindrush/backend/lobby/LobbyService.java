@@ -5,6 +5,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import pl.mindrush.backend.AppRole;
+import pl.mindrush.backend.AppUser;
+import pl.mindrush.backend.AppUserRepository;
 import pl.mindrush.backend.guest.GuestSession;
 import pl.mindrush.backend.guest.GuestSessionRepository;
 import pl.mindrush.backend.guest.GuestSessionService;
@@ -51,6 +54,7 @@ public class LobbyService {
 
     private final GuestSessionService guestSessionService;
     private final GuestSessionRepository guestSessionRepository;
+    private final AppUserRepository appUserRepository;
     private final LobbyRepository lobbyRepository;
     private final LobbyParticipantRepository participantRepository;
     private final LobbyBanRepository lobbyBanRepository;
@@ -63,6 +67,7 @@ public class LobbyService {
     public LobbyService(
             GuestSessionService guestSessionService,
             GuestSessionRepository guestSessionRepository,
+            AppUserRepository appUserRepository,
             LobbyRepository lobbyRepository,
             LobbyParticipantRepository participantRepository,
             LobbyBanRepository lobbyBanRepository,
@@ -74,6 +79,7 @@ public class LobbyService {
     ) {
         this.guestSessionService = guestSessionService;
         this.guestSessionRepository = guestSessionRepository;
+        this.appUserRepository = appUserRepository;
         this.lobbyRepository = lobbyRepository;
         this.participantRepository = participantRepository;
         this.lobbyBanRepository = lobbyBanRepository;
@@ -188,6 +194,18 @@ public class LobbyService {
         for (GuestSession session : guestSessionRepository.findAllById(ownerGuestSessionIds)) {
             ownerSessionById.put(session.getId(), session);
         }
+        List<Long> ownerUserIds = ownerSessionById.values().stream()
+                .map(GuestSession::getUserId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, Boolean> premiumByUserId = new HashMap<>();
+        if (!ownerUserIds.isEmpty()) {
+            for (AppUser user : appUserRepository.findAllById(ownerUserIds)) {
+                if (user == null || user.getId() == null) continue;
+                premiumByUserId.put(user.getId(), user.getRoles().contains(AppRole.PREMIUM));
+            }
+        }
 
         List<Map<String, Object>> rows = new ArrayList<>();
         for (Lobby lobby : lobbies) {
@@ -211,6 +229,9 @@ public class LobbyService {
                     ? "AUTHENTICATED"
                     : "GUEST";
             int leaderRankPoints = ownerSession == null ? 0 : Math.max(0, ownerSession.getRankPoints());
+            boolean leaderIsPremium = ownerSession != null
+                    && ownerSession.getUserId() != null
+                    && premiumByUserId.getOrDefault(ownerSession.getUserId(), false);
 
             Map<String, Object> row = new HashMap<>();
             row.put("code", lobby.getCode());
@@ -221,6 +242,7 @@ public class LobbyService {
             row.put("playerCount", lobbyParticipants.size());
             row.put("leaderDisplayName", leaderDisplayName);
             row.put("leaderRankPoints", leaderRankPoints);
+            row.put("leaderIsPremium", leaderIsPremium);
             row.put("ownerType", ownerType);
             row.put("isOwner", isOwner);
             row.put("isParticipant", isParticipant);

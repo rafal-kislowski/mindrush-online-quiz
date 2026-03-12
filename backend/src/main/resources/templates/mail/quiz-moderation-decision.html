@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quiz moderation update</title>
+  <style>
+    a { color: #9ddfff; }
+  </style>
+</head>
+<body style="margin:0;padding:0;background:#0b1220;color:#e5edf8;font-family:Segoe UI,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#0b1220;padding:28px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#121b2d;border:1px solid rgba(255,255,255,0.12);border-radius:18px;overflow:hidden;">
+          <tr>
+            <td style="padding:28px 28px 10px 28px;">
+              <p style="margin:0 0 8px 0;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#f7c96a;font-weight:700;">MindRush Moderation</p>
+              <h1 style="margin:0;font-size:28px;line-height:1.15;color:#ffffff;">Quiz review update</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 28px 10px 28px;">
+              <p style="margin:0;font-size:15px;line-height:1.6;color:#d7e2f3;">
+                Hi <strong th:text="${displayName}">Player</strong>,<br>
+                we reviewed your quiz <strong th:text="${quizTitle}">Your quiz</strong>.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:4px 28px 0 28px;">
+              <p style="margin:0;display:inline-block;padding:7px 12px;border-radius:999px;font-size:12px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);"
+                 th:style="'margin:0;display:inline-block;padding:7px 12px;border-radius:999px;font-size:12px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);color:' + ${decisionTone} + ';'">
+                <span th:text="${decisionLabel}">Approved</span>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:12px 28px 0 28px;">
+              <p style="margin:0;font-size:14px;line-height:1.6;color:#c9d8ef;" th:text="${decisionText}">
+                Your quiz passed moderation and is now published.
+              </p>
+              <p th:if="${hasQuestionIssues}" style="margin:8px 0 0 0;font-size:14px;line-height:1.6;color:#ffd7b3;">
+                Question issues: <strong th:text="${questionIssueCount}">0</strong>
+              </p>
+              <p th:if="${reason != null and !#strings.isEmpty(reason)}" style="margin:8px 0 0 0;font-size:14px;line-height:1.6;color:#ffcfb0;">
+                Admin comment: <span th:text="${reason}">Please adjust a few questions.</span>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 28px 10px 28px;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td align="center" style="border-radius:12px;background:#2f8dff;">
+                    <a th:href="${actionUrl}" href="http://localhost:4200/library"
+                       target="_blank" rel="noopener noreferrer"
+                       style="display:block;padding:14px 24px;border-radius:12px;border:1px solid #5da7ff;background:#2f8dff;font-weight:800;font-size:15px;line-height:20px;color:#ffffff !important;text-decoration:none;"
+                       th:text="${actionLabel}">
+                      Open quiz
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:6px 28px 24px 28px;">
+              <p style="margin:0;font-size:12px;line-height:1.55;color:#c5d5ed;">
+                If the quiz no longer exists, the app will redirect you to dashboard safely.
+              </p>
+              <p style="margin:10px 0 0 0;font-size:12px;line-height:1.55;color:#c5d5ed;">
+                Need help?
+                <a th:href="'mailto:' + ${supportEmail}" href="mailto:support@mindrush.local"
+                   th:text="${supportEmail}"
+                   style="color:#cfe5ff !important;text-decoration:underline;">
+                  support@mindrush.local
+                </a>
+              </p>
+              <p style="margin:10px 0 0 0;font-size:12px;line-height:1.55;color:#c5d5ed;">
+                If the button does not work, use the direct link:
+                <a th:href="${actionUrl}" href="http://localhost:4200/library"
+                   target="_blank" rel="noopener noreferrer"
+                   style="color:#cfe5ff !important;text-decoration:underline;font-weight:700;">
+                  Open moderation details
+                </a>
+              </p>
+              <p style="margin:10px 0 0 0;font-size:12px;line-height:1.55;color:#c5d5ed;">
+                Or copy and open this URL:<br>
+                <a th:href="${actionUrl}" th:text="${actionUrl}" href="http://localhost:4200/library"
+                   target="_blank" rel="noopener noreferrer"
+                   style="color:#cfe5ff !important;word-break:break-all;text-decoration:underline;">
+                  http://localhost:4200/library
+                </a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

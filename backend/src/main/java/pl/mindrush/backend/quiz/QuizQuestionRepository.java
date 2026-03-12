@@ -35,6 +35,9 @@ public interface QuizQuestionRepository extends JpaRepository<QuizQuestion, Long
     @Query("select count(q.id) from QuizQuestion q where q.quiz.id = :quizId")
     long countByQuizId(@Param("quizId") Long quizId);
 
+    @Query("select count(q.id) from QuizQuestion q where q.quiz.id = :quizId and q.imageUrl is not null")
+    long countByQuizIdWithImage(@Param("quizId") Long quizId);
+
     @Query("""
             select count(qq.id)
             from QuizQuestion qq

@@ -69,6 +69,12 @@ public class AppUser {
     @Column(name = "last_password_reset_email_sent_at")
     private Instant lastPasswordResetEmailSentAt;
 
+    @Column(name = "last_login_at")
+    private Instant lastLoginAt;
+
+    @Column(name = "last_display_name_change_at")
+    private Instant lastDisplayNameChangeAt;
+
     protected AppUser() {
     }
 
@@ -85,6 +91,8 @@ public class AppUser {
         this.emailVerifiedAt = createdAt;
         this.lastVerificationEmailSentAt = null;
         this.lastPasswordResetEmailSentAt = null;
+        this.lastLoginAt = null;
+        this.lastDisplayNameChangeAt = null;
     }
 
     public Long getId() {
@@ -139,6 +147,14 @@ public class AppUser {
         return lastPasswordResetEmailSentAt;
     }
 
+    public Instant getLastLoginAt() {
+        return lastLoginAt;
+    }
+
+    public Instant getLastDisplayNameChangeAt() {
+        return lastDisplayNameChangeAt;
+    }
+
     public void setPasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
     }
@@ -177,5 +193,13 @@ public class AppUser {
 
     public void setLastPasswordResetEmailSentAt(Instant lastPasswordResetEmailSentAt) {
         this.lastPasswordResetEmailSentAt = lastPasswordResetEmailSentAt;
+    }
+
+    public void setLastLoginAt(Instant lastLoginAt) {
+        this.lastLoginAt = lastLoginAt;
+    }
+
+    public void setLastDisplayNameChangeAt(Instant lastDisplayNameChangeAt) {
+        this.lastDisplayNameChangeAt = lastDisplayNameChangeAt;
     }
 }

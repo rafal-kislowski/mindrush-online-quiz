@@ -16,14 +16,17 @@ import pl.mindrush.backend.AppRole;
 import pl.mindrush.backend.AppUser;
 import pl.mindrush.backend.AppUserRepository;
 import pl.mindrush.backend.RefreshTokenRepository;
+import pl.mindrush.backend.notification.UserNotificationCategory;
 import pl.mindrush.backend.notification.UserNotificationRepository;
 
 import java.time.Clock;
 import java.util.Optional;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -440,6 +443,53 @@ class AdminQuizSubmissionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.unreadCount").value(0))
                 .andExpect(jsonPath("$.items").isEmpty());
+    }
+
+    @Test
+    void approveSubmission_unlocksCreatorAchievement_andCreatesRewardNotification() throws Exception {
+        Cookie adminCookie = loginAs("admin-achievements@example.com", Set.of(AppRole.ADMIN));
+        AppUser owner = createUser("owner-achievements@example.com", Set.of(AppRole.USER));
+        Cookie ownerCookie = loginExisting(owner.getEmail());
+
+        Quiz pending = new Quiz("Achievement quiz", "desc", null);
+        pending.setSource(QuizSource.CUSTOM);
+        pending.setOwnerUserId(owner.getId());
+        pending.setStatus(QuizStatus.DRAFT);
+        pending.setModerationStatus(QuizModerationStatus.PENDING);
+        pending = quizRepository.save(pending);
+
+        for (int i = 0; i < 5; i++) {
+            QuizQuestion question = questionRepository.save(new QuizQuestion(pending, "Prompt " + i, i));
+            optionRepository.save(new QuizAnswerOption(question, "A", true, 0));
+            optionRepository.save(new QuizAnswerOption(question, "B", false, 1));
+            optionRepository.save(new QuizAnswerOption(question, "C", false, 2));
+            optionRepository.save(new QuizAnswerOption(question, "D", false, 3));
+        }
+
+        mockMvc.perform(post("/api/admin/quiz-submissions/" + pending.getId() + "/approve")
+                        .cookie(adminCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"expectedSubmissionVersion":%d}
+                                """.formatted(pending.getVersion())))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/achievements/me").cookie(ownerCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCount").value(greaterThanOrEqualTo(72)))
+                .andExpect(jsonPath("$.items[?(@.key=='creator_rookie')].unlocked").value(hasItem(true)))
+                .andExpect(jsonPath("$.items[?(@.key=='creator_rookie')].progress").value(hasItem(1)));
+
+        long rewardNotificationCount = userNotificationRepository.findAll().stream()
+                .filter(n -> owner.getId().equals(n.getUserId()))
+                .filter(n -> n.getCategory() == UserNotificationCategory.GIFT)
+                .count();
+        assertThat(rewardNotificationCount).isEqualTo(1L);
+
+        mockMvc.perform(get("/api/notifications?limit=20").cookie(ownerCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[?(@.category=='reward')].title").value(hasItem("Achievement unlocked")))
+                .andExpect(jsonPath("$.items[?(@.category=='reward')].subtitle").value(hasItem("Creator Rookie")));
     }
 
     private Cookie loginAs(String email, Set<AppRole> roles) throws Exception {

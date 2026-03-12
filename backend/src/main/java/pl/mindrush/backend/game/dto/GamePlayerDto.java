@@ -6,6 +6,8 @@ public record GamePlayerDto(
         String displayName,
         @JsonProperty("isAuthenticated")
         boolean isAuthenticated,
+        @JsonProperty("isPremium")
+        boolean isPremium,
         boolean answered,
         Boolean correct,
         long score,

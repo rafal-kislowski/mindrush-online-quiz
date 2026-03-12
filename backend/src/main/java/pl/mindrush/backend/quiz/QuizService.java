@@ -42,8 +42,8 @@ public class QuizService {
     public List<QuizListItemDto> listQuizzes(Long viewerUserId) {
         Map<Long, Quiz> visibleById = new LinkedHashMap<>();
 
-        for (Quiz quiz : quizRepository.findAllWithCategoryByStatus(QuizStatus.ACTIVE)) {
-            if (!QuizVisibilityRules.isPubliclyVisible(quiz)) continue;
+        for (Quiz quiz : quizRepository.findAllWithCategory()) {
+            if (!isVisibleForViewer(quiz, viewerUserId)) continue;
             visibleById.put(quiz.getId(), quiz);
         }
 
@@ -73,6 +73,11 @@ public class QuizService {
                         questionRepository.countByQuizId(q.getId())
                 ))
                 .toList();
+    }
+
+    private boolean isVisibleForViewer(Quiz quiz, Long viewerUserId) {
+        return QuizVisibilityRules.isPubliclyVisible(quiz)
+                || QuizVisibilityRules.canOwnerUsePrivately(quiz, viewerUserId);
     }
 
     private Set<Long> favoriteQuizIds(Long viewerUserId) {

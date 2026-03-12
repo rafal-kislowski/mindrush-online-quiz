@@ -96,7 +96,10 @@ public class AuthController {
                             u.getRankPoints(),
                             u.getXp(),
                             u.getCoins(),
-                            u.isEmailVerified()
+                            u.isEmailVerified(),
+                            u.getCreatedAt(),
+                            u.getLastLoginAt(),
+                            u.getLastDisplayNameChangeAt()
                     )))
                     .orElseGet(() -> ResponseEntity.status(401).build());
         }
@@ -135,6 +138,67 @@ public class AuthController {
         }
         authService.resetPassword(request.token(), request.password());
         return ResponseEntity.ok(new ActionResponse("Password was reset successfully."));
+    }
+
+    @PostMapping("/profile/display-name")
+    public ResponseEntity<AuthService.AuthUserDto> updateDisplayName(
+            Authentication authentication,
+            @Valid @RequestBody UpdateDisplayNameRequest request
+    ) {
+        AppUser user = requireAuthenticatedUser(authentication);
+        AuthService.AuthUserDto updated = authService.updateDisplayName(user.getId(), request.displayName());
+        return ResponseEntity.ok(updated);
+    }
+
+    @PostMapping("/password/change")
+    public ResponseEntity<AuthService.AuthUserDto> changePassword(
+            Authentication authentication,
+            @Valid @RequestBody ChangePasswordRequest request
+    ) {
+        if (!request.newPassword().equals(request.confirmPassword())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "Passwords do not match"
+            );
+        }
+        AppUser user = requireAuthenticatedUser(authentication);
+        AuthService.AuthResult res = authService.changePassword(user.getId(), request.currentPassword(), request.newPassword());
+        return withCookies(ResponseEntity.ok(res.user()), res.cookies());
+    }
+
+    @PostMapping("/sessions/revoke-all")
+    public ResponseEntity<ActionResponse> revokeAllSessions(Authentication authentication) {
+        AppUser user = requireAuthenticatedUser(authentication);
+        authService.revokeAllSessions(user.getId());
+        AuthService.ResponseCookies cleared = authService.clearCookies();
+
+        return ResponseEntity.ok()
+                .headers(h -> {
+                    h.add(HttpHeaders.SET_COOKIE, cleared.access().toString());
+                    h.add(HttpHeaders.SET_COOKIE, cleared.refresh().toString());
+                })
+                .body(new ActionResponse("Signed out from all devices."));
+    }
+
+    private AppUser requireAuthenticatedUser(Authentication authentication) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNAUTHORIZED,
+                    "Authentication is required"
+            );
+        }
+        Object principal = authentication.getPrincipal();
+        if (!(principal instanceof JwtCookieAuthenticationFilter.AuthenticatedUser au)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNAUTHORIZED,
+                    "Authentication is required"
+            );
+        }
+        return userRepository.findById(au.id())
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.UNAUTHORIZED,
+                        "Authentication is required"
+                ));
     }
 
     private static <T> ResponseEntity<T> withCookies(ResponseEntity<T> response, AuthService.ResponseCookies cookies) {
@@ -193,6 +257,25 @@ public class AuthController {
             @NotBlank(message = "Password is required")
             @Size(min = 8, max = 72, message = "Password must be 8-72 characters")
             String password,
+            @NotBlank(message = "Confirm password is required")
+            @Size(min = 8, max = 72, message = "Password must be 8-72 characters")
+            String confirmPassword
+    ) {}
+
+    public record UpdateDisplayNameRequest(
+            @NotBlank(message = "Nickname is required")
+            @Size(min = 3, max = 32, message = "Nickname must be 3-32 characters")
+            @Pattern(regexp = "^[A-Za-z0-9 _-]{3,32}$", message = "Nickname contains invalid characters")
+            String displayName
+    ) {}
+
+    public record ChangePasswordRequest(
+            @NotBlank(message = "Current password is required")
+            @Size(min = 8, max = 72, message = "Password must be 8-72 characters")
+            String currentPassword,
+            @NotBlank(message = "Password is required")
+            @Size(min = 8, max = 72, message = "Password must be 8-72 characters")
+            String newPassword,
             @NotBlank(message = "Confirm password is required")
             @Size(min = 8, max = 72, message = "Password must be 8-72 characters")
             String confirmPassword

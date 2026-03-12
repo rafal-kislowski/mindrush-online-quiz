@@ -4,6 +4,9 @@ import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
+import pl.mindrush.backend.AppRole;
+import pl.mindrush.backend.AppUserRepository;
+import pl.mindrush.backend.guest.GuestSessionRepository;
 import pl.mindrush.backend.lobby.Lobby;
 import pl.mindrush.backend.lobby.LobbyParticipant;
 import pl.mindrush.backend.lobby.LobbyParticipantRepository;
@@ -21,6 +24,8 @@ public class LobbyChatController {
     private final SimpMessagingTemplate messagingTemplate;
     private final LobbyRepository lobbyRepository;
     private final LobbyParticipantRepository participantRepository;
+    private final GuestSessionRepository guestSessionRepository;
+    private final AppUserRepository appUserRepository;
     private final LobbyChatHistoryService chatHistoryService;
     private final Clock clock;
 
@@ -28,12 +33,16 @@ public class LobbyChatController {
             SimpMessagingTemplate messagingTemplate,
             LobbyRepository lobbyRepository,
             LobbyParticipantRepository participantRepository,
+            GuestSessionRepository guestSessionRepository,
+            AppUserRepository appUserRepository,
             LobbyChatHistoryService chatHistoryService,
             Clock clock
     ) {
         this.messagingTemplate = messagingTemplate;
         this.lobbyRepository = lobbyRepository;
         this.participantRepository = participantRepository;
+        this.guestSessionRepository = guestSessionRepository;
+        this.appUserRepository = appUserRepository;
         this.chatHistoryService = chatHistoryService;
         this.clock = clock;
     }
@@ -66,13 +75,28 @@ public class LobbyChatController {
         if (participantOpt.isEmpty()) return;
 
         LobbyParticipant participant = participantOpt.get();
+        boolean premium = isPremiumGuestSession(guestSessionId);
         LobbyChatMessageDto msg = chatHistoryService.append(
                 lobbyCode,
                 participant.getDisplayName(),
                 text,
-                clock.instant()
+                clock.instant(),
+                premium
         );
         messagingTemplate.convertAndSend("/topic/lobbies/" + lobbyCode + "/chat", msg);
+    }
+
+    private boolean isPremiumGuestSession(String guestSessionId) {
+        if (guestSessionId == null || guestSessionId.isBlank()) return false;
+        return guestSessionRepository.findById(guestSessionId)
+                .map(session -> {
+                    Long userId = session.getUserId();
+                    if (userId == null) return false;
+                    return appUserRepository.findById(userId)
+                            .map(user -> user.getRoles().contains(AppRole.PREMIUM))
+                            .orElse(false);
+                })
+                .orElse(false);
     }
 
     public record LobbyChatSendRequest(String text) {

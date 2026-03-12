@@ -364,6 +364,187 @@ class AuthControllerTest {
                 .andExpect(status().isOk());
     }
 
+    @Test
+    void updateDisplayName_authenticatedUser_updatesNickname() throws Exception {
+        AppUser user = new AppUser(
+                "settings-name@example.com",
+                passwordEncoder.encode("Password123"),
+                "OldName",
+                Set.of(AppRole.USER),
+                clock.instant()
+        );
+        user.setCoins(60_000);
+        user = userRepository.save(user);
+
+        MvcResult loginRes = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new Login(user.getEmail(), "Password123"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String setCookie = String.join("\n", loginRes.getResponse().getHeaders(HttpHeaders.SET_COOKIE));
+        String access = cookieValueFromSetCookie(setCookie, "accessToken").orElseThrow();
+
+        mockMvc.perform(post("/api/auth/profile/display-name")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"displayName":"NewName_77"}
+                                """)
+                        .cookie(new jakarta.servlet.http.Cookie("accessToken", access)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.displayName").value("NewName_77"))
+                .andExpect(jsonPath("$.coins").value(10_000));
+
+        AppUser updated = userRepository.findById(user.getId()).orElseThrow();
+        assertThat(updated.getDisplayName()).isEqualTo("NewName_77");
+        assertThat(updated.getCoins()).isEqualTo(10_000);
+        assertThat(updated.getLastDisplayNameChangeAt()).isNotNull();
+    }
+
+    @Test
+    void updateDisplayName_requiresEnoughCoins() throws Exception {
+        AppUser user = new AppUser(
+                "settings-name-coins@example.com",
+                passwordEncoder.encode("Password123"),
+                "OldName",
+                Set.of(AppRole.USER),
+                clock.instant()
+        );
+        user.setCoins(49_999);
+        user = userRepository.save(user);
+
+        MvcResult loginRes = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new Login(user.getEmail(), "Password123"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String setCookie = String.join("\n", loginRes.getResponse().getHeaders(HttpHeaders.SET_COOKIE));
+        String access = cookieValueFromSetCookie(setCookie, "accessToken").orElseThrow();
+
+        mockMvc.perform(post("/api/auth/profile/display-name")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"displayName":"NewName_77"}
+                                """)
+                        .cookie(new jakarta.servlet.http.Cookie("accessToken", access)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(containsString("Not enough coins")));
+    }
+
+    @Test
+    void updateDisplayName_respectsWeeklyCooldown() throws Exception {
+        AppUser user = new AppUser(
+                "settings-name-cooldown@example.com",
+                passwordEncoder.encode("Password123"),
+                "OldName",
+                Set.of(AppRole.USER),
+                clock.instant()
+        );
+        user.setCoins(200_000);
+        user.setLastDisplayNameChangeAt(clock.instant().minus(Duration.ofDays(2)));
+        user = userRepository.save(user);
+
+        MvcResult loginRes = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new Login(user.getEmail(), "Password123"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String setCookie = String.join("\n", loginRes.getResponse().getHeaders(HttpHeaders.SET_COOKIE));
+        String access = cookieValueFromSetCookie(setCookie, "accessToken").orElseThrow();
+
+        mockMvc.perform(post("/api/auth/profile/display-name")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"displayName":"NewName_77"}
+                                """)
+                        .cookie(new jakarta.servlet.http.Cookie("accessToken", access)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(containsString("once every 7 days")));
+    }
+
+    @Test
+    void changePassword_updatesPasswordAndIssuesNewCookies() throws Exception {
+        AppUser user = new AppUser(
+                "settings-password@example.com",
+                passwordEncoder.encode("OldPassword123"),
+                "PasswordUser",
+                Set.of(AppRole.USER),
+                clock.instant()
+        );
+        user = userRepository.save(user);
+
+        MvcResult loginRes = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new Login(user.getEmail(), "OldPassword123"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String setCookie = String.join("\n", loginRes.getResponse().getHeaders(HttpHeaders.SET_COOKIE));
+        String access = cookieValueFromSetCookie(setCookie, "accessToken").orElseThrow();
+
+        MvcResult changeRes = mockMvc.perform(post("/api/auth/password/change")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"OldPassword123","newPassword":"NewPassword123","confirmPassword":"NewPassword123"}
+                                """)
+                        .cookie(new jakarta.servlet.http.Cookie("accessToken", access)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("settings-password@example.com"))
+                .andReturn();
+
+        String changedSetCookie = String.join("\n", changeRes.getResponse().getHeaders(HttpHeaders.SET_COOKIE));
+        assertThat(changedSetCookie).contains("accessToken=");
+        assertThat(changedSetCookie).contains("refreshToken=");
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new Login(user.getEmail(), "OldPassword123"))))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new Login(user.getEmail(), "NewPassword123"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void revokeAllSessions_revokesRefreshTokensAndClearsCookies() throws Exception {
+        AppUser user = new AppUser(
+                "settings-sessions@example.com",
+                passwordEncoder.encode("Password123"),
+                "SessionUser",
+                Set.of(AppRole.USER),
+                clock.instant()
+        );
+        user = userRepository.save(user);
+
+        MvcResult loginRes = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new Login(user.getEmail(), "Password123"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String loginSetCookie = String.join("\n", loginRes.getResponse().getHeaders(HttpHeaders.SET_COOKIE));
+        String access = cookieValueFromSetCookie(loginSetCookie, "accessToken").orElseThrow();
+        String refresh = cookieValueFromSetCookie(loginSetCookie, "refreshToken").orElseThrow();
+
+        MvcResult revokeRes = mockMvc.perform(post("/api/auth/sessions/revoke-all")
+                        .cookie(new jakarta.servlet.http.Cookie("accessToken", access)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value(containsString("Signed out from all devices")))
+                .andReturn();
+
+        String revokeSetCookie = String.join("\n", revokeRes.getResponse().getHeaders(HttpHeaders.SET_COOKIE));
+        assertThat(revokeSetCookie).contains("accessToken=");
+        assertThat(revokeSetCookie).contains("refreshToken=");
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(new jakarta.servlet.http.Cookie("refreshToken", refresh)))
+                .andExpect(status().isUnauthorized());
+    }
+
     private record Login(String email, String password) {}
 
     private static Optional<String> cookieValueFromSetCookie(String setCookie, String cookieName) {

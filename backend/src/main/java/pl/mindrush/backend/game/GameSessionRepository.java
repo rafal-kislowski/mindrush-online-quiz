@@ -32,5 +32,7 @@ public interface GameSessionRepository extends JpaRepository<GameSession, String
             @Param("cutoff") Instant cutoff
     );
 
+    long countByQuizIdAndStatus(Long quizId, GameStatus status);
+
     long countByStatus(GameStatus status);
 }

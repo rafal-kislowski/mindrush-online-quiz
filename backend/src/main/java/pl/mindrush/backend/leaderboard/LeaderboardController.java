@@ -6,6 +6,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import pl.mindrush.backend.AppRole;
 import pl.mindrush.backend.AppUser;
 import pl.mindrush.backend.AppUserRepository;
 import pl.mindrush.backend.game.GameAnswerRepository;
@@ -70,11 +71,13 @@ public class LeaderboardController {
                 .map(u -> {
                     Map<String, Long> counts = duplicateCounts(List.of(u));
                     long position = userRepository.countAhead(u.getRankPoints(), u.getId()) + 1L;
+                    LeaderboardEntryDto dto = toDto(u, counts);
                     return ResponseEntity.ok(new LeaderboardMeDto(
                             u.getId(),
-                            toDto(u, counts).displayName(),
+                            dto.displayName(),
                             u.getRankPoints(),
-                            position
+                            position,
+                            dto.isPremium()
                     ));
                 })
                 .orElseGet(() -> ResponseEntity.status(401).build());
@@ -128,15 +131,16 @@ public class LeaderboardController {
         String key = (u.getDisplayName() == null) ? "" : u.getDisplayName().trim().toLowerCase();
         boolean duplicate = !key.isBlank() && nameCounts.getOrDefault(key, 0L) > 1L;
         String display = duplicate ? base + "#" + u.getId() : base;
-        return new LeaderboardEntryDto(u.getId(), display, u.getRankPoints());
+        boolean premium = u.getRoles().contains(AppRole.PREMIUM);
+        return new LeaderboardEntryDto(u.getId(), display, u.getRankPoints(), premium);
     }
 
-    public record LeaderboardEntryDto(long userId, String displayName, int rankPoints) {
+    public record LeaderboardEntryDto(long userId, String displayName, int rankPoints, boolean isPremium) {
     }
 
     public record LeaderboardStatsDto(long players, long matches, long answers) {
     }
 
-    public record LeaderboardMeDto(long userId, String displayName, int rankPoints, long position) {
+    public record LeaderboardMeDto(long userId, String displayName, int rankPoints, long position, boolean isPremium) {
     }
 }

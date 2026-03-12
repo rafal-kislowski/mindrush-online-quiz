@@ -13,6 +13,43 @@ public interface GamePlayerRepository extends JpaRepository<GamePlayer, Long> {
     List<GamePlayer> findAllByGameSessionIdOrderByOrderIndexAsc(String gameSessionId);
 
     @Query("""
+            select count(distinct gp.gameSession.id)
+            from GamePlayer gp
+            where gp.guestSessionId in :guestSessionIds
+              and gp.gameSession.status = :status
+            """)
+    long countDistinctFinishedSessionsByGuestSessionIds(
+            @Param("guestSessionIds") List<String> guestSessionIds,
+            @Param("status") GameStatus status
+    );
+
+    @Query("""
+            select count(distinct gp.gameSession.id)
+            from GamePlayer gp
+            where gp.guestSessionId in :guestSessionIds
+              and gp.gameSession.status = :status
+              and gp.gameSession.lobbyId like :lobbyIdPattern
+            """)
+    long countDistinctFinishedSessionsByGuestSessionIdsAndLobbyIdLike(
+            @Param("guestSessionIds") List<String> guestSessionIds,
+            @Param("status") GameStatus status,
+            @Param("lobbyIdPattern") String lobbyIdPattern
+    );
+
+    @Query("""
+            select count(distinct gp.gameSession.id)
+            from GamePlayer gp
+            where gp.guestSessionId in :guestSessionIds
+              and gp.gameSession.status = :status
+              and gp.gameSession.lobbyId not like :lobbyIdPattern
+            """)
+    long countDistinctFinishedSessionsByGuestSessionIdsAndLobbyIdNotLike(
+            @Param("guestSessionIds") List<String> guestSessionIds,
+            @Param("status") GameStatus status,
+            @Param("lobbyIdPattern") String lobbyIdPattern
+    );
+
+    @Query("""
             select gs
             from GamePlayer gp
             join gp.gameSession gs

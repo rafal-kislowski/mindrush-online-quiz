@@ -5,6 +5,7 @@ public record LobbyChatMessageDto(
         String displayName,
         String text,
         String serverTime,
-        String kind
+        String kind,
+        boolean isPremium
 ) {
 }

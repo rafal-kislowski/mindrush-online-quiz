@@ -144,6 +144,56 @@ public class UserNotificationService {
         publishRefresh(userId);
     }
 
+    public void createAchievementUnlockedNotification(
+            Long userId,
+            String achievementKey,
+            String achievementTitle,
+            String achievementDescription,
+            String iconClass,
+            Instant createdAt
+    ) {
+        if (userId == null) return;
+
+        String normalizedKey = String.valueOf(achievementKey == null ? "" : achievementKey).trim();
+        String normalizedTitle = String.valueOf(achievementTitle == null ? "" : achievementTitle).trim();
+        if (normalizedKey.isBlank() || normalizedTitle.isBlank()) return;
+
+        Instant now = createdAt != null ? createdAt : clock.instant();
+        String dedupeKey = "achievement:%s".formatted(normalizedKey.toLowerCase(Locale.ROOT));
+        if (notificationRepository.existsByUserIdAndDedupeKey(userId, dedupeKey)) {
+            return;
+        }
+
+        UserNotification notification = new UserNotification();
+        notification.setUserId(userId);
+        notification.setCategory(UserNotificationCategory.GIFT);
+        notification.setSeverity(UserNotificationSeverity.SUCCESS);
+        notification.setDecision(null);
+        notification.setTitle("Achievement unlocked");
+        notification.setSubtitle(normalizedTitle);
+        notification.setText(String.valueOf(achievementDescription == null ? "" : achievementDescription).trim());
+        notification.setMeta("Milestone completed");
+        notification.setAvatarImageUrl(null);
+        notification.setAvatarBgStart("#F6C453");
+        notification.setAvatarBgEnd("#F08A3E");
+        notification.setAvatarTextColor("#1B1100");
+        notification.setRoutePath("/profile");
+        notification.setRouteQueryJson(toJsonString(Map.of(
+                "tab", "stats",
+                "section", "achievements"
+        )));
+        notification.setPayloadJson(toJsonString(Map.of(
+                "type", "achievement",
+                "achievementKey", normalizedKey,
+                "icon", String.valueOf(iconClass == null ? "" : iconClass).trim()
+        )));
+        notification.setDedupeKey(dedupeKey);
+        notification.setCreatedAt(now);
+        notificationRepository.save(notification);
+
+        publishRefresh(userId);
+    }
+
     public void publishRefresh(Long userId) {
         long unreadCount = notificationRepository.countByUserIdAndReadAtIsNullAndDismissedAtIsNull(userId);
         streamService.publishRefresh(userId, unreadCount);
@@ -270,4 +320,3 @@ public class UserNotificationService {
             long unreadCount
     ) {}
 }
-

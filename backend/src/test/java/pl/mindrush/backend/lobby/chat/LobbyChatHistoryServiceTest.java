@@ -20,9 +20,9 @@ class LobbyChatHistoryServiceTest {
         Instant t2 = Instant.parse("2026-02-21T10:00:02Z");
         Instant t3 = Instant.parse("2026-02-21T10:00:03Z");
 
-        service.append("ABC123", "Alice", "first", t1);
-        service.append("ABC123", "Bob", "second", t2);
-        service.append("ABC123", "Cara", "third", t3);
+        service.append("ABC123", "Alice", "first", t1, false);
+        service.append("ABC123", "Bob", "second", t2, false);
+        service.append("ABC123", "Cara", "third", t3, false);
 
         List<LobbyChatMessageDto> fromT2 = service.historySince("ABC123", t2);
         assertThat(fromT2).hasSize(2);
@@ -37,7 +37,7 @@ class LobbyChatHistoryServiceTest {
 
         Instant base = Instant.parse("2026-02-21T10:00:00Z");
         for (int i = 0; i < 2010; i++) {
-            service.append("ROOM99", "User", "m" + i, base.plusSeconds(i));
+            service.append("ROOM99", "User", "m" + i, base.plusSeconds(i), false);
         }
 
         List<LobbyChatMessageDto> all = service.historySince("ROOM99", Instant.EPOCH);
@@ -46,4 +46,3 @@ class LobbyChatHistoryServiceTest {
         assertThat(all.get(all.size() - 1).text()).isEqualTo("m2009");
     }
 }
-

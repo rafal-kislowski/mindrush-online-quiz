@@ -1,12 +1,16 @@
 package pl.mindrush.backend.quiz;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import pl.mindrush.backend.achievement.UserAchievementService;
 import pl.mindrush.backend.AppRole;
 import pl.mindrush.backend.AppUser;
 import pl.mindrush.backend.AppUserRepository;
 import pl.mindrush.backend.RefreshTokenRepository;
+import pl.mindrush.backend.mail.QuizModerationMailWorkflowService;
 import pl.mindrush.backend.media.MediaStorageService;
 import pl.mindrush.backend.notification.UserNotificationService;
 
@@ -33,6 +37,7 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 @Transactional
 public class QuizLibraryService {
 
+    private static final Logger log = LoggerFactory.getLogger(QuizLibraryService.class);
     private static final int DEFAULT_QUESTION_TIME_LIMIT_SECONDS = Quiz.DEFAULT_QUESTION_TIME_LIMIT_SECONDS;
     private static final int DEFAULT_QUESTIONS_PER_GAME = Quiz.DEFAULT_QUESTIONS_PER_GAME;
     private static final Pattern HEX_COLOR = Pattern.compile("^#(?:[0-9A-F]{3}|[0-9A-F]{6})$");
@@ -49,6 +54,9 @@ public class QuizLibraryService {
     private final MediaStorageService mediaStorageService;
     private final QuizLibraryPolicyProperties policyProperties;
     private final UserNotificationService userNotificationService;
+    private final UserAchievementService userAchievementService;
+    private final QuizModerationMailWorkflowService quizModerationMailWorkflowService;
+    private final QuizUsageGuardService quizUsageGuardService;
 
     public QuizLibraryService(
             QuizRepository quizRepository,
@@ -61,7 +69,10 @@ public class QuizLibraryService {
             RefreshTokenRepository refreshTokenRepository,
             MediaStorageService mediaStorageService,
             QuizLibraryPolicyProperties policyProperties,
-            UserNotificationService userNotificationService
+            UserNotificationService userNotificationService,
+            UserAchievementService userAchievementService,
+            QuizModerationMailWorkflowService quizModerationMailWorkflowService,
+            QuizUsageGuardService quizUsageGuardService
     ) {
         this.quizRepository = quizRepository;
         this.categoryRepository = categoryRepository;
@@ -74,6 +85,9 @@ public class QuizLibraryService {
         this.mediaStorageService = mediaStorageService;
         this.policyProperties = policyProperties;
         this.userNotificationService = userNotificationService;
+        this.userAchievementService = userAchievementService;
+        this.quizModerationMailWorkflowService = quizModerationMailWorkflowService;
+        this.quizUsageGuardService = quizUsageGuardService;
     }
 
     @Transactional(readOnly = true)
@@ -108,6 +122,7 @@ public class QuizLibraryService {
                 limits.getMaxPendingSubmissions(),
                 limits.getMinQuestionsToSubmit(),
                 limits.getMaxQuestionsPerQuiz(),
+                limits.getMaxQuestionImagesPerQuiz(),
                 limits.getMinQuestionTimeLimitSeconds(),
                 limits.getMaxQuestionTimeLimitSeconds(),
                 limits.getMaxQuestionsPerGame(),
@@ -245,19 +260,21 @@ public class QuizLibraryService {
         }
 
         String normalizedPrompt = normalizeRequiredPrompt(prompt);
+        String normalizedQuestionImageUrl = normalizeNullableStoredMediaUrl(imageUrl, "Question image URL");
+        ensureCanAssignQuestionImage(quizId, limits, null, normalizedQuestionImageUrl);
         int orderIndex = (int) questionCount;
         QuizQuestion question = questionRepository.save(new QuizQuestion(quiz, normalizedPrompt, orderIndex));
-        question.setImageUrl(normalizeNullableStoredMediaUrl(imageUrl, "Question image URL"));
+        question.setImageUrl(normalizedQuestionImageUrl);
 
         for (int i = 0; i < options.size(); i++) {
             AnswerOptionInput input = options.get(i);
             QuizAnswerOption option = new QuizAnswerOption(
                     question,
-                    normalizeOptionText(input == null ? null : input.text()),
+                    normalizeRequiredOptionText(input == null ? null : input.text()),
                     input != null && input.correct(),
                     i
             );
-            option.setImageUrl(normalizeNullableStoredMediaUrl(input == null ? null : input.imageUrl(), "Option image URL"));
+            option.setImageUrl(null);
             optionRepository.save(option);
         }
 
@@ -272,6 +289,7 @@ public class QuizLibraryService {
             String imageUrl,
             List<AnswerOptionUpdateInput> options
     ) {
+        QuizLibraryPolicyProperties.TierLimits limits = limitsForUser(userId);
         Quiz quiz = requireOwnedQuiz(userId, quizId);
         ensureQuizMutable(quiz);
         resetModerationAfterOwnerEdit(quiz);
@@ -281,7 +299,9 @@ public class QuizLibraryService {
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Question not found"));
 
         question.setPrompt(normalizeRequiredPrompt(prompt));
-        question.setImageUrl(normalizeNullableStoredMediaUrl(imageUrl, "Question image URL"));
+        String normalizedQuestionImageUrl = normalizeNullableStoredMediaUrl(imageUrl, "Question image URL");
+        ensureCanAssignQuestionImage(quizId, limits, question.getImageUrl(), normalizedQuestionImageUrl);
+        question.setImageUrl(normalizedQuestionImageUrl);
 
         List<QuizAnswerOption> existing = optionRepository.findAllByQuestionIdOrderByOrderIndexAsc(questionId);
         if (existing.size() != 4) {
@@ -299,8 +319,8 @@ public class QuizLibraryService {
         for (int i = 0; i < options.size(); i++) {
             AnswerOptionUpdateInput input = options.get(i);
             QuizAnswerOption option = existingById.get(input.id());
-            option.setText(normalizeOptionText(input.text()));
-            option.setImageUrl(normalizeNullableStoredMediaUrl(input.imageUrl(), "Option image URL"));
+            option.setText(normalizeRequiredOptionText(input.text()));
+            option.setImageUrl(null);
             option.setCorrect(input.correct());
             option.setOrderIndex(i);
             optionRepository.save(option);
@@ -322,6 +342,9 @@ public class QuizLibraryService {
 
     public Quiz trashOwnedQuiz(Long userId, Long quizId) {
         Quiz quiz = requireOwnedQuiz(userId, quizId);
+        if (quiz.getStatus() == QuizStatus.ACTIVE) {
+            quizUsageGuardService.assertCanDeactivateOrDelete(quiz.getId(), "move this quiz to trash");
+        }
         quiz.setStatus(QuizStatus.TRASHED);
         quiz.setModerationStatus(QuizModerationStatus.NONE);
         quiz.setModerationReason(null);
@@ -334,6 +357,9 @@ public class QuizLibraryService {
         if (status == null) throw new ResponseStatusException(BAD_REQUEST, "Status is required");
 
         Quiz quiz = requireOwnedQuiz(userId, quizId);
+        if (quiz.getStatus() == QuizStatus.ACTIVE && status != QuizStatus.ACTIVE) {
+            quizUsageGuardService.assertCanDeactivateOrDelete(quiz.getId(), "change quiz status");
+        }
         if (status == QuizStatus.ACTIVE) {
             throw new ResponseStatusException(
                     CONFLICT,
@@ -359,6 +385,7 @@ public class QuizLibraryService {
 
     public void purgeOwnedQuiz(Long userId, Long quizId) {
         Quiz quiz = requireOwnedQuiz(userId, quizId);
+        quizUsageGuardService.assertCanDeactivateOrDelete(quiz.getId(), "delete this quiz");
         if (quiz.getStatus() != QuizStatus.TRASHED) {
             throw new ResponseStatusException(CONFLICT, "Only trashed quiz can be permanently deleted");
         }
@@ -593,6 +620,11 @@ public class QuizLibraryService {
         clearModerationIssues(quiz.getId());
         Quiz saved = quizRepository.save(quiz);
         userNotificationService.createModerationDecisionNotification(saved, 0);
+        sendModerationDecisionEmailSafely(saved, 0);
+        if (saved.getOwnerUserId() != null) {
+            Instant unlockedAt = saved.getModerationUpdatedAt() != null ? saved.getModerationUpdatedAt() : Instant.now();
+            userAchievementService.refreshForUser(saved.getOwnerUserId(), unlockedAt);
+        }
         return saved;
     }
 
@@ -635,8 +667,25 @@ public class QuizLibraryService {
         }
 
         userNotificationService.createModerationDecisionNotification(saved, normalizedQuestionIssues.size());
+        sendModerationDecisionEmailSafely(saved, normalizedQuestionIssues.size());
 
         return saved;
+    }
+
+    private void sendModerationDecisionEmailSafely(Quiz quiz, int questionIssueCount) {
+        if (quiz == null || quiz.getOwnerUserId() == null) return;
+        appUserRepository.findById(quiz.getOwnerUserId()).ifPresent(owner -> {
+            try {
+                quizModerationMailWorkflowService.sendModerationDecision(owner, quiz, questionIssueCount);
+            } catch (RuntimeException ex) {
+                log.warn(
+                        "Failed to send moderation decision email for quizId={}, ownerUserId={}: {}",
+                        quiz.getId(),
+                        quiz.getOwnerUserId(),
+                        ex.getMessage()
+                );
+            }
+        });
     }
 
     private Quiz requireSubmissionForAdmin(Long quizId) {
@@ -730,6 +779,25 @@ public class QuizLibraryService {
             throw new ResponseStatusException(
                     CONFLICT,
                     "Owned quiz limit reached (" + limits.getMaxOwnedQuizzes() + "). Move old quizzes to trash or delete them."
+            );
+        }
+    }
+
+    private void ensureCanAssignQuestionImage(
+            Long quizId,
+            QuizLibraryPolicyProperties.TierLimits limits,
+            String currentImageUrl,
+            String requestedImageUrl
+    ) {
+        if (requestedImageUrl == null) return;
+        if (currentImageUrl != null && !currentImageUrl.isBlank()) return;
+
+        int maxQuestionImagesPerQuiz = limits.getMaxQuestionImagesPerQuiz();
+        long currentImageCount = questionRepository.countByQuizIdWithImage(quizId);
+        if (currentImageCount >= maxQuestionImagesPerQuiz) {
+            throw new ResponseStatusException(
+                    CONFLICT,
+                    "Question image limit reached (" + maxQuestionImagesPerQuiz + ") for this quiz."
             );
         }
     }
@@ -894,12 +962,15 @@ public class QuizLibraryService {
         moderationIssueRepository.deleteAllByQuizId(quizId);
     }
 
-    private static String normalizeOptionText(String text) {
+    private static String normalizeRequiredOptionText(String text) {
         String normalized = normalizeNullable(text);
-        if (normalized != null && normalized.length() > 200) {
+        if (normalized == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "Each answer option must have text");
+        }
+        if (normalized.length() > 200) {
             throw new ResponseStatusException(BAD_REQUEST, "Option text is too long");
         }
-        return normalized == null ? "" : normalized;
+        return normalized;
     }
 
     private static String normalizeNullable(String value) {
@@ -961,8 +1032,11 @@ public class QuizLibraryService {
         for (AnswerOptionInput option : options) {
             String text = option == null ? null : normalizeNullable(option.text());
             String imageUrl = option == null ? null : normalizeNullable(option.imageUrl());
-            if (text == null && imageUrl == null) {
-                throw new ResponseStatusException(BAD_REQUEST, "Each answer option must have text or an image");
+            if (imageUrl != null) {
+                throw new ResponseStatusException(BAD_REQUEST, "Answer option images are disabled for user quizzes");
+            }
+            if (text == null) {
+                throw new ResponseStatusException(BAD_REQUEST, "Each answer option must have text");
             }
             if (text != null && text.length() > 200) {
                 throw new ResponseStatusException(BAD_REQUEST, "Option text is too long");
@@ -986,8 +1060,11 @@ public class QuizLibraryService {
             }
             String text = normalizeNullable(option.text());
             String imageUrl = normalizeNullable(option.imageUrl());
-            if (text == null && imageUrl == null) {
-                throw new ResponseStatusException(BAD_REQUEST, "Each answer option must have text or an image");
+            if (imageUrl != null) {
+                throw new ResponseStatusException(BAD_REQUEST, "Answer option images are disabled for user quizzes");
+            }
+            if (text == null) {
+                throw new ResponseStatusException(BAD_REQUEST, "Each answer option must have text");
             }
             if (text != null && text.length() > 200) {
                 throw new ResponseStatusException(BAD_REQUEST, "Option text is too long");
@@ -1147,6 +1224,7 @@ public class QuizLibraryService {
             int maxPendingSubmissions,
             int minQuestionsToSubmit,
             int maxQuestionsPerQuiz,
+            int maxQuestionImagesPerQuiz,
             int minQuestionTimeLimitSeconds,
             int maxQuestionTimeLimitSeconds,
             int maxQuestionsPerGame,

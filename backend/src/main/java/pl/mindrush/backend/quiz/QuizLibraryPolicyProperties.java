@@ -17,10 +17,10 @@ import java.util.Set;
 public class QuizLibraryPolicyProperties {
 
     @Valid
-    private TierLimits user = new TierLimits(20, 5, 3, 5, 50, 5, 180, 50);
+    private TierLimits user = new TierLimits(20, 5, 3, 5, 50, 10, 5, 180, 50);
 
     @Valid
-    private TierLimits premium = new TierLimits(60, 20, 10, 5, 100, 5, 300, 100);
+    private TierLimits premium = new TierLimits(60, 20, 10, 5, 100, 100, 5, 300, 100);
 
     @Valid
     private Media media = new Media(2L * 1024L * 1024L, List.of("image/jpeg", "image/png", "image/webp", "image/gif"));
@@ -30,7 +30,7 @@ public class QuizLibraryPolicyProperties {
     }
 
     public void setUser(TierLimits user) {
-        this.user = user == null ? new TierLimits(20, 5, 3, 5, 50, 5, 180, 50) : user;
+        this.user = user == null ? new TierLimits(20, 5, 3, 5, 50, 10, 5, 180, 50) : user;
     }
 
     public TierLimits getPremium() {
@@ -38,7 +38,7 @@ public class QuizLibraryPolicyProperties {
     }
 
     public void setPremium(TierLimits premium) {
-        this.premium = premium == null ? new TierLimits(60, 20, 10, 5, 100, 5, 300, 100) : premium;
+        this.premium = premium == null ? new TierLimits(60, 20, 10, 5, 100, 100, 5, 300, 100) : premium;
     }
 
     public Media getMedia() {
@@ -69,6 +69,8 @@ public class QuizLibraryPolicyProperties {
         private int minQuestionsToSubmit;
         @Min(1)
         private int maxQuestionsPerQuiz;
+        @Min(0)
+        private int maxQuestionImagesPerQuiz;
         @Min(1)
         private int minQuestionTimeLimitSeconds;
         @Min(1)
@@ -85,6 +87,7 @@ public class QuizLibraryPolicyProperties {
                 int maxPendingSubmissions,
                 int minQuestionsToSubmit,
                 int maxQuestionsPerQuiz,
+                int maxQuestionImagesPerQuiz,
                 int minQuestionTimeLimitSeconds,
                 int maxQuestionTimeLimitSeconds,
                 int maxQuestionsPerGame
@@ -94,6 +97,7 @@ public class QuizLibraryPolicyProperties {
             this.maxPendingSubmissions = maxPendingSubmissions;
             this.minQuestionsToSubmit = minQuestionsToSubmit;
             this.maxQuestionsPerQuiz = maxQuestionsPerQuiz;
+            this.maxQuestionImagesPerQuiz = maxQuestionImagesPerQuiz;
             this.minQuestionTimeLimitSeconds = minQuestionTimeLimitSeconds;
             this.maxQuestionTimeLimitSeconds = maxQuestionTimeLimitSeconds;
             this.maxQuestionsPerGame = maxQuestionsPerGame;
@@ -137,6 +141,14 @@ public class QuizLibraryPolicyProperties {
 
         public void setMaxQuestionsPerQuiz(int maxQuestionsPerQuiz) {
             this.maxQuestionsPerQuiz = maxQuestionsPerQuiz;
+        }
+
+        public int getMaxQuestionImagesPerQuiz() {
+            return maxQuestionImagesPerQuiz;
+        }
+
+        public void setMaxQuestionImagesPerQuiz(int maxQuestionImagesPerQuiz) {
+            this.maxQuestionImagesPerQuiz = maxQuestionImagesPerQuiz;
         }
 
         public int getMinQuestionTimeLimitSeconds() {
