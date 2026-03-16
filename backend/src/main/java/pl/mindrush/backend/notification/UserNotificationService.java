@@ -6,6 +6,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import pl.mindrush.backend.AppRole;
+import pl.mindrush.backend.AppUserRepository;
 import pl.mindrush.backend.quiz.Quiz;
 import pl.mindrush.backend.quiz.QuizModerationStatus;
 
@@ -15,6 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
@@ -28,17 +31,20 @@ public class UserNotificationService {
 
     private final UserNotificationRepository notificationRepository;
     private final UserNotificationStreamService streamService;
+    private final AppUserRepository appUserRepository;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
     public UserNotificationService(
             UserNotificationRepository notificationRepository,
             UserNotificationStreamService streamService,
+            AppUserRepository appUserRepository,
             ObjectMapper objectMapper,
             Clock clock
     ) {
         this.notificationRepository = notificationRepository;
         this.streamService = streamService;
+        this.appUserRepository = appUserRepository;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -142,6 +148,64 @@ public class UserNotificationService {
         notificationRepository.save(notification);
 
         publishRefresh(userId);
+    }
+
+    public void createModerationSubmissionNotificationForAdmins(Quiz quiz, String submitterDisplayName) {
+        if (quiz == null || quiz.getId() == null) return;
+        if (quiz.getModerationStatus() != QuizModerationStatus.PENDING) return;
+
+        List<Long> adminIds = appUserRepository.findAllIdsByRole(AppRole.ADMIN).stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (adminIds.isEmpty()) return;
+
+        Instant createdAt = quiz.getModerationUpdatedAt() != null ? quiz.getModerationUpdatedAt() : clock.instant();
+        String dedupeKey = "moderation:submitted:%d:%d".formatted(quiz.getId(), quiz.getVersion() == null ? 0L : quiz.getVersion());
+
+        String quizTitle = String.valueOf(quiz.getTitle() == null ? "" : quiz.getTitle()).trim();
+        if (quizTitle.isBlank()) {
+            quizTitle = "Untitled quiz";
+        }
+        String authorLabel = String.valueOf(submitterDisplayName == null ? "" : submitterDisplayName).trim();
+        if (authorLabel.isBlank()) {
+            authorLabel = "A user";
+        }
+
+        String text = "%s submitted a quiz for moderation review.".formatted(authorLabel);
+        for (Long adminId : adminIds) {
+            if (notificationRepository.existsByUserIdAndDedupeKey(adminId, dedupeKey)) {
+                continue;
+            }
+
+            UserNotification notification = new UserNotification();
+            notification.setUserId(adminId);
+            notification.setCategory(UserNotificationCategory.MODERATION);
+            notification.setSeverity(UserNotificationSeverity.WARNING);
+            notification.setDecision(null);
+            notification.setTitle("New quiz for review");
+            notification.setSubtitle(quizTitle);
+            notification.setText(text);
+            notification.setMeta("Pending moderation");
+            notification.setAvatarImageUrl(quiz.getAvatarImageUrl());
+            notification.setAvatarBgStart(quiz.getAvatarBgStart());
+            notification.setAvatarBgEnd(quiz.getAvatarBgEnd());
+            notification.setAvatarTextColor(quiz.getAvatarTextColor());
+            notification.setRoutePath("/admin/quiz-submissions");
+            notification.setRouteQueryJson(toJsonString(Map.of(
+                    "openQuiz", quiz.getId()
+            )));
+            notification.setPayloadJson(toJsonString(Map.of(
+                    "quizId", quiz.getId(),
+                    "status", QuizModerationStatus.PENDING.name(),
+                    "ownerUserId", quiz.getOwnerUserId() == null ? 0L : quiz.getOwnerUserId()
+            )));
+            notification.setDedupeKey(dedupeKey);
+            notification.setCreatedAt(createdAt);
+            notificationRepository.save(notification);
+
+            publishRefresh(adminId);
+        }
     }
 
     public void createAchievementUnlockedNotification(

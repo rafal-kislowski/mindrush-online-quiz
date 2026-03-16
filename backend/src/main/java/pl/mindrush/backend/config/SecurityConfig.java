@@ -1,5 +1,6 @@
 package pl.mindrush.backend.config;
 
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -38,6 +39,7 @@ public class SecurityConfig {
                 )
                 .addFilterBefore(new JwtCookieAuthenticationFilter(jwtService, userRepository), UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                         .requestMatchers("/api/health").permitAll()

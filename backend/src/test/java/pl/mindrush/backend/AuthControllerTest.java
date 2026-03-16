@@ -212,6 +212,51 @@ class AuthControllerTest {
     }
 
     @Test
+    void admin_generateQuestions_returnsServiceUnavailableWhenAiDisabled() throws Exception {
+        AppUser admin = new AppUser(
+                "admin@example.com",
+                passwordEncoder.encode("Password123"),
+                "Admin",
+                Set.of(AppRole.ADMIN),
+                clock.instant()
+        );
+        userRepository.save(admin);
+
+        MvcResult loginRes = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new Login("admin@example.com", "Password123"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String setCookie = String.join("\n", loginRes.getResponse().getHeaders(HttpHeaders.SET_COOKIE));
+        String access = cookieValueFromSetCookie(setCookie, "accessToken").orElseThrow();
+        jakarta.servlet.http.Cookie accessCookie = new jakarta.servlet.http.Cookie("accessToken", access);
+
+        MvcResult createQuizRes = mockMvc.perform(post("/api/admin/quizzes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Generated quiz\"}")
+                        .cookie(accessCookie))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        long quizId = objectMapper.readTree(createQuizRes.getResponse().getContentAsString()).get("id").asLong();
+
+        mockMvc.perform(post("/api/admin/quizzes/" + quizId + "/questions/generate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "topic": "Java basics",
+                                  "questionCount": 3,
+                                  "difficulty": "MIXED",
+                                  "language": "EN"
+                                }
+                                """)
+                        .cookie(accessCookie))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.message").value(containsString("disabled")));
+    }
+
+    @Test
     void forgotPassword_forUnknownEmail_returnsGenericMessage() throws Exception {
         mockMvc.perform(post("/api/auth/password/forgot")
                         .contentType(MediaType.APPLICATION_JSON)

@@ -19,6 +19,7 @@ import pl.mindrush.backend.guest.GuestSessionRepository;
 import pl.mindrush.backend.lobby.LobbyParticipantRepository;
 import pl.mindrush.backend.lobby.LobbyRepository;
 import pl.mindrush.backend.quiz.QuizAnswerOptionRepository;
+import pl.mindrush.backend.quiz.QuizRepository;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -99,6 +100,9 @@ class GameControllerTest {
 
     @Autowired
     private QuizAnswerOptionRepository quizAnswerOptionRepository;
+
+    @Autowired
+    private QuizRepository quizRepository;
 
     @BeforeEach
     void setUp() {
@@ -532,6 +536,47 @@ class GameControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.mode").value("THREE_LIVES"))
                 .andExpect(jsonPath("$.stage").value("REVEAL"));
+    }
+
+    @Test
+    void soloThreeLivesMode_usesAllQuizQuestionsEvenWhenQuestionsPerGameIsLower() throws Exception {
+        String ownerSessionId = createGuestSession();
+        Long quizId = firstQuizId();
+        int expectedTotalQuestions = firstQuizQuestionCount();
+        assertThat(expectedTotalQuestions).isGreaterThan(1);
+
+        var quiz = quizRepository.findById(quizId).orElseThrow();
+        int originalQuestionsPerGame = quiz.getQuestionsPerGame();
+        quiz.setQuestionsPerGame(1);
+        quizRepository.saveAndFlush(quiz);
+
+        try {
+            MvcResult started = mockMvc.perform(post("/api/solo-games/start")
+                            .cookie(new Cookie("guestSessionId", ownerSessionId))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"quizId\":" + quizId + ",\"mode\":\"THREE_LIVES\"}"))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.mode").value("THREE_LIVES"))
+                    .andExpect(jsonPath("$.totalQuestions").value(expectedTotalQuestions))
+                    .andReturn();
+
+            String sessionId = JsonPath.read(started.getResponse().getContentAsString(), "$.gameSessionId");
+
+            clock.advance(Duration.ofSeconds(4));
+            gameService.tickDueSessions();
+
+            mockMvc.perform(get("/api/solo-games/" + sessionId + "/state")
+                            .cookie(new Cookie("guestSessionId", ownerSessionId)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.mode").value("THREE_LIVES"))
+                    .andExpect(jsonPath("$.stage").value("QUESTION"))
+                    .andExpect(jsonPath("$.totalQuestions").value(expectedTotalQuestions));
+        } finally {
+            quizRepository.findById(quizId).ifPresent(currentQuiz -> {
+                currentQuiz.setQuestionsPerGame(originalQuestionsPerGame);
+                quizRepository.saveAndFlush(currentQuiz);
+            });
+        }
     }
 
     @Test

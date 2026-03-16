@@ -1480,7 +1480,9 @@ public class GameService {
             throw new ResponseStatusException(CONFLICT, "Quiz has no questions");
         }
 
-        int targetCount = Math.min(quiz.getQuestionsPerGame(), allQuestionIds.size());
+        int targetCount = isThreeLives(session)
+                ? allQuestionIds.size()
+                : Math.min(quiz.getQuestionsPerGame(), allQuestionIds.size());
         List<Long> selectedQuestionIds = selectSessionQuestionIds(session, quiz, allQuestionIds, targetCount);
         List<GameSessionQuestion> poolRows = new ArrayList<>(selectedQuestionIds.size());
         for (int i = 0; i < selectedQuestionIds.size(); i++) {

@@ -1,6 +1,7 @@
 package pl.mindrush.backend.casual;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.mindrush.backend.casual.dto.CasualThreeLivesBestDto;
@@ -62,7 +63,7 @@ public class CasualThreeLivesRecordService {
 
         CasualThreeLivesRecord record = recordRepository.findByParticipantKey(participantKey).orElse(null);
         if (record == null) {
-            recordRepository.save(CasualThreeLivesRecord.create(
+            CasualThreeLivesRecord created = CasualThreeLivesRecord.create(
                     participantKey,
                     session.getId(),
                     session.getUserId(),
@@ -70,8 +71,17 @@ public class CasualThreeLivesRecordService {
                     normalizedAnswered,
                     normalizedDuration,
                     now
-            ));
-            return;
+            );
+            try {
+                recordRepository.saveAndFlush(created);
+                return;
+            } catch (DataIntegrityViolationException ex) {
+                // Another concurrent transaction inserted the same participant row.
+                record = recordRepository.findByParticipantKey(participantKey).orElse(null);
+                if (record == null) {
+                    throw ex;
+                }
+            }
         }
 
         record.setGuestSessionId(session.getId());
@@ -124,4 +134,3 @@ public class CasualThreeLivesRecordService {
         return candidateDurationMs < currentBestDurationMs;
     }
 }
-

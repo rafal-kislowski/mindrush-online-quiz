@@ -18,6 +18,7 @@ import pl.mindrush.backend.AppRole;
 import pl.mindrush.backend.AppUser;
 import pl.mindrush.backend.AppUserRepository;
 import pl.mindrush.backend.RefreshTokenRepository;
+import pl.mindrush.backend.notification.UserNotificationRepository;
 
 import java.time.Clock;
 import java.nio.file.Files;
@@ -26,6 +27,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -84,6 +86,9 @@ class LibraryQuizControllerTest {
     @Autowired
     private QuizModerationIssueRepository moderationIssueRepository;
 
+    @Autowired
+    private UserNotificationRepository userNotificationRepository;
+
     @BeforeEach
     void setUp() {
         try {
@@ -104,6 +109,7 @@ class LibraryQuizControllerTest {
         optionRepository.deleteAll();
         questionRepository.deleteAll();
         moderationIssueRepository.deleteAll();
+        userNotificationRepository.deleteAll();
         quizRepository.deleteAll();
         refreshTokenRepository.deleteAll();
         userRepository.deleteAll();
@@ -372,12 +378,43 @@ class LibraryQuizControllerTest {
         org.assertj.core.api.Assertions.assertThat(Files.exists(stored)).isTrue();
     }
 
+    @Test
+    void submitForModeration_createsAdminNotification() throws Exception {
+        Cookie ownerCookie = loginAsUser("submit-owner@example.com");
+        Cookie adminCookie = loginAsRoles("submit-admin@example.com", Set.of(AppRole.ADMIN));
+
+        long quizId = createQuiz(ownerCookie, "Submission notify quiz");
+        Quiz quiz = quizRepository.findById(quizId).orElseThrow();
+        questionRepository.save(new QuizQuestion(quiz, "Prompt A", 0));
+        questionRepository.save(new QuizQuestion(quiz, "Prompt B", 1));
+
+        mockMvc.perform(post("/api/library/quizzes/" + quizId + "/submit")
+                        .cookie(ownerCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.moderationStatus").value("PENDING"));
+
+        mockMvc.perform(get("/api/notifications?limit=20").cookie(adminCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.unreadCount").value(1))
+                .andExpect(jsonPath("$.items[0].category").value("moderation"))
+                .andExpect(jsonPath("$.items[0].severity").value("warning"))
+                .andExpect(jsonPath("$.items[0].title").value("New quiz for review"))
+                .andExpect(jsonPath("$.items[0].subtitle").value("Submission notify quiz"))
+                .andExpect(jsonPath("$.items[0].text").value(containsString("submitted a quiz for moderation review")))
+                .andExpect(jsonPath("$.items[0].routePath").value("/admin/quiz-submissions"))
+                .andExpect(jsonPath("$.items[0].routeQueryParams.openQuiz").value((int) quizId));
+    }
+
     private Cookie loginAsUser(String email) throws Exception {
+        return loginAsRoles(email, Set.of(AppRole.USER));
+    }
+
+    private Cookie loginAsRoles(String email, Set<AppRole> roles) throws Exception {
         AppUser user = new AppUser(
                 email,
                 passwordEncoder.encode("Password123"),
                 "Player",
-                Set.of(AppRole.USER),
+                roles,
                 clock.instant()
         );
         userRepository.save(user);

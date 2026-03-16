@@ -27,6 +27,14 @@ public class JwtCookieAuthenticationFilter extends OncePerRequestFilter {
     }
 
     @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        // Required for SSE/async redispatches (e.g. /api/notifications/stream).
+        // Without this, async dispatch can lose authentication context and trigger AccessDenied
+        // after the response has already started streaming.
+        return false;
+    }
+
+    @Override
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,

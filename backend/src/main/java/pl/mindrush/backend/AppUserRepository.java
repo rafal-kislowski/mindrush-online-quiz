@@ -30,4 +30,12 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
                or (u.rankPoints = :rankPoints and u.id < :userId)
             """)
     long countAhead(@Param("rankPoints") int rankPoints, @Param("userId") long userId);
+
+    @Query("""
+            select u.id
+            from AppUser u
+            join u.roles role
+            where role = :role
+            """)
+    List<Long> findAllIdsByRole(@Param("role") AppRole role);
 }

@@ -1,8 +1,11 @@
 package pl.mindrush.backend.quiz;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,7 +14,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -20,6 +25,8 @@ import static org.springframework.http.HttpStatus.CREATED;
 @RestController
 @RequestMapping("/api/admin/quizzes")
 public class AdminQuizController {
+
+    private static final int MAX_GENERATE_QUESTION_COUNT = 500;
 
     private final QuizAdminService adminService;
 
@@ -162,6 +169,95 @@ public class AdminQuizController {
         return ResponseEntity.status(CREATED).body(new QuizQuestionAdminDto(q.getId(), q.getOrderIndex(), q.getPrompt(), q.getImageUrl()));
     }
 
+    @PostMapping("/{id}/questions/generate")
+    public ResponseEntity<GenerateQuestionsResponse> generateQuestions(
+            @PathVariable("id") Long quizId,
+            @Valid @RequestBody GenerateQuestionsRequest req
+    ) {
+        QuizAdminService.GeneratedQuestionsResult result = adminService.generateQuestions(
+                quizId,
+                new QuizAdminService.QuestionGenerationInput(
+                        req.topic(),
+                        req.categoryHint(),
+                        req.instructions(),
+                        req.questionCount(),
+                        req.difficulty(),
+                        req.language(),
+                        false
+                )
+        );
+
+        return ResponseEntity.status(CREATED).body(
+                new GenerateQuestionsResponse(
+                        result.requestedCount(),
+                        result.generatedCount(),
+                        result.totalQuestionCount()
+                )
+        );
+    }
+
+    @PostMapping(path = "/{id}/questions/generate/ai/from-files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<GenerateQuestionsResponse> generateQuestionsFromFiles(
+            @PathVariable("id") Long quizId,
+            @Valid @RequestPart("request") GenerateQuestionsRequest req,
+            @RequestPart(name = "files", required = false) List<MultipartFile> files
+    ) {
+        QuizAdminService.GeneratedQuestionsResult result = adminService.generateQuestionsFromSourceFiles(
+                quizId,
+                new QuizAdminService.QuestionGenerationInput(
+                        req.topic(),
+                        req.categoryHint(),
+                        req.instructions(),
+                        req.questionCount(),
+                        req.difficulty(),
+                        req.language(),
+                        false
+                ),
+                files
+        );
+
+        return ResponseEntity.status(CREATED).body(
+                new GenerateQuestionsResponse(
+                        result.requestedCount(),
+                        result.generatedCount(),
+                        result.totalQuestionCount()
+                )
+        );
+    }
+
+    @PostMapping("/{id}/questions/generate/opentdb")
+    public ResponseEntity<GenerateQuestionsResponse> generateQuestionsFromOpenTdb(
+            @PathVariable("id") Long quizId,
+            @Valid @RequestBody GenerateQuestionsOpenTdbRequest req
+    ) {
+        QuizAdminService.GeneratedQuestionsResult result = adminService.generateQuestionsFromOpenTdb(
+                quizId,
+                new QuizAdminService.OpenTdbQuestionGenerationInput(
+                        req.questionCount(),
+                        req.categoryId(),
+                        req.difficulty(),
+                        req.language()
+                )
+        );
+
+        return ResponseEntity.status(CREATED).body(
+                new GenerateQuestionsResponse(
+                        result.requestedCount(),
+                        result.generatedCount(),
+                        result.totalQuestionCount()
+                )
+        );
+    }
+
+    @GetMapping("/questions/generate/opentdb/categories")
+    public ResponseEntity<List<OpenTdbCategoryDto>> listOpenTdbCategories() {
+        return ResponseEntity.ok(
+                adminService.listOpenTdbCategories().stream()
+                        .map(item -> new OpenTdbCategoryDto(item.id(), item.name()))
+                        .toList()
+        );
+    }
+
     @PutMapping("/{id}/questions/{questionId}")
     public ResponseEntity<Void> updateQuestion(
             @PathVariable("id") Long quizId,
@@ -225,6 +321,22 @@ public class AdminQuizController {
             boolean correct
     ) {}
 
+    public record GenerateQuestionsRequest(
+            @Size(max = 160) String topic,
+            @Size(max = 64) String categoryHint,
+            @Size(max = 1200) String instructions,
+            @Min(1) @Max(MAX_GENERATE_QUESTION_COUNT) int questionCount,
+            QuestionGenerationDifficulty difficulty,
+            QuestionGenerationLanguage language
+    ) {}
+
+    public record GenerateQuestionsOpenTdbRequest(
+            @Min(1) @Max(MAX_GENERATE_QUESTION_COUNT) int questionCount,
+            Integer categoryId,
+            QuestionGenerationDifficulty difficulty,
+            QuestionGenerationLanguage language
+    ) {}
+
     public record UpdateQuestionRequest(
             @NotBlank @Size(max = 500) String prompt,
             @Size(max = 500) String imageUrl,
@@ -258,6 +370,17 @@ public class AdminQuizController {
     public record StatusRequest(QuizStatus status) {}
 
     public record QuizQuestionAdminDto(Long id, int orderIndex, String prompt, String imageUrl) {}
+
+    public record GenerateQuestionsResponse(
+            int requestedCount,
+            int generatedCount,
+            long totalQuestionCount
+    ) {}
+
+    public record OpenTdbCategoryDto(
+            int id,
+            String name
+    ) {}
 
     public record AdminQuizListItemDto(
             Long id,

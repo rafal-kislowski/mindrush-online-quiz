@@ -22,6 +22,7 @@ import java.util.List;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final String NOTIFICATION_STREAM_PATH = "/api/notifications/stream";
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleMethodArgumentNotValid(
@@ -126,11 +127,20 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiErrorResponse> handleUnhandled(
+    public ResponseEntity<?> handleUnhandled(
             Exception ex,
             HttpServletRequest request
     ) {
-        log.error("Unhandled exception for path {}", request == null ? "unknown" : request.getRequestURI(), ex);
+        String path = request == null ? "unknown" : request.getRequestURI();
+        if (isClientDisconnect(ex)) {
+            log.debug("Client disconnected for path {}: {}", path, safeMessage(ex.getMessage(), "I/O closed"));
+            return ResponseEntity.noContent().build();
+        }
+        if (isSseRequest(request)) {
+            log.warn("Unhandled SSE exception for path {}: {}", path, safeMessage(ex.getMessage(), "stream failed"));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+        log.error("Unhandled exception for path {}", path, ex);
         return response(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "INTERNAL_ERROR",
@@ -187,5 +197,41 @@ public class GlobalExceptionHandler {
         int dot = rawPath.lastIndexOf('.');
         if (dot < 0 || dot + 1 >= rawPath.length()) return rawPath;
         return rawPath.substring(dot + 1);
+    }
+
+    private static boolean isSseRequest(HttpServletRequest request) {
+        if (request == null) return false;
+        String path = request.getRequestURI();
+        if (path != null && path.startsWith(NOTIFICATION_STREAM_PATH)) return true;
+        String accept = request.getHeader("Accept");
+        return accept != null && accept.contains("text/event-stream");
+    }
+
+    private static boolean isClientDisconnect(Throwable ex) {
+        Throwable current = ex;
+        int depth = 0;
+        while (current != null && depth < 10) {
+            String className = current.getClass().getName();
+            if (className.contains("ClientAbortException")
+                    || className.contains("EOFException")
+                    || className.contains("EofException")) {
+                return true;
+            }
+
+            String message = current.getMessage();
+            if (message != null) {
+                String normalized = message.toLowerCase();
+                if (normalized.contains("broken pipe")
+                        || normalized.contains("connection reset")
+                        || normalized.contains("forcibly closed")
+                        || normalized.contains("przerwane przez oprogramowanie")) {
+                    return true;
+                }
+            }
+
+            current = current.getCause();
+            depth++;
+        }
+        return false;
     }
 }

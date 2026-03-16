@@ -434,7 +434,13 @@ public class QuizLibraryService {
         quiz.setModerationReason(null);
         quiz.setModerationUpdatedAt(Instant.now());
         clearModerationIssues(quiz.getId());
-        return quizRepository.save(quiz);
+        Quiz saved = quizRepository.save(quiz);
+
+        String submitterDisplayName = appUserRepository.findById(userId)
+                .map(AppUser::getDisplayName)
+                .orElse(null);
+        userNotificationService.createModerationSubmissionNotificationForAdmins(saved, submitterDisplayName);
+        return saved;
     }
 
     @Transactional(readOnly = true)

@@ -38,6 +38,15 @@ spring.datasource.username=mindrush
 spring.datasource.password=mindrush
 ```
 
+Optional (admin AI question generation, disabled by default):
+
+```properties
+OPENAI_ENABLED=true
+OPENAI_API_KEY=your-openai-api-key
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_MAX_QUESTIONS_PER_REQUEST=100
+```
+
 ### 3) Run the backend
 Windows:
 
