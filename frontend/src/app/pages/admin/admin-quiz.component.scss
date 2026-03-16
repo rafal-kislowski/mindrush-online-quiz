@@ -3183,6 +3183,31 @@ h2 {
   gap: 8px;
 }
 
+@media (min-width: 721px) {
+  .generate-dialog {
+    width: min(900px, calc(100vw - 72px));
+    max-width: calc(100vw - 72px);
+    max-height: calc(100svh - 56px);
+  }
+
+  .generate-dialog .feedback-modal {
+    max-height: calc(100svh - 56px);
+  }
+
+  .feedback-modal__head {
+    padding: 16px 18px 12px;
+  }
+
+  .feedback-modal__body {
+    padding: 16px 18px;
+    gap: 12px;
+  }
+
+  .feedback-modal__actions {
+    padding: 12px 18px 18px;
+  }
+}
+
 .feedback-modal__body .field input,
 .feedback-modal__body .field textarea {
   width: 100%;

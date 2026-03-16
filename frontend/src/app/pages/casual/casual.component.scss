@@ -227,8 +227,15 @@
 }
 
 .casual-variant-card {
-  --btn-glow-a: rgba(56, 189, 248, 0.14);
-  --btn-glow-b: rgba(47, 134, 255, 0.1);
+  --btn-border-hover: rgba(166, 205, 251, 0.44);
+  --btn-left-accent: rgba(109, 184, 255, 0.9);
+  --btn-glow: rgba(56, 149, 255, 0.14);
+  --btn-tint-a: rgba(72, 171, 255, 0.1);
+  --btn-tint-b: rgba(56, 189, 248, 0.07);
+  --icon-tint-a: rgba(156, 214, 255, 0.18);
+  --icon-tint-b: rgba(43, 99, 190, 0.42);
+  --icon-tint-c: rgba(18, 45, 100, 0.54);
+  --icon-border: rgba(128, 182, 250, 0.34);
   position: relative;
   overflow: hidden;
   isolation: isolate;
@@ -241,105 +248,111 @@
   gap: 12px;
   padding: 14px 14px;
   border-radius: 16px;
-  border: none;
+  border: 1px solid transparent;
   color: rgba(255, 255, 255, 0.9);
   background:
-    radial-gradient(130% 120% at 8% 0%, var(--btn-glow-a), transparent 62%),
-    radial-gradient(120% 120% at 100% 100%, var(--btn-glow-b), transparent 68%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.12));
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: none;
-  transition: none;
+    radial-gradient(120% 140% at 0% 50%, var(--btn-tint-a), transparent 70%),
+    radial-gradient(120% 140% at 100% 100%, var(--btn-tint-b), transparent 72%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(7, 18, 42, 0.6));
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 6px 16px rgba(0, 0, 0, 0.16);
+  transition:
+    border-color 180ms ease,
+    box-shadow 220ms ease,
+    filter 180ms ease;
+}
+
+.casual-variant-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.casual-variant-card::before {
+  content: "";
+  position: absolute;
+  left: 0px;
+  top: 50%;
+  bottom: auto;
+  width: 1.5px;
+  height: clamp(24px, calc(100% - 42px), 40px);
+  border-radius: 999px;
+  transform: translateY(-50%);
+  background: linear-gradient(
+    180deg,
+    color-mix(
+      in srgb,
+      var(--btn-left-accent-top, color-mix(in srgb, var(--btn-left-accent) 82%, #ffffff 18%)) 72%,
+      transparent
+    ),
+    color-mix(in srgb, var(--btn-left-accent) 78%, transparent)
+  );
+  opacity: 0;
+  transition: opacity 140ms ease;
 }
 
 .casual-variant-card::after {
-  content: "";
-  position: absolute;
-  inset: -45% -20%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.16),
-    transparent
-  );
-  transform: rotate(12deg) translateX(-135%);
-  transition: none;
-  pointer-events: none;
-  opacity: 0;
+  display: none;
 }
 
-.casual-variant-card:hover {
-  transform: none;
-  background:
-    radial-gradient(130% 120% at 8% 0%, var(--btn-glow-a), transparent 58%),
-    radial-gradient(120% 120% at 100% 100%, var(--btn-glow-b), transparent 64%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.12));
-  box-shadow:
-    0 0 12px 1px color-mix(in srgb, var(--btn-glow-a) 72%, transparent),
-    0 0 20px 4px color-mix(in srgb, var(--btn-glow-a) 30%, transparent);
-  filter: none;
-}
-
-.casual-variant-card:hover::after,
-.casual-variant-card.is-active::after {
-  transform: rotate(12deg) translateX(135%);
-  opacity: 0.9;
-}
-
-.casual-variant-card:active {
-  transform: none;
-  background:
-    radial-gradient(130% 120% at 8% 0%, var(--btn-glow-a), transparent 60%),
-    radial-gradient(120% 120% at 100% 100%, var(--btn-glow-b), transparent 66%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(0, 0, 0, 0.12));
-  box-shadow:
-    0 0 12px 1px color-mix(in srgb, var(--btn-glow-a) 74%, transparent);
-  filter: none;
-}
-
-.casual-variant-card:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(47, 208, 255, 0.34);
-}
-
+.casual-variant-card:hover,
+.casual-variant-card:focus-visible,
+.casual-variant-card:active,
 .casual-variant-card.is-active {
-  border-color: rgba(255, 255, 255, 0.2);
+  outline: none;
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.16) inset,
-    0 0 18px color-mix(in srgb, var(--btn-glow-a) 50%, transparent);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 1px color-mix(in srgb, var(--btn-border-hover) 28%, transparent),
+    0 8px 18px rgba(0, 0, 0, 0.18);
+  border-color: color-mix(in srgb, var(--btn-border-hover) 74%, transparent);
+  filter: none;
+}
+
+.casual-variant-card:hover::before,
+.casual-variant-card:focus-visible::before,
+.casual-variant-card:active::before,
+.casual-variant-card.is-active::before {
+  opacity: 0.86;
 }
 
 .casual-variant-card .mini__icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
+  width: var(--dash-btn-icon-size, 46px);
+  height: var(--dash-btn-icon-size, 46px);
+  border-radius: var(--dash-btn-icon-radius, 14px);
   display: grid;
   place-items: center;
   flex: 0 0 auto;
+  background:
+    radial-gradient(50px 50px at 26% 24%, var(--icon-tint-a), transparent 64%),
+    linear-gradient(135deg, var(--icon-tint-b), var(--icon-tint-c));
+  border: 1px solid var(--icon-border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 4px 10px rgba(0, 0, 0, 0.14);
   color: rgba(255, 255, 255, 0.92);
-  opacity: 0.95;
-  filter: saturate(0.9);
+  opacity: 0.98;
+  filter: none;
   transform: translateZ(0) scale(1);
   transform-origin: center center;
   backface-visibility: hidden;
   will-change: transform;
-  transition: none;
+  transition: transform 190ms cubic-bezier(0.22, 0.61, 0.36, 1), filter 190ms var(--ease-out, ease);
 }
 
 .casual-variant-card .mini__icon svg {
-  width: 24px;
-  height: 24px;
+  width: var(--dash-btn-icon-glyph-size, 24px);
+  height: var(--dash-btn-icon-glyph-size, 24px);
   display: block;
 }
 
-.casual-variant-card:hover .mini__icon {
-  transform: translateZ(0) scale(1.06);
+.casual-variant-card:hover .mini__icon,
+.casual-variant-card:focus-visible .mini__icon,
+.casual-variant-card:active .mini__icon,
+.casual-variant-card.is-active .mini__icon {
+  transform: translateZ(0) scale(1.02);
   filter: none;
-}
-
-.casual-variant-card:active .mini__icon {
-  transform: translateZ(0) scale(1.03);
 }
 
 .casual-variant-card .mini__text {
@@ -365,40 +378,41 @@
   line-height: 1.25;
 }
 
-.casual-variant-card.accent--cyan .mini__icon {
-  background:
-    radial-gradient(50px 50px at 30% 30%, rgba(255, 255, 255, 0.14), transparent 62%),
-    linear-gradient(135deg, rgba(56, 189, 248, 0.26), rgba(47, 134, 255, 0.16)),
-    rgba(255, 255, 255, 0.03);
-}
-
 .casual-variant-card.accent--cyan {
-  --btn-glow-a: rgba(56, 189, 248, 0.14);
-  --btn-glow-b: rgba(47, 134, 255, 0.1);
-}
-
-.casual-variant-card.accent--orange .mini__icon {
-  background:
-    radial-gradient(50px 50px at 30% 30%, rgba(255, 255, 255, 0.14), transparent 62%),
-    linear-gradient(135deg, rgba(255, 177, 63, 0.24), rgba(255, 123, 42, 0.16)),
-    rgba(255, 255, 255, 0.03);
+  --btn-border-hover: rgba(148, 205, 255, 0.36);
+  --btn-left-accent: rgba(109, 184, 255, 0.9);
+  --btn-glow: rgba(56, 149, 255, 0.14);
+  --btn-tint-a: rgba(72, 171, 255, 0.1);
+  --btn-tint-b: rgba(56, 189, 248, 0.07);
+  --icon-tint-a: rgba(156, 214, 255, 0.18);
+  --icon-tint-b: rgba(43, 99, 190, 0.42);
+  --icon-tint-c: rgba(18, 45, 100, 0.54);
+  --icon-border: rgba(128, 182, 250, 0.34);
 }
 
 .casual-variant-card.accent--orange {
-  --btn-glow-a: rgba(255, 177, 63, 0.13);
-  --btn-glow-b: rgba(255, 123, 42, 0.1);
-}
-
-.casual-variant-card.accent--purple .mini__icon {
-  background:
-    radial-gradient(50px 50px at 30% 30%, rgba(255, 255, 255, 0.14), transparent 62%),
-    linear-gradient(135deg, rgba(185, 107, 255, 0.24), rgba(110, 86, 255, 0.14)),
-    rgba(255, 255, 255, 0.03);
+  --btn-border-hover: rgba(224, 198, 148, 0.42);
+  --btn-left-accent: rgba(255, 203, 130, 0.94);
+  --btn-left-accent-top: rgba(255, 203, 130, 0.94);
+  --btn-glow: rgba(255, 177, 63, 0.13);
+  --btn-tint-a: rgba(229, 177, 96, 0.09);
+  --btn-tint-b: rgba(229, 177, 96, 0.06);
+  --icon-tint-a: rgba(255, 214, 149, 0.16);
+  --icon-tint-b: rgba(131, 98, 52, 0.42);
+  --icon-tint-c: rgba(108, 82, 44, 0.44);
+  --icon-border: rgba(201, 171, 119, 0.32);
 }
 
 .casual-variant-card.accent--purple {
-  --btn-glow-a: rgba(185, 107, 255, 0.13);
-  --btn-glow-b: rgba(110, 86, 255, 0.1);
+  --btn-border-hover: rgba(181, 166, 236, 0.32);
+  --btn-left-accent: rgba(170, 146, 246, 0.88);
+  --btn-glow: rgba(153, 124, 224, 0.12);
+  --btn-tint-a: rgba(148, 126, 221, 0.1);
+  --btn-tint-b: rgba(185, 107, 255, 0.06);
+  --icon-tint-a: rgba(199, 164, 255, 0.16);
+  --icon-tint-b: rgba(91, 79, 171, 0.38);
+  --icon-tint-c: rgba(23, 50, 105, 0.54);
+  --icon-border: rgba(161, 146, 229, 0.32);
 }
 
 .config-panel {

@@ -2361,6 +2361,38 @@
   gap: 8px;
 }
 
+@media (min-width: 721px) {
+  .feedback-dialog[open] {
+    padding: clamp(20px, 3vw, 34px);
+  }
+
+  .feedback-dialog .feedback-modal {
+    width: min(620px, calc(100vw - 80px));
+    max-height: calc(100svh - 64px);
+  }
+
+  .feedback-modal--question {
+    width: min(560px, calc(100vw - 80px));
+  }
+
+  .feedback-modal--reject {
+    width: min(620px, calc(100vw - 80px));
+  }
+
+  .feedback-modal__head {
+    padding: 16px 18px 12px;
+  }
+
+  .feedback-modal__body {
+    padding: 16px 18px;
+    gap: 12px;
+  }
+
+  .feedback-modal__actions {
+    padding: 12px 18px 18px;
+  }
+}
+
 .field__error {
   margin: -4px 0 0;
   font-size: 12px;

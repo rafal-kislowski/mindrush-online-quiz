@@ -15,11 +15,12 @@
 
 /* ===== LAYOUT ===== */
 .layout {
+  --sidebar-width: 280px;
   position: relative;
   z-index: 1;
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
 }
 
 .overlay {
@@ -46,6 +47,7 @@
 
   position: sticky;
   top: 0;
+  width: var(--sidebar-width);
   min-height: 100svh;
   height: 100svh;
   padding: 16px 14px 14px;
@@ -1558,31 +1560,29 @@
     transition: transform 240ms ease;
     z-index: 30;
     backface-visibility: hidden;
-    contain: paint;
-    will-change: transform;
-    overflow-y: auto;
-    overflow-x: hidden;
+    contain: layout paint style;
+    will-change: transform, opacity;
+    overflow: hidden;
     padding-bottom: max(12px, env(safe-area-inset-bottom));
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
   }
 
-  .sidebar__top,
-  .sidebar__scroll,
-  .sidebar__bottomFixed {
+  .sidebar__top {
     flex: 0 0 auto;
   }
 
   .sidebar__scroll {
-    min-height: auto;
-    overflow: visible;
-    padding-right: 0;
-    padding-bottom: 0;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 2px;
+    padding-bottom: 8px;
   }
 
   .sidebar__bottomFixed {
-    margin-top: 14px;
-    padding-top: 6px;
+    flex: 0 0 auto;
+    margin-top: 10px;
+    padding-top: 4px;
   }
 
   .sidebar__close {
@@ -1652,6 +1652,22 @@
   .layout.is-open .overlay {
     opacity: 1;
     pointer-events: auto;
+  }
+
+  .layout.is-sidebar-prewarm .sidebar,
+  .layout.is-sidebar-prewarm .overlay {
+    transition: none !important;
+  }
+
+  .layout.is-sidebar-prewarm .sidebar {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .layout.is-sidebar-prewarm .overlay {
+    opacity: 0;
+    pointer-events: none;
   }
 }
 
