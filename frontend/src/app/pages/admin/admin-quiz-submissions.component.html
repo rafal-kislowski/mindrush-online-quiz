@@ -773,116 +773,6 @@
             </div>
           </ng-template>
 
-          <div
-            class="feedback-modal-backdrop"
-            *ngIf="questionFeedbackModalOpen && canModerateSelected"
-            (click)="closeQuestionFeedbackModal()"
-            aria-hidden="true"
-          ></div>
-
-          <aside
-            class="feedback-modal feedback-modal--question"
-            *ngIf="questionFeedbackModalOpen && canModerateSelected && questionFeedbackTarget as feedbackQuestion"
-            [formGroup]="questionFeedbackForm"
-            #questionFeedbackModal
-            role="dialog"
-            aria-modal="true"
-            aria-label="Question feedback"
-            (click)="$event.stopPropagation()"
-          >
-            <header class="feedback-modal__head">
-              <div>
-                <h3>Question {{ feedbackQuestion.orderIndex + 1 }} feedback</h3>
-                <p class="muted">The feedback will be attached to this question in the reject summary.</p>
-              </div>
-              <button class="icon-btn" type="button" (click)="closeQuestionFeedbackModal()" aria-label="Close question feedback modal">
-                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-              </button>
-            </header>
-
-            <div class="feedback-modal__body">
-              <label class="field">
-                <span class="field__label">Feedback message</span>
-                <textarea
-                  rows="5"
-                  formControlName="message"
-                  maxlength="500"
-                  placeholder="Explain what should be improved in this question..."
-                ></textarea>
-              </label>
-              <p
-                class="field__error"
-                *ngIf="questionFeedbackForm.controls.message.invalid && questionFeedbackForm.controls.message.touched"
-              >
-                Question feedback is required.
-              </p>
-            </div>
-
-            <footer class="feedback-modal__actions">
-              <button class="btn secondary" type="button" (click)="closeQuestionFeedbackModal()">Cancel</button>
-              <button class="btn success" type="button" (click)="acceptQuestionFeedback()">Accept</button>
-            </footer>
-          </aside>
-
-          <div
-            class="feedback-modal-backdrop"
-            *ngIf="rejectFeedbackModalOpen && canModerateSelected"
-            (click)="closeRejectFeedbackModal()"
-            aria-hidden="true"
-          ></div>
-
-          <aside
-            class="feedback-modal feedback-modal--reject"
-            *ngIf="rejectFeedbackModalOpen && canModerateSelected"
-            [formGroup]="rejectForm"
-            #rejectFeedbackModal
-            role="dialog"
-            aria-modal="true"
-            aria-label="Reject feedback modal"
-            (click)="$event.stopPropagation()"
-          >
-            <header class="feedback-modal__head">
-              <div>
-                <h3>Reject feedback</h3>
-                <p class="muted">Provide the main reject reason before sending.</p>
-              </div>
-              <button class="icon-btn" type="button" (click)="closeRejectFeedbackModal()" aria-label="Close reject feedback modal">
-                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-              </button>
-            </header>
-
-            <div class="feedback-modal__body">
-              <label class="field">
-                <span class="field__label">Reject reason (required)</span>
-                <textarea
-                  rows="5"
-                  formControlName="reason"
-                  maxlength="500"
-                  placeholder="Explain what should be changed before next submission..."
-                ></textarea>
-              </label>
-              <p
-                class="field__error"
-                *ngIf="rejectForm.controls.reason.invalid && rejectForm.controls.reason.touched"
-              >
-                Reject reason is required.
-              </p>
-
-              <div class="feedback-modal__summary muted">
-                Question feedback added for
-                <strong>{{ selectedQuestionIssueCount }}</strong>
-                {{ selectedQuestionIssueCount === 1 ? 'question' : 'questions' }}.
-              </div>
-            </div>
-
-            <footer class="feedback-modal__actions">
-              <button class="btn secondary" type="button" (click)="closeRejectFeedbackModal()">Cancel</button>
-              <button class="btn danger" type="button" (click)="reject()" [disabled]="actionBusy">
-                Send reject
-              </button>
-            </footer>
-          </aside>
-
           <dialog
             #imagePreviewDialog
             class="image-preview-dialog"
@@ -924,6 +814,108 @@
           </dialog>
         </div>
       </ng-template>
+
+      <dialog
+        #questionFeedbackDialog
+        class="feedback-dialog"
+        aria-label="Question feedback"
+        (close)="onQuestionFeedbackDialogClosed()"
+        (cancel)="onQuestionFeedbackDialogCancel($event)"
+      >
+        <section
+          class="feedback-modal feedback-modal--question"
+          *ngIf="questionFeedbackModalOpen && canModerateSelected && questionFeedbackTarget as feedbackQuestion"
+          [formGroup]="questionFeedbackForm"
+        >
+          <header class="feedback-modal__head">
+            <div>
+              <h3>Question {{ feedbackQuestion.orderIndex + 1 }} feedback</h3>
+              <p class="muted">The feedback will be attached to this question in the reject summary.</p>
+            </div>
+            <button class="icon-btn" type="button" (click)="closeQuestionFeedbackModal()" aria-label="Close question feedback modal">
+              <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+          </header>
+
+          <div class="feedback-modal__body">
+            <label class="field">
+              <span class="field__label">Feedback message</span>
+              <textarea
+                rows="5"
+                formControlName="message"
+                maxlength="500"
+                placeholder="Explain what should be improved in this question..."
+              ></textarea>
+            </label>
+            <p
+              class="field__error"
+              *ngIf="questionFeedbackForm.controls.message.invalid && questionFeedbackForm.controls.message.touched"
+            >
+              Question feedback is required.
+            </p>
+          </div>
+
+          <footer class="feedback-modal__actions">
+            <button class="btn secondary" type="button" (click)="closeQuestionFeedbackModal()">Cancel</button>
+            <button class="btn success" type="button" (click)="acceptQuestionFeedback()">Accept</button>
+          </footer>
+        </section>
+      </dialog>
+
+      <dialog
+        #rejectFeedbackDialog
+        class="feedback-dialog"
+        aria-label="Reject feedback modal"
+        (close)="onRejectFeedbackDialogClosed()"
+        (cancel)="onRejectFeedbackDialogCancel($event)"
+      >
+        <section
+          class="feedback-modal feedback-modal--reject"
+          *ngIf="rejectFeedbackModalOpen && canModerateSelected"
+          [formGroup]="rejectForm"
+        >
+          <header class="feedback-modal__head">
+            <div>
+              <h3>Reject feedback</h3>
+              <p class="muted">Provide the main reject reason before sending.</p>
+            </div>
+            <button class="icon-btn" type="button" (click)="closeRejectFeedbackModal()" aria-label="Close reject feedback modal">
+              <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+          </header>
+
+          <div class="feedback-modal__body">
+            <label class="field">
+              <span class="field__label">Reject reason (required)</span>
+              <textarea
+                rows="5"
+                formControlName="reason"
+                maxlength="500"
+                placeholder="Explain what should be changed before next submission..."
+              ></textarea>
+            </label>
+            <p
+              class="field__error"
+              *ngIf="rejectForm.controls.reason.invalid && rejectForm.controls.reason.touched"
+            >
+              Reject reason is required.
+            </p>
+
+            <div class="feedback-modal__summary muted">
+              Question feedback added for
+              <strong>{{ selectedQuestionIssueCount }}</strong>
+              {{ selectedQuestionIssueCount === 1 ? 'question' : 'questions' }}.
+            </div>
+          </div>
+
+          <footer class="feedback-modal__actions">
+            <button class="btn secondary" type="button" (click)="closeRejectFeedbackModal()">Cancel</button>
+            <button class="btn danger" type="button" (click)="reject()" [disabled]="actionBusy">
+              Send reject
+            </button>
+          </footer>
+        </section>
+      </dialog>
 
       <ng-template #loadingState>
         <div class="muted">Loading...</div>

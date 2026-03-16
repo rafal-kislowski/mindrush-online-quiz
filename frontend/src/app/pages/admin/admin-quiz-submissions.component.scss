@@ -2180,31 +2180,51 @@
   color: rgba(255, 214, 227, 0.95);
 }
 
-.feedback-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(2, 7, 20, 0.58);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  z-index: 120;
+.feedback-dialog {
+  border: 0;
+  padding: 0;
+  margin: auto;
+  background: transparent;
+  width: auto;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100svh - 24px);
+  overflow: visible;
 }
 
-.feedback-modal {
+.feedback-dialog[open] {
   position: fixed;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  inset: 0;
+  width: 100vw;
+  max-width: 100vw;
+  min-height: 100svh;
+  max-height: 100svh;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  justify-items: center;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.feedback-dialog::backdrop {
+  background: rgba(2, 7, 20, 0.66);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.feedback-dialog .feedback-modal {
+  position: static;
   width: min(620px, calc(100vw - 24px));
-  max-height: min(84vh, 780px);
-  border-radius: 16px;
-  border: 1px solid rgba(146, 178, 224, 0.28);
+  max-height: calc(100svh - 24px);
+  margin: 0;
+  border-radius: 18px;
+  border: 1px solid rgba(162, 194, 238, 0.4);
   background:
-    radial-gradient(120% 120% at 0% 0%, rgba(92, 152, 255, 0.14), transparent 56%),
-    linear-gradient(180deg, rgba(12, 25, 54, 0.98), rgba(9, 18, 39, 0.98));
+    radial-gradient(120% 120% at 0% 0%, rgba(92, 152, 255, 0.2), transparent 58%),
+    linear-gradient(180deg, rgba(14, 30, 64, 0.99), rgba(10, 21, 46, 0.99));
   box-shadow:
-    0 30px 68px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  z-index: 130;
+    0 34px 74px rgba(0, 0, 0, 0.54),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
@@ -2219,7 +2239,7 @@
 }
 
 .feedback-modal__head {
-  padding: 12px 12px 10px;
+  padding: 12px 14px 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: flex-start;
@@ -2241,12 +2261,33 @@
   line-height: 1.3;
 }
 
+.feedback-modal__head .icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(176, 206, 246, 0.28);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(232, 243, 255, 0.94);
+}
+
+.feedback-modal__head .icon-btn:hover {
+  border-color: rgba(188, 218, 255, 0.42);
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .feedback-modal__body {
   min-height: 0;
   overflow: auto;
-  padding: 12px;
+  padding: 12px 14px;
   display: grid;
-  gap: 12px;
+  gap: 10px;
+}
+
+.feedback-modal__body .field__label {
+  font-size: 12px;
+  letter-spacing: 0.35px;
+  line-height: 1.2;
+  opacity: 1;
 }
 
 .feedback-modal__summary {
@@ -2261,15 +2302,58 @@
   font-weight: 900;
 }
 
+.feedback-modal__body .field input,
 .feedback-modal__body .field textarea {
-  border: 0;
-  border-radius: 10px;
-  background: rgba(4, 14, 38, 0.52);
+  width: 100%;
+  min-width: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+  padding: 0 12px;
+  outline: none;
+  box-shadow: none;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.feedback-modal__body .field input::placeholder,
+.feedback-modal__body .field textarea::placeholder {
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+  opacity: 1;
+}
+
+.feedback-modal__body .field input:hover,
+.feedback-modal__body .field textarea:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.feedback-modal__body .field input:focus,
+.feedback-modal__body .field textarea:focus {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
   box-shadow: none;
 }
 
+.feedback-modal__body .field input {
+  height: 42px;
+}
+
+.feedback-modal__body .field textarea {
+  min-height: 96px;
+  max-height: 152px;
+  resize: vertical;
+  padding: 10px 12px;
+}
+
 .feedback-modal__actions {
-  padding: 10px 12px 12px;
+  padding: 10px 14px 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   justify-content: flex-end;
@@ -2547,13 +2631,9 @@
     max-height: calc(100vh - 16px);
   }
 
-  .feedback-modal {
-    left: 8px;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: auto;
-    max-height: min(78vh, 640px);
+  .feedback-dialog .feedback-modal {
+    width: min(100vw, calc(100vw - 16px));
+    max-height: calc(100svh - 16px);
   }
 
   .panel--editor .rules-grid {

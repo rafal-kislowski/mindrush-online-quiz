@@ -5,6 +5,9 @@ import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { apiErrorMessage } from '../../core/api/api-error.util';
 import {
+  AdminOpenTdbCategoryDto,
+  AdminQuestionGenerationDifficulty,
+  AdminQuestionGenerationLanguage,
   AdminQuestionDto,
   AdminQuizApi,
   AdminQuizDetailDto,
@@ -23,6 +26,24 @@ const QUESTION_PAGE_SIZE = 25;
 const BYTES_PER_MB = 1024 * 1024;
 const ADMIN_MAX_UPLOAD_BYTES = 2 * BYTES_PER_MB;
 const ADMIN_ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const MIN_GENERATE_QUESTION_COUNT = 1;
+const MAX_GENERATE_QUESTION_COUNT = 500;
+const DEFAULT_GENERATE_QUESTION_COUNT = 5;
+const GENERATION_SOURCE_MAX_FILE_COUNT = 10;
+const GENERATION_SOURCE_MAX_FILE_BYTES = 10 * BYTES_PER_MB;
+const GENERATION_SOURCE_MAX_TOTAL_BYTES = 20 * BYTES_PER_MB;
+const GENERATION_SOURCE_ALLOWED_EXTENSIONS = ['txt', 'pdf', 'doc', 'docx'];
+
+type QuestionGenerationSourceMode = 'AI' | 'OPEN_TDB';
+type OpenMenuId =
+  | 'category'
+  | 'sort'
+  | 'pageSize'
+  | 'questionPageSize'
+  | 'generateDifficulty'
+  | 'generateLanguage'
+  | 'generateOpenTdbCategory'
+  | 'generateOpenTdbLanguage';
 
 function questionTimeLimitValidator(control: AbstractControl): ValidationErrors | null {
   const v = control.value;
@@ -100,7 +121,7 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
   private questionsPaneResizeObserver: ResizeObserver | null = null;
   private questionsPaneRafId: number | null = null;
 
-  openMenu: 'category' | 'sort' | 'pageSize' | 'questionPageSize' | null = null;
+  openMenu: OpenMenuId | null = null;
   previewImageUrl: string | null = null;
   previewImageAlt = 'Image preview';
   previewImageName = '';
@@ -123,6 +144,7 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
   deletingQuiz = false;
   creating = false;
   addingExistingQuestion = false;
+  generatingQuestions = false;
 
   readonly quizSearch = new FormControl('', { nonNullable: true });
   readonly quizCategory = new FormControl<string>('all', { nonNullable: true });
@@ -138,6 +160,23 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly questionPageSize = new FormControl<number>(QUESTION_PAGE_SIZE, { nonNullable: true });
   readonly questionPageSizeOptions: ReadonlyArray<number> = [10, 25, 50, 100];
   private questionSearchSub?: Subscription;
+  readonly generationDifficultyOptions: ReadonlyArray<{ value: AdminQuestionGenerationDifficulty; label: string }> = [
+    { value: 'MIXED', label: 'Mixed' },
+    { value: 'EASY', label: 'Easy' },
+    { value: 'MEDIUM', label: 'Medium' },
+    { value: 'HARD', label: 'Hard' },
+  ];
+  readonly generationLanguageOptions: ReadonlyArray<{ value: AdminQuestionGenerationLanguage; label: string }> = [
+    { value: 'PL', label: 'Polish' },
+    { value: 'EN', label: 'English' },
+  ];
+  readonly generationSourceOptions: ReadonlyArray<{ value: QuestionGenerationSourceMode; label: string }> = [
+    { value: 'AI', label: 'AI (topic/files)' },
+    { value: 'OPEN_TDB', label: 'OpenTDB' },
+  ];
+  openTdbCategories: AdminOpenTdbCategoryDto[] = [];
+  loadingOpenTdbCategories = false;
+  generationSourceFiles: File[] = [];
 
   @ViewChild('quizDetailsLeft')
   set quizDetailsLeftRef(ref: ElementRef<HTMLElement> | undefined) {
@@ -183,6 +222,8 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
 
   @ViewChild('imagePreviewDialog')
   imagePreviewDialogRef: ElementRef<HTMLDialogElement> | null = null;
+  @ViewChild('generateQuestionsDialog')
+  generateQuestionsDialogRef: ElementRef<HTMLDialogElement> | null = null;
 
   readonly quizSortOptions: ReadonlyArray<{
     value: 'newest' | 'oldest' | 'name_az' | 'name_za';
@@ -248,6 +289,21 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
     o3ImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
     o4: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
     o4ImageUrl: new FormControl<string | null>(null, { validators: [Validators.maxLength(500)] }),
+  });
+
+  readonly generateQuestionsForm = new FormGroup({
+    sourceMode: new FormControl<QuestionGenerationSourceMode>('AI', { nonNullable: true }),
+    topic: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(160)] }),
+    categoryHint: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(64)] }),
+    instructions: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(1200)] }),
+    questionCount: new FormControl<number>(DEFAULT_GENERATE_QUESTION_COUNT, {
+      nonNullable: true,
+      validators: [Validators.min(MIN_GENERATE_QUESTION_COUNT), Validators.max(MAX_GENERATE_QUESTION_COUNT)],
+    }),
+    difficulty: new FormControl<AdminQuestionGenerationDifficulty>('MIXED', { nonNullable: true }),
+    language: new FormControl<AdminQuestionGenerationLanguage>('PL', { nonNullable: true }),
+    openTdbCategoryId: new FormControl<number | null>(null),
+    openTdbLanguage: new FormControl<AdminQuestionGenerationLanguage>('EN', { nonNullable: true }),
   });
 
   constructor(
@@ -327,6 +383,9 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
       this.closeImagePreview();
       return;
     }
+    if (this.generateQuestionsDialogRef?.nativeElement?.open) {
+      return;
+    }
     this.openMenu = null;
     this.closeQuizActions();
   }
@@ -348,7 +407,7 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
     this.closeQuizActions();
   }
 
-  toggleMenu(menu: 'category' | 'sort' | 'pageSize' | 'questionPageSize', ev?: Event): void {
+  toggleMenu(menu: OpenMenuId, ev?: Event): void {
     ev?.stopPropagation();
     this.closeQuizActions();
     this.openMenu = this.openMenu === menu ? null : menu;
@@ -419,6 +478,51 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
     return `Show ${this.questionPageSize.value}`;
   }
 
+  get generationDifficultyLabel(): string {
+    const value = this.generateQuestionsForm.controls.difficulty.value;
+    return this.generationDifficultyOptions.find((option) => option.value === value)?.label ?? 'Difficulty';
+  }
+
+  get generationLanguageLabel(): string {
+    const value = this.generateQuestionsForm.controls.language.value;
+    return this.generationLanguageOptions.find((option) => option.value === value)?.label ?? 'Language';
+  }
+
+  get generationOpenTdbLanguageLabel(): string {
+    const value = this.generateQuestionsForm.controls.openTdbLanguage.value;
+    return this.generationLanguageOptions.find((option) => option.value === value)?.label ?? 'Language';
+  }
+
+  get generationOpenTdbCategoryLabel(): string {
+    const value = this.generateQuestionsForm.controls.openTdbCategoryId.value;
+    if (value == null) return 'Any category';
+    return this.openTdbCategories.find((category) => category.id === value)?.name ?? 'Any category';
+  }
+
+  setGenerationDifficulty(value: AdminQuestionGenerationDifficulty, ev?: Event): void {
+    ev?.stopPropagation();
+    this.generateQuestionsForm.controls.difficulty.setValue(value);
+    this.openMenu = null;
+  }
+
+  setGenerationLanguage(value: AdminQuestionGenerationLanguage, ev?: Event): void {
+    ev?.stopPropagation();
+    this.generateQuestionsForm.controls.language.setValue(value);
+    this.openMenu = null;
+  }
+
+  setGenerationOpenTdbLanguage(value: AdminQuestionGenerationLanguage, ev?: Event): void {
+    ev?.stopPropagation();
+    this.generateQuestionsForm.controls.openTdbLanguage.setValue(value);
+    this.openMenu = null;
+  }
+
+  setGenerationOpenTdbCategory(value: number | null, ev?: Event): void {
+    ev?.stopPropagation();
+    this.generateQuestionsForm.controls.openTdbCategoryId.setValue(value);
+    this.openMenu = null;
+  }
+
   get maxUploadMbLabel(): string {
     const mb = Math.max(1, Math.round(ADMIN_MAX_UPLOAD_BYTES / BYTES_PER_MB));
     return `${mb}MB`;
@@ -426,6 +530,20 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
 
   get allowedUploadMimeTypes(): string[] {
     return ADMIN_ALLOWED_IMAGE_MIME_TYPES;
+  }
+
+  get generationSourceAllowedExtensionsLabel(): string {
+    return GENERATION_SOURCE_ALLOWED_EXTENSIONS.map((ext) => `.${ext}`).join(', ');
+  }
+
+  get generationSourceMaxUploadMbLabel(): string {
+    const mb = Math.max(1, Math.round(GENERATION_SOURCE_MAX_FILE_BYTES / BYTES_PER_MB));
+    return `${mb}MB`;
+  }
+
+  get generationSourceMaxTotalUploadMbLabel(): string {
+    const mb = Math.max(1, Math.round(GENERATION_SOURCE_MAX_TOTAL_BYTES / BYTES_PER_MB));
+    return `${mb}MB`;
   }
 
   get tabTransitionClass(): string {
@@ -824,6 +942,7 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
     this.error = null;
     if (tab === 'create') {
       this.editorTab = 'details';
+      this.closeGenerateQuestionsModal();
     }
     if (tab === 'manage') this.loadList();
     this.queueAvatarPreviewResize();
@@ -848,6 +967,7 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
   selectQuiz(id: number, openTab: 'details' | 'questions' | 'keep' = 'details'): void {
     this.error = null;
     this.loadingQuiz = true;
+    this.closeGenerateQuestionsModal();
     this.selectedQuestionId = null;
     this.questionSearch.setValue('');
     this.resetQuestionPage();
@@ -927,6 +1047,7 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   closeSelectedQuiz(): void {
+    this.closeGenerateQuestionsModal();
     this.selectedQuiz = null;
     this.selectedQuestionId = null;
     this.questionSearch.setValue('');
@@ -1103,6 +1224,223 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     this.selectQuestion(q);
+  }
+
+  openGenerateQuestionsModal(): void {
+    const quiz = this.selectedQuiz;
+    if (!quiz) return;
+    this.error = null;
+    this.openMenu = null;
+    this.closeQuizActions();
+
+    const topic = this.generateQuestionsForm.controls.topic.value.trim();
+    if (!topic) {
+      this.generateQuestionsForm.controls.topic.setValue((quiz.title ?? '').trim());
+    }
+    const categoryHint = this.generateQuestionsForm.controls.categoryHint.value.trim();
+    if (!categoryHint) {
+      this.generateQuestionsForm.controls.categoryHint.setValue((quiz.categoryName ?? '').trim());
+    }
+    if (this.generateQuestionsForm.controls.sourceMode.value === 'OPEN_TDB') {
+      this.loadOpenTdbCategories();
+    }
+
+    const dialog = this.generateQuestionsDialogRef?.nativeElement;
+    if (!dialog || dialog.open) return;
+    dialog.showModal();
+  }
+
+  closeGenerateQuestionsModal(): void {
+    const dialog = this.generateQuestionsDialogRef?.nativeElement;
+    if (dialog?.open) {
+      dialog.close();
+    }
+  }
+
+  onGenerateQuestionsDialogClosed(): void {
+    this.openMenu = null;
+  }
+
+  onGenerateQuestionsDialogCancel(ev: Event): void {
+    ev.preventDefault();
+  }
+
+  onGenerateQuestionCountBlur(): void {
+    const raw = this.generateQuestionsForm.controls.questionCount.value;
+    const value = Number(raw);
+    if (!Number.isFinite(value)) {
+      this.generateQuestionsForm.controls.questionCount.setValue(DEFAULT_GENERATE_QUESTION_COUNT);
+      return;
+    }
+    const bounded = Math.max(MIN_GENERATE_QUESTION_COUNT, Math.min(MAX_GENERATE_QUESTION_COUNT, Math.trunc(value)));
+    if (bounded !== raw) {
+      this.generateQuestionsForm.controls.questionCount.setValue(bounded);
+    }
+  }
+
+  setGenerationSource(mode: QuestionGenerationSourceMode): void {
+    if (this.generateQuestionsForm.controls.sourceMode.value === mode) return;
+    this.generateQuestionsForm.controls.sourceMode.setValue(mode);
+    this.openMenu = null;
+    if (mode === 'OPEN_TDB') {
+      this.loadOpenTdbCategories();
+    }
+  }
+
+  isGenerationSource(mode: QuestionGenerationSourceMode): boolean {
+    return this.generateQuestionsForm.controls.sourceMode.value === mode;
+  }
+
+  generateQuestions(): void {
+    if (this.generateQuestionsForm.controls.sourceMode.value === 'OPEN_TDB') {
+      this.generateQuestionsFromOpenTdb();
+      return;
+    }
+    this.generateQuestionsWithAi();
+  }
+
+  onGenerationSourceFilesSelected(ev: Event): void {
+    const input = ev.target as HTMLInputElement | null;
+    const selected = Array.from(input?.files ?? []);
+    if (input) input.value = '';
+    if (!selected.length) return;
+
+    if (this.generationSourceFiles.length >= GENERATION_SOURCE_MAX_FILE_COUNT) {
+      this.error = `Max ${GENERATION_SOURCE_MAX_FILE_COUNT} source files allowed.`;
+      return;
+    }
+
+    for (const file of selected) {
+      const validationError = this.validateGenerationSourceFile(file);
+      if (validationError) {
+        this.error = validationError;
+        continue;
+      }
+
+      if (this.generationSourceFiles.length >= GENERATION_SOURCE_MAX_FILE_COUNT) {
+        this.error = `Max ${GENERATION_SOURCE_MAX_FILE_COUNT} source files allowed.`;
+        break;
+      }
+
+      const fileKey = `${file.name}::${file.size}::${file.lastModified}`;
+      const alreadyAdded = this.generationSourceFiles.some(
+        (existing) => `${existing.name}::${existing.size}::${existing.lastModified}` === fileKey
+      );
+      if (alreadyAdded) continue;
+      const currentTotalBytes = this.generationSourceFiles.reduce((sum, existing) => sum + Math.max(0, existing.size ?? 0), 0);
+      const nextTotalBytes = currentTotalBytes + Math.max(0, file.size ?? 0);
+      if (nextTotalBytes > GENERATION_SOURCE_MAX_TOTAL_BYTES) {
+        this.error = `Combined source files are too large. Max ${this.generationSourceMaxTotalUploadMbLabel} total.`;
+        break;
+      }
+      this.generationSourceFiles = [...this.generationSourceFiles, file];
+    }
+  }
+
+  removeGenerationSourceFile(index: number): void {
+    if (index < 0 || index >= this.generationSourceFiles.length) return;
+    this.generationSourceFiles = this.generationSourceFiles.filter((_, fileIndex) => fileIndex !== index);
+  }
+
+  clearGenerationSourceFiles(): void {
+    this.generationSourceFiles = [];
+  }
+
+  generationSourceFileSizeLabel(file: File): string {
+    const bytes = Math.max(0, file.size ?? 0);
+    if (bytes >= BYTES_PER_MB) {
+      return `${(bytes / BYTES_PER_MB).toFixed(2)} MB`;
+    }
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  }
+
+  private generateQuestionsWithAi(): void {
+    if (!this.selectedQuiz) return;
+    if (this.generatingQuestions) return;
+
+    if (this.generateQuestionsForm.invalid) {
+      this.generateQuestionsForm.markAllAsTouched();
+      return;
+    }
+
+    const rawTopic = this.generateQuestionsForm.controls.topic.value.trim();
+    const topic = rawTopic || (
+      this.generationSourceFiles.length > 0
+        ? ((this.selectedQuiz.title ?? '').trim() || 'Source material')
+        : ''
+    );
+    if (!topic) {
+      this.generateQuestionsForm.controls.topic.setErrors({ required: true });
+      this.generateQuestionsForm.controls.topic.markAsTouched();
+      return;
+    }
+
+    const quizId = this.selectedQuiz.id;
+    this.generatingQuestions = true;
+    this.error = null;
+    const payload = {
+      topic,
+      categoryHint: this.normalizeNullableText(this.generateQuestionsForm.controls.categoryHint.value),
+      instructions: this.normalizeNullableText(this.generateQuestionsForm.controls.instructions.value),
+      questionCount: this.generateQuestionsForm.controls.questionCount.value,
+      difficulty: this.generateQuestionsForm.controls.difficulty.value,
+      language: this.generateQuestionsForm.controls.language.value,
+    };
+    const generation$ = this.generationSourceFiles.length > 0
+      ? this.api.generateQuestionsFromFiles(quizId, payload, this.generationSourceFiles)
+      : this.api.generateQuestions(quizId, payload);
+
+    generation$.subscribe({
+      next: (result) => {
+        this.handleGenerateQuestionsSuccess(quizId, result.generatedCount);
+      },
+      error: (err) => {
+        this.generatingQuestions = false;
+        this.error = apiErrorMessage(err, 'Failed to generate questions');
+      },
+    });
+  }
+
+  private generateQuestionsFromOpenTdb(): void {
+    if (!this.selectedQuiz) return;
+    if (this.generatingQuestions) return;
+
+    if (this.generateQuestionsForm.invalid) {
+      this.generateQuestionsForm.markAllAsTouched();
+      return;
+    }
+
+    const quizId = this.selectedQuiz.id;
+    this.generatingQuestions = true;
+    this.error = null;
+
+    this.api.generateQuestionsFromOpenTdb(quizId, {
+      questionCount: this.generateQuestionsForm.controls.questionCount.value,
+      categoryId: this.generateQuestionsForm.controls.openTdbCategoryId.value,
+      difficulty: this.generateQuestionsForm.controls.difficulty.value,
+      language: this.generateQuestionsForm.controls.openTdbLanguage.value,
+    }).subscribe({
+      next: (result) => {
+        this.handleGenerateQuestionsSuccess(quizId, result.generatedCount);
+      },
+      error: (err) => {
+        this.generatingQuestions = false;
+        this.error = apiErrorMessage(err, 'Failed to generate OpenTDB questions');
+      },
+    });
+  }
+
+  private handleGenerateQuestionsSuccess(quizId: number, generatedCount: number): void {
+    this.generatingQuestions = false;
+    this.generationSourceFiles = [];
+    this.closeGenerateQuestionsModal();
+    this.toast.success(`Generated ${generatedCount} question(s).`, { title: 'Admin' });
+    if (this.selectedQuiz?.id === quizId && this.tab === 'manage') {
+      this.selectQuiz(quizId, 'questions');
+      this.loadList();
+    } else {
+      this.loadList();
+    }
   }
 
   saveQuestion(): void {
@@ -1541,6 +1879,39 @@ export class AdminQuizComponent implements OnInit, AfterViewInit, OnDestroy {
       return 'Unsupported image format.';
     }
     return null;
+  }
+
+  private validateGenerationSourceFile(file: File): string | null {
+    if (!file) return 'Invalid source file.';
+    if (file.size <= 0) return 'Source file is empty.';
+    if (file.size > GENERATION_SOURCE_MAX_FILE_BYTES) {
+      return `Source file ${file.name} is too large. Max ${this.generationSourceMaxUploadMbLabel}.`;
+    }
+
+    const name = (file.name ?? '').trim().toLowerCase();
+    const dotIndex = name.lastIndexOf('.');
+    const extension = dotIndex >= 0 ? name.substring(dotIndex + 1) : '';
+    if (!GENERATION_SOURCE_ALLOWED_EXTENSIONS.includes(extension)) {
+      return `Unsupported source file type for ${file.name}. Allowed: ${this.generationSourceAllowedExtensionsLabel}.`;
+    }
+    return null;
+  }
+
+  private loadOpenTdbCategories(): void {
+    if (this.loadingOpenTdbCategories || this.openTdbCategories.length > 0) {
+      return;
+    }
+    this.loadingOpenTdbCategories = true;
+    this.api.listOpenTdbCategories().subscribe({
+      next: (categories) => {
+        this.loadingOpenTdbCategories = false;
+        this.openTdbCategories = [...(categories ?? [])].sort((a, b) => a.name.localeCompare(b.name));
+      },
+      error: (err) => {
+        this.loadingOpenTdbCategories = false;
+        this.error = apiErrorMessage(err, 'Failed to load OpenTDB categories');
+      },
+    });
   }
 
   private resetImagePreviewState(): void {

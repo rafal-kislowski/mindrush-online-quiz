@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { apiErrorMessage } from '../../core/api/api-error.util';
 import {
@@ -88,6 +88,7 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
   private questionIssueNotes: Record<number, string> = {};
   private readonly uiSub = new Subscription();
   private heightSyncScheduled = false;
+  private pendingOpenSubmissionId: number | null = null;
   private submissionAvatarOverrides = new Map<number, Pick<
     AdminQuizListItemDto,
     'avatarImageUrl' | 'avatarBgStart' | 'avatarBgEnd' | 'avatarTextColor'
@@ -97,12 +98,13 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
   private _error: string | null = null;
   @ViewChild('imagePreviewDialog') imagePreviewDialogRef: ElementRef<HTMLDialogElement> | null = null;
   @ViewChild('detailsSection') private detailsSectionRef?: ElementRef<HTMLElement>;
-  @ViewChild('questionFeedbackModal') private questionFeedbackModalRef?: ElementRef<HTMLElement>;
-  @ViewChild('rejectFeedbackModal') private rejectFeedbackModalRef?: ElementRef<HTMLElement>;
+  @ViewChild('questionFeedbackDialog') private questionFeedbackDialogRef?: ElementRef<HTMLDialogElement>;
+  @ViewChild('rejectFeedbackDialog') private rejectFeedbackDialogRef?: ElementRef<HTMLDialogElement>;
 
   constructor(
     private readonly api: AdminQuizApi,
     private readonly toast: ToastService,
+    private readonly route: ActivatedRoute,
     private readonly router: Router
   ) {}
 
@@ -118,6 +120,11 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadSubmissions();
+    this.uiSub.add(
+      this.route.queryParamMap.subscribe((params) => {
+        this.handleOpenQuizQueryParam(params.get('openQuiz'));
+      })
+    );
     this.uiSub.add(this.search.valueChanges.subscribe(() => this.resetPage()));
     this.uiSub.add(this.pageSize.valueChanges.subscribe(() => this.resetPage()));
     this.uiSub.add(this.sortBy.valueChanges.subscribe(() => this.resetPage()));
@@ -387,6 +394,12 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
       next: (detail) => {
         this.loadingDetail = false;
         this.selectedSubmission = this.normalizeSubmissionDetail(detail);
+        void this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { openQuiz: detail.id },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
         this.detailTab = 'details';
         this.detailTabHeightPx = null;
         this.closeQuestionFeedbackModal();
@@ -396,10 +409,12 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
         this.resetQuestionPage();
         this.resetQuestionIssuesDraft();
         this.scheduleDetailsHeightSync();
+        this.flushPendingOpenSubmission(quizId);
       },
       error: (err) => {
         this.loadingDetail = false;
         this.error = apiErrorMessage(err, 'Failed to load submission details');
+        this.flushPendingOpenSubmission(quizId);
       },
     });
   }
@@ -418,6 +433,12 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
     this.rejectForm.reset({ reason: '' });
     this.resetQuestionIssuesDraft();
     this.error = null;
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { openQuiz: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
     this.loadSubmissions();
   }
 
@@ -472,13 +493,19 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
     this.questionFeedbackTargetId = questionId;
     this.questionFeedbackForm.reset({ message: this.questionIssueMessage(questionId) });
     this.questionFeedbackModalOpen = true;
-    this.scheduleMobileModalCenter('question');
+    const dialog = this.questionFeedbackDialogRef?.nativeElement;
+    if (dialog && !dialog.open) {
+      dialog.showModal();
+    }
   }
 
   closeQuestionFeedbackModal(): void {
-    this.questionFeedbackModalOpen = false;
-    this.questionFeedbackTargetId = null;
-    this.questionFeedbackForm.reset({ message: '' });
+    const dialog = this.questionFeedbackDialogRef?.nativeElement;
+    if (dialog?.open) {
+      dialog.close();
+      return;
+    }
+    this.onQuestionFeedbackDialogClosed();
   }
 
   acceptQuestionFeedback(): void {
@@ -505,11 +532,37 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
     if (!this.canModerateSelected) return;
     this.closeQuestionFeedbackModal();
     this.rejectFeedbackModalOpen = true;
-    this.scheduleMobileModalCenter('reject');
+    const dialog = this.rejectFeedbackDialogRef?.nativeElement;
+    if (dialog && !dialog.open) {
+      dialog.showModal();
+    }
   }
 
   closeRejectFeedbackModal(): void {
+    const dialog = this.rejectFeedbackDialogRef?.nativeElement;
+    if (dialog?.open) {
+      dialog.close();
+      return;
+    }
+    this.onRejectFeedbackDialogClosed();
+  }
+
+  onQuestionFeedbackDialogClosed(): void {
+    this.questionFeedbackModalOpen = false;
+    this.questionFeedbackTargetId = null;
+    this.questionFeedbackForm.reset({ message: '' });
+  }
+
+  onQuestionFeedbackDialogCancel(ev: Event): void {
+    ev.preventDefault();
+  }
+
+  onRejectFeedbackDialogClosed(): void {
     this.rejectFeedbackModalOpen = false;
+  }
+
+  onRejectFeedbackDialogCancel(ev: Event): void {
+    ev.preventDefault();
   }
 
   toggleMenu(menu: 'pageSize' | 'sort' | 'creatorTier' | 'questionPageSize', ev?: Event): void {
@@ -1372,17 +1425,38 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
     return flip ? 'view-screen--enter-forward-a' : 'view-screen--enter-forward-b';
   }
 
-  private scheduleMobileModalCenter(target: 'question' | 'reject'): void {
-    if (typeof window === 'undefined' || window.innerWidth > 980) return;
-    window.setTimeout(() => {
-      requestAnimationFrame(() => {
-        const modal = target === 'question'
-          ? this.questionFeedbackModalRef?.nativeElement
-          : this.rejectFeedbackModalRef?.nativeElement;
-        if (!modal) return;
-        modal.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-      });
-    }, 0);
+  private handleOpenQuizQueryParam(rawQuizId: string | null): void {
+    const quizId = this.parsePositiveInt(rawQuizId);
+    if (quizId == null) {
+      this.pendingOpenSubmissionId = null;
+      return;
+    }
+    if (this.selectedSubmission?.id === quizId) {
+      this.pendingOpenSubmissionId = null;
+      return;
+    }
+    if (this.loadingDetail) {
+      this.pendingOpenSubmissionId = quizId;
+      return;
+    }
+    this.pendingOpenSubmissionId = null;
+    this.openSubmission(quizId);
+  }
+
+  private flushPendingOpenSubmission(currentQuizId: number): void {
+    const queuedQuizId = this.pendingOpenSubmissionId;
+    this.pendingOpenSubmissionId = null;
+    if (queuedQuizId == null || queuedQuizId === currentQuizId) return;
+    if (this.selectedSubmission?.id === queuedQuizId) return;
+    this.openSubmission(queuedQuizId);
+  }
+
+  private parsePositiveInt(raw: string | null): number | null {
+    if (raw == null) return null;
+    const value = Number(raw);
+    if (!Number.isFinite(value)) return null;
+    const normalized = Math.trunc(value);
+    return normalized > 0 ? normalized : null;
   }
 
 }

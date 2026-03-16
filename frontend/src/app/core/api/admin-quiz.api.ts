@@ -63,6 +63,20 @@ export interface AdminQuestionDto {
   options: AdminAnswerOptionDto[];
 }
 
+export type AdminQuestionGenerationDifficulty = 'EASY' | 'MEDIUM' | 'HARD' | 'MIXED';
+export type AdminQuestionGenerationLanguage = 'PL' | 'EN';
+
+export interface AdminGenerateQuestionsResponseDto {
+  requestedCount: number;
+  generatedCount: number;
+  totalQuestionCount: number;
+}
+
+export interface AdminOpenTdbCategoryDto {
+  id: number;
+  name: string;
+}
+
 export interface AdminQuizDetailDto {
   id: number;
   title: string;
@@ -228,6 +242,71 @@ export class AdminQuizApi {
       input,
       { withCredentials: true }
     );
+  }
+
+  generateQuestions(
+    quizId: number,
+    input: {
+      topic: string;
+      categoryHint?: string | null;
+      instructions?: string | null;
+      questionCount: number;
+      difficulty: AdminQuestionGenerationDifficulty;
+      language: AdminQuestionGenerationLanguage;
+    }
+  ): Observable<AdminGenerateQuestionsResponseDto> {
+    return this.http.post<AdminGenerateQuestionsResponseDto>(
+      `/api/admin/quizzes/${encodeURIComponent(String(quizId))}/questions/generate`,
+      input,
+      { withCredentials: true }
+    );
+  }
+
+  generateQuestionsFromFiles(
+    quizId: number,
+    input: {
+      topic: string;
+      categoryHint?: string | null;
+      instructions?: string | null;
+      questionCount: number;
+      difficulty: AdminQuestionGenerationDifficulty;
+      language: AdminQuestionGenerationLanguage;
+    },
+    files: File[]
+  ): Observable<AdminGenerateQuestionsResponseDto> {
+    const form = new FormData();
+    form.append('request', new Blob([JSON.stringify(input)], { type: 'application/json' }));
+    for (const file of files) {
+      form.append('files', file);
+    }
+
+    return this.http.post<AdminGenerateQuestionsResponseDto>(
+      `/api/admin/quizzes/${encodeURIComponent(String(quizId))}/questions/generate/ai/from-files`,
+      form,
+      { withCredentials: true }
+    );
+  }
+
+  generateQuestionsFromOpenTdb(
+    quizId: number,
+    input: {
+      questionCount: number;
+      categoryId?: number | null;
+      difficulty: AdminQuestionGenerationDifficulty;
+      language: AdminQuestionGenerationLanguage;
+    }
+  ): Observable<AdminGenerateQuestionsResponseDto> {
+    return this.http.post<AdminGenerateQuestionsResponseDto>(
+      `/api/admin/quizzes/${encodeURIComponent(String(quizId))}/questions/generate/opentdb`,
+      input,
+      { withCredentials: true }
+    );
+  }
+
+  listOpenTdbCategories(): Observable<AdminOpenTdbCategoryDto[]> {
+    return this.http.get<AdminOpenTdbCategoryDto[]>('/api/admin/quizzes/questions/generate/opentdb/categories', {
+      withCredentials: true,
+    });
   }
 
   updateQuestion(

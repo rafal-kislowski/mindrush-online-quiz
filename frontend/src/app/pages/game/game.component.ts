@@ -545,6 +545,7 @@ export class GameComponent implements OnInit, OnDestroy {
     totalQuestions: number | null | undefined
   ): string {
     const current = Math.max(1, Math.floor(Number(questionIndex) || 1));
+    if (this.isThreeLivesMode) return `Question ${current}`;
     const total = Math.floor(Number(totalQuestions) || 0);
     if (total <= 0) return `Question ${current}`;
     return `Question ${current} / ${total}`;
@@ -622,6 +623,7 @@ export class GameComponent implements OnInit, OnDestroy {
   get showRevealTransition(): boolean {
     if (!this.state) return false;
     if (this.state.stage !== 'REVEAL') return false;
+    if (this.isThreeLivesMode) return false;
     if (this.state.questionIndex >= this.state.totalQuestions) return false;
     return this.revealPhase === 'transition';
   }
