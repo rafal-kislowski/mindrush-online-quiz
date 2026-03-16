@@ -16,13 +16,16 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final GuestSessionHandshakeInterceptor guestSessionHandshakeInterceptor;
     private final GuestSessionHandshakeHandler guestSessionHandshakeHandler;
+    private final AppCorsProperties corsProperties;
 
     public WebSocketConfig(
             GuestSessionHandshakeInterceptor guestSessionHandshakeInterceptor,
-            GuestSessionHandshakeHandler guestSessionHandshakeHandler
+            GuestSessionHandshakeHandler guestSessionHandshakeHandler,
+            AppCorsProperties corsProperties
     ) {
         this.guestSessionHandshakeInterceptor = guestSessionHandshakeInterceptor;
         this.guestSessionHandshakeHandler = guestSessionHandshakeHandler;
+        this.corsProperties = corsProperties;
     }
 
     @Override
@@ -37,7 +40,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*")
+                .setAllowedOrigins(corsProperties.normalizedAllowedOrigins().toArray(String[]::new))
                 .addInterceptors(guestSessionHandshakeInterceptor)
                 .setHandshakeHandler(guestSessionHandshakeHandler);
     }

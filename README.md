@@ -6,7 +6,19 @@ Full-stack quiz platform (Spring Boot backend + Angular frontend).
 - Java 17, Spring Boot 3
 - Spring Web, Spring Security (JWT in HttpOnly cookies)
 - Spring Data JPA + MySQL
+- Flyway (versioned DB migrations)
 - Docker Compose (MySQL)
+
+## Production pre-flight
+Before deploying on VPS, prepare environment variables and production profile:
+
+1. Copy `.env.example` to your local secret file (`.env`, system env, or host panel vars) and set real values.
+2. Use `SPRING_PROFILES_ACTIVE=prod` on server.
+3. Ensure `JWT_SECRET`, `APP_CORS_ALLOWED_ORIGINS`, `APP_FRONTEND_BASE_URL` are set.
+4. For existing databases created before Flyway:
+   - keep `APP_FLYWAY_BASELINE_ON_MIGRATE=true` (default),
+   - first start will create Flyway history baseline.
+5. Rotate any previously used API/SMTP credentials before public demo deployment.
 
 ## Local setup
 
