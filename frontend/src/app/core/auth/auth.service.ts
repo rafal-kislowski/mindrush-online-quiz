@@ -48,6 +48,7 @@ export class AuthService {
   dropLocalAuth(): void {
     this.loaded = true;
     this.userSubject.next(null);
+    this.sessionService.clearAndRefresh().subscribe({ error: () => {} });
   }
 
   login(email: string, password: string): Observable<AuthUserDto> {
@@ -118,9 +119,7 @@ export class AuthService {
   revokeAllSessions(): Observable<AuthActionResponseDto> {
     return this.api.revokeAllSessions().pipe(
       tap(() => {
-        this.loaded = true;
-        this.userSubject.next(null);
-        this.sessionService.clearAndRefresh().subscribe({ error: () => {} });
+        this.dropLocalAuth();
       })
     );
   }
@@ -157,14 +156,10 @@ export class AuthService {
   logout(): Observable<void> {
     return this.api.logout().pipe(
       tap(() => {
-        this.loaded = true;
-        this.userSubject.next(null);
-        this.sessionService.clearAndRefresh().subscribe({ error: () => {} });
+        this.dropLocalAuth();
       }),
       catchError(() => {
-        this.loaded = true;
-        this.userSubject.next(null);
-        this.sessionService.clearAndRefresh().subscribe({ error: () => {} });
+        this.dropLocalAuth();
         return of(void 0);
       })
     );

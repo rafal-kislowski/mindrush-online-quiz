@@ -45,6 +45,9 @@ public class JwtService {
     public Token createAccessToken(AppUser user) {
         Instant now = clock.instant();
         Instant expiresAt = now.plus(accessTtl);
+        Instant sessionStartedAt = user != null && user.getLastLoginAt() != null
+                ? user.getLastLoginAt()
+                : now;
 
         Map<String, Object> header = Map.of("alg", "HS256", "typ", "JWT");
         Map<String, Object> payload = new HashMap<>();
@@ -53,6 +56,7 @@ public class JwtService {
         payload.put("roles", user.getRoles().stream().map(Enum::name).toList());
         payload.put("iat", now.getEpochSecond());
         payload.put("exp", expiresAt.getEpochSecond());
+        payload.put("sid", sessionStartedAt.toEpochMilli());
 
         String token = sign(header, payload);
         return new Token(token, expiresAt);
@@ -73,6 +77,7 @@ public class JwtService {
         String sub = asString(payload.get("sub"));
         String email = asString(payload.get("email"));
         long exp = asLong(payload.get("exp"));
+        Long sessionStartedAtEpochMillis = asLongOrNull(payload.get("sid"));
         Instant expiresAt = Instant.ofEpochSecond(exp);
         if (expiresAt.isBefore(clock.instant())) throw new UnauthorizedException("Token expired");
 
@@ -88,7 +93,8 @@ public class JwtService {
                 userId,
                 email,
                 roles == null ? Set.of() : roles.stream().collect(Collectors.toUnmodifiableSet()),
-                expiresAt
+                expiresAt,
+                sessionStartedAtEpochMillis
         );
     }
 
@@ -141,6 +147,16 @@ public class JwtService {
         }
     }
 
+    private static Long asLongOrNull(Object v) {
+        if (v == null) return null;
+        if (v instanceof Number n) return n.longValue();
+        try {
+            return Long.parseLong(String.valueOf(v));
+        } catch (Exception e) {
+            throw new UnauthorizedException("Invalid token");
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private static List<String> asStringList(Object v) {
         if (v == null) return null;
@@ -152,7 +168,13 @@ public class JwtService {
 
     public record Token(String value, Instant expiresAt) {}
 
-    public record JwtPayload(long userId, String email, Set<String> roles, Instant expiresAt) {}
+    public record JwtPayload(
+            long userId,
+            String email,
+            Set<String> roles,
+            Instant expiresAt,
+            Long sessionStartedAtEpochMillis
+    ) {}
 
     public static final class UnauthorizedException extends RuntimeException {
         public UnauthorizedException(String message) {
@@ -160,4 +182,3 @@ public class JwtService {
         }
     }
 }
-

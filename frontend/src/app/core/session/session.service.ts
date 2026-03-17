@@ -32,7 +32,10 @@ export class SessionService {
             this.sessionSubject.next(s);
             if (s) this.startHeartbeat();
           }),
-          catchError(() => of(null)),
+          catchError(() => {
+            this.sessionSubject.next(null);
+            return of(null);
+          }),
           shareReplay({ bufferSize: 1, refCount: false })
         );
     }
@@ -46,6 +49,7 @@ export class SessionService {
 
   clearAndRefresh(): Observable<GuestSessionInfoDto | null> {
     this.resetCache();
+    this.sessionSubject.next(null);
     return this.guestSessionApi.clear().pipe(
       catchError(() => of(void 0)),
       concatMap(() => this.ensure())

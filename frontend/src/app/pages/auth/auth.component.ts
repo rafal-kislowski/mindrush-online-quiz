@@ -38,6 +38,7 @@ export class AuthComponent implements OnInit, OnDestroy {
   private tokenSub?: Subscription;
   private resendCooldownTimer: ReturnType<typeof setInterval> | null = null;
   private forgotCooldownTimer: ReturnType<typeof setInterval> | null = null;
+  private loginRedirectUrl: string | null = null;
 
   @ViewChild('authEmailInput')
   private authEmailInput?: ElementRef<HTMLInputElement>;
@@ -95,6 +96,7 @@ export class AuthComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.resolveMode();
+    this.loginRedirectUrl = this.normalizeRedirectUrl(this.route.snapshot.queryParamMap.get('redirect'));
     if (this.mode === 'verify') {
       this.listenForVerifyTokenAndRedirect();
       return;
@@ -104,7 +106,7 @@ export class AuthComponent implements OnInit, OnDestroy {
     if (this.mode === 'login' || this.mode === 'register') {
       this.consumeFlash();
       this.auth.ensureLoaded().subscribe((u) => {
-        if (u) this.router.navigate(['/']);
+        if (u) this.navigateAfterLogin();
       });
     }
 
@@ -182,11 +184,11 @@ export class AuthComponent implements OnInit, OnDestroy {
           this.sessionService.refresh().subscribe({
             next: () => {
               this.loading = false;
-              this.router.navigate(['/']);
+              this.navigateAfterLogin();
             },
             error: () => {
               this.loading = false;
-              this.router.navigate(['/']);
+              this.navigateAfterLogin();
             },
           });
         },
@@ -596,5 +598,18 @@ export class AuthComponent implements OnInit, OnDestroy {
     this.form.controls.password.setValue('');
     this.form.controls.password.markAsPristine();
     this.form.controls.password.markAsUntouched();
+  }
+
+  private navigateAfterLogin(): void {
+    const redirect = this.loginRedirectUrl ?? '/';
+    void this.router.navigateByUrl(redirect);
+  }
+
+  private normalizeRedirectUrl(raw: string | null | undefined): string | null {
+    const value = (raw ?? '').trim();
+    if (!value) return null;
+    if (!value.startsWith('/')) return null;
+    if (value.startsWith('//')) return null;
+    return value;
   }
 }

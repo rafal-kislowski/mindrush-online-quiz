@@ -1273,6 +1273,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       );
     }
     this.pickerScope = scope;
+    this.recomputeCategoryOptions();
   }
 
   setPickerSort(sort: 'az' | 'za'): void {
@@ -1322,6 +1323,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     this.pendingMatchType = next;
     this.matchType = next;
     if (next === 'RANKED') this.pickerScope = 'official';
+    this.recomputeCategoryOptions();
     this.scheduleMatchTypeCommit();
   }
 
@@ -1449,28 +1451,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   get filteredQuizzes(): QuizListItemDto[] {
     const needle = (this.quizSearch ?? '').trim().toLowerCase();
     const cats = this.categorySelected.map((c) => c.trim().toLowerCase()).filter(Boolean);
-    const scope = this.matchType === 'RANKED' ? 'official' : this.pickerScope;
-    const type = this.matchType;
-
-    const matchesScope = (q: QuizListItemDto): boolean => {
-      const raw = (q as any)?.source ?? (q as any)?.scope ?? (q as any)?.type ?? null;
-      const source = typeof raw === 'string' && raw.trim()
-        ? raw.trim().toLowerCase()
-        : 'official';
-      const normalizedSource = source === 'user' ? 'custom' : source;
-      const inLibrary = q.inLibrary === true || normalizedSource === 'library';
-      const publicAvailable = q.publicAvailable !== false;
-
-      if (scope === 'library') return inLibrary && publicAvailable;
-      if (scope === 'official') return normalizedSource === 'official' && publicAvailable;
-      if (scope === 'custom') return normalizedSource === 'custom' && publicAvailable;
-      return false;
-    };
-
-    const filtered = (this.quizzes ?? []).filter((q) => {
-      if (!this.quizMatchesMatchType(q, type)) return false;
-      if (!matchesScope(q)) return false;
-
+    const filtered = this.getCategoryBaseQuizzes().filter((q) => {
       if (cats.length) {
         const c = (q.categoryName ?? '').trim().toLowerCase();
         if (!cats.includes(c)) return false;
@@ -1641,14 +1622,53 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     return q?.includeInRanking === true;
   }
 
+  private effectivePickerScope(): 'official' | 'custom' | 'library' {
+    return this.matchType === 'RANKED' ? 'official' : this.pickerScope;
+  }
+
+  private quizSource(q: QuizListItemDto): 'official' | 'custom' | 'library' | string {
+    const raw = (q as any)?.source ?? (q as any)?.scope ?? (q as any)?.type ?? null;
+    const source = typeof raw === 'string' && raw.trim()
+      ? raw.trim().toLowerCase()
+      : 'official';
+    return source === 'user' ? 'custom' : source;
+  }
+
+  private quizMatchesScope(
+    q: QuizListItemDto,
+    scope: 'official' | 'custom' | 'library'
+  ): boolean {
+    const source = this.quizSource(q);
+    const inLibrary = q.inLibrary === true || source === 'library';
+    const publicAvailable = q.publicAvailable !== false;
+
+    if (scope === 'library') return inLibrary && publicAvailable;
+    if (scope === 'official') return source === 'official' && publicAvailable;
+    if (scope === 'custom') return source === 'custom' && publicAvailable;
+    return false;
+  }
+
+  private getCategoryBaseQuizzes(): QuizListItemDto[] {
+    const scope = this.effectivePickerScope();
+    const type = this.matchType;
+    return (this.quizzes ?? []).filter((q) => (
+      this.quizMatchesMatchType(q, type) && this.quizMatchesScope(q, scope)
+    ));
+  }
+
   private syncMatchTypeFromLobby(lobby: LobbyDto | null): void {
     // During local mode switch (debounced or in-flight request), keep optimistic UI state.
     // Otherwise websocket snapshots with stale ranking flag can briefly flip the mode back.
     if (this.pendingMatchType != null || this.matchTypeRequestInFlight) {
-      if (this.pendingMatchType === 'RANKED') this.pickerScope = 'official';
+      if (this.pendingMatchType === 'RANKED' && this.pickerScope !== 'official') {
+        this.pickerScope = 'official';
+        this.recomputeCategoryOptions();
+      }
       return;
     }
 
+    const prevMatchType = this.matchType;
+    const prevScope = this.pickerScope;
     const explicitRanking = lobby?.rankingEnabled;
     let next: 'CASUAL' | 'RANKED';
     if (explicitRanking != null) {
@@ -1658,14 +1678,26 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       next = this.quizSupportsRanking(q) ? 'RANKED' : 'CASUAL';
     }
 
-    if (this.matchType === next) return;
+    if (this.matchType === next) {
+      if (next === 'RANKED' && this.pickerScope !== 'official') {
+        this.pickerScope = 'official';
+      }
+      if (this.pickerScope !== prevScope) {
+        this.recomputeCategoryOptions();
+      }
+      return;
+    }
     this.matchType = next;
     if (next === 'RANKED') this.pickerScope = 'official';
+    if (this.matchType !== prevMatchType || this.pickerScope !== prevScope) {
+      this.recomputeCategoryOptions();
+    }
   }
 
   private recomputeCategoryOptions(): void {
+    const base = this.getCategoryBaseQuizzes();
     const counts = new Map<string, number>();
-    for (const q of this.quizzes ?? []) {
+    for (const q of base) {
       const name = (q.categoryName ?? '').trim();
       if (!name) continue;
       counts.set(name, (counts.get(name) ?? 0) + 1);
@@ -1675,7 +1707,7 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
       .sort((a, b) => a[0].localeCompare(b[0], 'pl'))
       .map(([name, count]) => ({ name, label: name, count }));
 
-    this.categoryOptions = [{ name: null, label: 'All', count: this.quizzes.length }, ...entries];
+    this.categoryOptions = [{ name: null, label: 'All', count: base.length }, ...entries];
 
     if (this.categorySelected.length) {
       const allowed = new Set(counts.keys());

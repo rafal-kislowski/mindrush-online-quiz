@@ -248,7 +248,7 @@ public class AuthService {
         AppUser user = findActiveUserById(userId);
         String current = currentPassword == null ? "" : currentPassword;
         if (!passwordEncoder.matches(current, user.getPasswordHash())) {
-            throw new ResponseStatusException(UNAUTHORIZED, "Current password is incorrect");
+            throw new ResponseStatusException(BAD_REQUEST, "Current password is incorrect");
         }
 
         String normalizedPassword = normalizePassword(newPassword);
@@ -270,12 +270,12 @@ public class AuthService {
     private AuthResult issueTokens(AppUser user) {
         ensureNotBanned(user);
         ensureVerifiedForLogin(user);
-
-        JwtService.Token access = jwtService.createAccessToken(user);
-
         Instant now = clock.instant();
         user.setLastLoginAt(now);
         userRepository.save(user);
+        refreshTokenRepository.deleteAllByUser_Id(user.getId());
+
+        JwtService.Token access = jwtService.createAccessToken(user);
         Instant refreshExpiresAt = now.plus(refreshTtl);
         String refreshValue = SecureTokenUtils.randomUrlSafeToken(32);
         RefreshToken refresh = new RefreshToken(user, SecureTokenUtils.sha256Hex(refreshValue), now, refreshExpiresAt);

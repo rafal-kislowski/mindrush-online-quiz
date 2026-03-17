@@ -25,11 +25,20 @@ export const authRefreshInterceptor: HttpInterceptorFn = (req, next) => {
       if (!auth.snapshot) return throwError(() => err);
 
       return auth.refreshOnce().pipe(
-        switchMap(() => next(req)),
         catchError(() => {
           auth.dropLocalAuth();
           return throwError(() => err);
-        })
+        }),
+        switchMap(() =>
+          next(req).pipe(
+            catchError((retryErr: unknown) => {
+              if (retryErr instanceof HttpErrorResponse && retryErr.status === 401) {
+                auth.dropLocalAuth();
+              }
+              return throwError(() => retryErr);
+            })
+          )
+        )
       );
     })
   );

@@ -555,6 +555,91 @@ class AuthControllerTest {
     }
 
     @Test
+    void changePassword_withWrongCurrentPassword_returnsBadRequest() throws Exception {
+        AppUser user = new AppUser(
+                "settings-password-wrong-current@example.com",
+                passwordEncoder.encode("OldPassword123"),
+                "PasswordUser",
+                Set.of(AppRole.USER),
+                clock.instant()
+        );
+        user = userRepository.save(user);
+
+        MvcResult loginRes = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new Login(user.getEmail(), "OldPassword123"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String setCookie = String.join("\n", loginRes.getResponse().getHeaders(HttpHeaders.SET_COOKIE));
+        String access = cookieValueFromSetCookie(setCookie, "accessToken").orElseThrow();
+
+        mockMvc.perform(post("/api/auth/password/change")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"currentPassword":"WrongPassword123","newPassword":"NewPassword123","confirmPassword":"NewPassword123"}
+                                """)
+                        .cookie(new jakarta.servlet.http.Cookie("accessToken", access)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(containsString("Current password is incorrect")));
+
+        mockMvc.perform(get("/api/auth/me")
+                        .cookie(new jakarta.servlet.http.Cookie("accessToken", access)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("settings-password-wrong-current@example.com"));
+    }
+
+    @Test
+    void secondLogin_invalidatesPreviousSessionTokensImmediately() throws Exception {
+        AppUser user = new AppUser(
+                "single-session@example.com",
+                passwordEncoder.encode("Password123"),
+                "SingleSessionUser",
+                Set.of(AppRole.USER),
+                clock.instant()
+        );
+        user = userRepository.save(user);
+
+        MvcResult firstLogin = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new Login(user.getEmail(), "Password123"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String firstSetCookie = String.join("\n", firstLogin.getResponse().getHeaders(HttpHeaders.SET_COOKIE));
+        String firstAccess = cookieValueFromSetCookie(firstSetCookie, "accessToken").orElseThrow();
+        String firstRefresh = cookieValueFromSetCookie(firstSetCookie, "refreshToken").orElseThrow();
+
+        Thread.sleep(5L);
+
+        MvcResult secondLogin = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new Login(user.getEmail(), "Password123"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String secondSetCookie = String.join("\n", secondLogin.getResponse().getHeaders(HttpHeaders.SET_COOKIE));
+        String secondAccess = cookieValueFromSetCookie(secondSetCookie, "accessToken").orElseThrow();
+        String secondRefresh = cookieValueFromSetCookie(secondSetCookie, "refreshToken").orElseThrow();
+
+        assertThat(secondAccess).isNotEqualTo(firstAccess);
+        assertThat(secondRefresh).isNotEqualTo(firstRefresh);
+
+        mockMvc.perform(get("/api/auth/me")
+                        .cookie(new jakarta.servlet.http.Cookie("accessToken", firstAccess)))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(new jakarta.servlet.http.Cookie("refreshToken", firstRefresh)))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/auth/me")
+                        .cookie(new jakarta.servlet.http.Cookie("accessToken", secondAccess)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("single-session@example.com"));
+    }
+
+    @Test
     void revokeAllSessions_revokesRefreshTokensAndClearsCookies() throws Exception {
         AppUser user = new AppUser(
                 "settings-sessions@example.com",

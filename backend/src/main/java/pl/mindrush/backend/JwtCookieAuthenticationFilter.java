@@ -49,6 +49,13 @@ public class JwtCookieAuthenticationFilter extends OncePerRequestFilter {
                         if (user.getRoles().contains(AppRole.BANNED)) {
                             return;
                         }
+                        Long tokenSessionStartedAt = payload.sessionStartedAtEpochMillis();
+                        if (tokenSessionStartedAt == null || user.getLastLoginAt() == null) {
+                            return;
+                        }
+                        if (tokenSessionStartedAt.longValue() != user.getLastLoginAt().toEpochMilli()) {
+                            return;
+                        }
                         AuthenticatedUser principal = new AuthenticatedUser(
                                 user.getId(),
                                 user.getEmail(),
