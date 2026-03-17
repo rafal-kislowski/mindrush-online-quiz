@@ -67,7 +67,7 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
   readonly search = new FormControl('', { nonNullable: true });
   readonly pageSize = new FormControl<number>(8, { nonNullable: true });
   readonly pageSizeOptions: ReadonlyArray<number> = [8, 12, 25, 50];
-  readonly sortBy = new FormControl<'newest' | 'oldest' | 'name_az' | 'name_za'>('newest', { nonNullable: true });
+  readonly sortBy = new FormControl<'premium_newest' | 'newest' | 'oldest' | 'name_az' | 'name_za'>('premium_newest', { nonNullable: true });
   readonly creatorTier = new FormControl<'all' | 'premium' | 'standard'>('all', { nonNullable: true });
   readonly questionSearch = new FormControl('', { nonNullable: true });
   readonly questionPageSize = new FormControl<number>(10, { nonNullable: true });
@@ -155,6 +155,14 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
 
     const sort = this.sortBy.value;
     filtered.sort((a, b) => {
+      if (sort === 'premium_newest') {
+        const premiumDelta = Number(!!b.ownerIsPremium) - Number(!!a.ownerIsPremium);
+        if (premiumDelta !== 0) return premiumDelta;
+        const bv = this.submissionTimestampValue(b);
+        const av = this.submissionTimestampValue(a);
+        if (bv !== av) return bv - av;
+        return (a.title ?? '').localeCompare(b.title ?? '', undefined, { sensitivity: 'base' });
+      }
       if (sort === 'name_az') {
         return (a.title ?? '').localeCompare(b.title ?? '', undefined, { sensitivity: 'base' });
       }
@@ -238,6 +246,7 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
 
   get sortLabel(): string {
     const sort = this.sortBy.value;
+    if (sort === 'premium_newest') return 'Premium first (newest)';
     if (sort === 'oldest') return 'Oldest first';
     if (sort === 'name_az') return 'Name A-Z';
     if (sort === 'name_za') return 'Name Z-A';
@@ -577,7 +586,7 @@ export class AdminQuizSubmissionsComponent implements OnInit, OnDestroy {
     this.openMenu = null;
   }
 
-  setSortBy(value: 'newest' | 'oldest' | 'name_az' | 'name_za', ev?: Event): void {
+  setSortBy(value: 'premium_newest' | 'newest' | 'oldest' | 'name_az' | 'name_za', ev?: Event): void {
     ev?.stopPropagation();
     this.sortBy.setValue(value);
     this.openMenu = null;

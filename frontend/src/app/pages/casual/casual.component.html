@@ -182,7 +182,7 @@
         <section class="config-panel" aria-label="Mode configuration">
           <div class="config-panel__top">
             <h3>{{ activeModeConfig.title }}</h3>
-            <p class="muted">{{ activeModeConfig.details }}</p>
+            <p class="muted" [attr.title]="activeModeConfig.details">{{ activeModeConfig.details }}</p>
           </div>
 
           <div class="loading" *ngIf="quizzesLoading">Loading casual categories...</div>

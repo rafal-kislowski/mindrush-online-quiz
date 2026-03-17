@@ -155,6 +155,7 @@
                         <span class="mr-select__caret" aria-hidden="true"></span>
                       </button>
                       <div class="mr-select__menu" *ngIf="openMenu === 'sort'" role="listbox" (click)="$event.stopPropagation()">
+                        <button class="mr-select__item" type="button" [class.active]="sortBy.value === 'premium_newest'" (click)="setSortBy('premium_newest', $event)">Premium first (newest)</button>
                         <button class="mr-select__item" type="button" [class.active]="sortBy.value === 'newest'" (click)="setSortBy('newest', $event)">Newest first</button>
                         <button class="mr-select__item" type="button" [class.active]="sortBy.value === 'oldest'" (click)="setSortBy('oldest', $event)">Oldest first</button>
                         <button class="mr-select__item" type="button" [class.active]="sortBy.value === 'name_az'" (click)="setSortBy('name_az', $event)">Name A-Z</button>

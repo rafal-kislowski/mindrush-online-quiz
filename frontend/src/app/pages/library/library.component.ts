@@ -172,6 +172,7 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
   private mineCategoriesCache:
     | {
       quizzesRef: LibraryQuizListItemDto[];
+      status: QuizStatus;
       value: string[];
     }
     | null = null;
@@ -507,16 +508,26 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private getMineCategoriesCached(): string[] {
+    const status = this.currentListStatusTab;
     const cache = this.mineCategoriesCache;
-    if (cache && cache.quizzesRef === this.myQuizzes) {
+    if (cache && cache.quizzesRef === this.myQuizzes && cache.status === status) {
       return cache.value;
     }
-    const categories = this.extractCategories(this.myQuizzes);
+    const categories = this.extractCategories(this.myQuizzes.filter((item) => item.status === status));
     this.mineCategoriesCache = {
       quizzesRef: this.myQuizzes,
+      status,
       value: categories,
     };
     return categories;
+  }
+
+  private ensureMineCategoryAvailable(): void {
+    const current = this.mineCategory.value;
+    if (current === LibraryComponent.ALL_CATEGORIES) return;
+    const categories = this.getMineCategoriesCached();
+    if (categories.includes(current)) return;
+    this.mineCategory.setValue(LibraryComponent.ALL_CATEGORIES, { emitEvent: false });
   }
 
   private getFilteredSelectedQuestionsCached(): LibraryQuestionDto[] {
@@ -569,6 +580,7 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
         this.myQuizzes = mine ?? [];
         this.policy = policy ?? DEFAULT_POLICY;
         this.hasLoadedLibrary = true;
+        this.ensureMineCategoryAvailable();
         this.resetMinePage();
         this.consumePendingOpenQuizRequest();
       },
@@ -591,6 +603,7 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
     this.tabTransitionFlip = !this.tabTransitionFlip;
     this.tab = tab;
     this.listTab = tab;
+    this.ensureMineCategoryAvailable();
     this.resetMinePage();
     this.error = null;
     this.openMenu = null;
@@ -1524,6 +1537,7 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
       next,
       ...this.myQuizzes.slice(index + 1),
     ];
+    this.ensureMineCategoryAvailable();
   }
 
   private resetQuestionForm(): void {

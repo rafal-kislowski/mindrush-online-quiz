@@ -178,27 +178,8 @@ export class CasualComponent implements OnInit, AfterViewInit, OnDestroy {
     const needle = (this.quizSearch ?? '').trim().toLowerCase();
     const scope = this.pickerScope;
 
-    const matchesScope = (q: QuizListItemDto): boolean => {
-      const raw = (q as any)?.source ?? (q as any)?.scope ?? (q as any)?.type ?? null;
-      const source = typeof raw === 'string' && raw.trim()
-        ? raw.trim().toLowerCase()
-        : 'official';
-      const normalizedSource = source === 'user' ? 'custom' : source;
-      const inLibrary = q.inLibrary === true || normalizedSource === 'library';
-      const publicAvailable = q.publicAvailable !== false;
-      const ownedPrivateCustom =
-        normalizedSource === 'custom' &&
-        q.ownedByViewer === true &&
-        !publicAvailable;
-
-      if (scope === 'library') return (inLibrary && publicAvailable) || ownedPrivateCustom;
-      if (scope === 'official') return normalizedSource === 'official' && publicAvailable;
-      if (scope === 'custom') return normalizedSource === 'custom' && publicAvailable;
-      return false;
-    };
-
     const filtered = this.modeEligibleQuizzes.filter((q) => {
-      if (!matchesScope(q)) return false;
+      if (!this.quizMatchesScope(q, scope)) return false;
 
       if (selectedCategories.length) {
         const c = (q.categoryName ?? '').trim().toLowerCase();
@@ -323,6 +304,8 @@ export class CasualComponent implements OnInit, AfterViewInit, OnDestroy {
       this.pickerScopeAnimFlip = !this.pickerScopeAnimFlip;
     }
     this.pickerScope = scope;
+    this.recomputeCategoryOptions();
+    this.ensureSelectedCategoriesStillAvailable();
     this.ensureQuizSelection();
     this.scheduleMarqueeMeasure();
   }
@@ -475,7 +458,7 @@ export class CasualComponent implements OnInit, AfterViewInit, OnDestroy {
         this.quizzes = rows;
         this.quizzesLoading = false;
         this.recomputeCategoryOptions();
-    this.ensureSelectedCategoriesStillAvailable();
+        this.ensureSelectedCategoriesStillAvailable();
         this.ensureQuizSelection();
         this.scheduleMarqueeMeasure();
       });
@@ -487,9 +470,41 @@ export class CasualComponent implements OnInit, AfterViewInit, OnDestroy {
     this.categorySelected = this.categorySelected.filter((name) => allowed.has(name));
   }
 
+  private quizSource(q: QuizListItemDto): 'official' | 'custom' | 'library' | string {
+    const raw = (q as any)?.source ?? (q as any)?.scope ?? (q as any)?.type ?? null;
+    const source = typeof raw === 'string' && raw.trim()
+      ? raw.trim().toLowerCase()
+      : 'official';
+    return source === 'user' ? 'custom' : source;
+  }
+
+  private quizMatchesScope(
+    q: QuizListItemDto,
+    scope: 'official' | 'custom' | 'library'
+  ): boolean {
+    const source = this.quizSource(q);
+    const inLibrary = q.inLibrary === true || source === 'library';
+    const publicAvailable = q.publicAvailable !== false;
+    const ownedPrivateCustom =
+      source === 'custom' &&
+      q.ownedByViewer === true &&
+      !publicAvailable;
+
+    if (scope === 'library') return (inLibrary && publicAvailable) || ownedPrivateCustom;
+    if (scope === 'official') return source === 'official' && publicAvailable;
+    if (scope === 'custom') return source === 'custom' && publicAvailable;
+    return false;
+  }
+
+  private getCategoryBaseQuizzes(): QuizListItemDto[] {
+    const scope = this.pickerScope;
+    return this.modeEligibleQuizzes.filter((q) => this.quizMatchesScope(q, scope));
+  }
+
   private recomputeCategoryOptions(): void {
+    const base = this.getCategoryBaseQuizzes();
     const counts = new Map<string, number>();
-    for (const q of this.modeEligibleQuizzes) {
+    for (const q of base) {
       const name = (q.categoryName ?? '').trim();
       if (!name) continue;
       counts.set(name, (counts.get(name) ?? 0) + 1);
@@ -500,7 +515,7 @@ export class CasualComponent implements OnInit, AfterViewInit, OnDestroy {
       .map(([name, count]) => ({ name, label: name, count }));
 
     this.categoryOptions = [
-      { name: null, label: 'All', count: this.modeEligibleQuizzes.length },
+      { name: null, label: 'All', count: base.length },
       ...entries,
     ];
   }
