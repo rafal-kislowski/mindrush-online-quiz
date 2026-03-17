@@ -20,13 +20,35 @@ Before deploying on VPS, prepare environment variables and production profile:
    - first start will create Flyway history baseline.
 5. Rotate any previously used API/SMTP credentials before public demo deployment.
 
+## Dockerized stack (frontend + backend + db)
+The repository now supports running the whole app in containers:
+
+```bash
+docker compose up -d --build
+```
+
+Default endpoints:
+- App (frontend + API proxy): `http://localhost`
+- MySQL: `localhost:3306`
+
+Optional phpMyAdmin (tools profile):
+```bash
+docker compose --profile tools up -d
+```
+- phpMyAdmin: `http://localhost:8081`
+
+Notes:
+- Frontend container serves Angular via Nginx and proxies `/api`, `/ws`, `/media` to backend.
+- Uploaded media is persisted in Docker volume `backend_uploads`.
+- For local HTTP testing (no TLS), set `AUTH_COOKIE_SECURE=false`. For VPS with HTTPS keep `true`.
+
 ## Local setup
 
 ### 1) Database (MySQL)
 From the repository root:
 
 ```bash
-docker compose up -d
+docker compose up -d mysql
 ```
 
 Defaults from `docker-compose.yml`:
