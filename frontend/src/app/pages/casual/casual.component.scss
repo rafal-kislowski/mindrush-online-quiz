@@ -7,8 +7,8 @@
 
 .page.casual-page.lobby-page {
   width: 100%;
-  min-height: 100%;
-  height: 100%;
+  min-height: calc(100svh - 64px);
+  height: auto;
   padding: calc(var(--outer-gap) + 6px);
   display: flex;
   align-items: center;
@@ -655,6 +655,23 @@
 @media (max-width: 980px) {
   .casual-variants {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .page.casual-page.lobby-page .view-screen > .config-panel:not(.config-panel--picker) .config-panel__top {
+    min-height: 0;
+  }
+
+  .page.casual-page.lobby-page .view-screen > .config-panel:not(.config-panel--picker) .config-panel__top p {
+    min-height: calc(1.3em * 2);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .page.casual-page.lobby-page .casual-startbar--summary .owner-startwide {
+    min-height: 64px;
   }
 }
 

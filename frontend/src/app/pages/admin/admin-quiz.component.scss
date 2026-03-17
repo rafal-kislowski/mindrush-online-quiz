@@ -425,7 +425,7 @@
 
 @media (min-width: 921px) {
   .admin-dashboard {
-    min-height: 100%;
+    min-height: calc(100svh - 64px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -548,7 +548,7 @@
   .admin-dashboard {
     overflow-y: auto;
     height: auto;
-    min-height: 100%;
+    min-height: calc(100svh - 64px);
   }
 }
 

@@ -150,9 +150,7 @@ export class AppComponent implements OnInit, OnDestroy {
   );
 
   sidebarOpen = false;
-  sidebarCollapsed = true;
   sidebarTransitionsReady = false;
-  sidebarPrewarm = false;
   contentWide = false;
   contentFull = false;
   currentLobby: LobbyDto | null = null;
@@ -175,8 +173,6 @@ export class AppComponent implements OnInit, OnDestroy {
   private currentLobbyEventsSub: Subscription | null = null;
   private currentLobbyEventsCode: string | null = null;
   private scrollResetRafId: number | null = null;
-  private sidebarPrewarmTimer: ReturnType<typeof setTimeout> | null = null;
-  private sidebarPrewarmRafId: number | null = null;
 
   @ViewChild('contentHost')
   private contentHostRef?: ElementRef<HTMLElement>;
@@ -239,8 +235,6 @@ export class AppComponent implements OnInit, OnDestroy {
         this.sidebarTransitionsReady = true;
       });
     });
-
-    this.scheduleSidebarPrewarm();
   }
 
   ngOnDestroy(): void {
@@ -251,14 +245,6 @@ export class AppComponent implements OnInit, OnDestroy {
     this.currentLobbyEventsSub?.unsubscribe();
     this.currentLobbyEventsSub = null;
     this.currentLobbyEventsCode = null;
-    if (this.sidebarPrewarmTimer) {
-      clearTimeout(this.sidebarPrewarmTimer);
-      this.sidebarPrewarmTimer = null;
-    }
-    if (this.sidebarPrewarmRafId != null) {
-      cancelAnimationFrame(this.sidebarPrewarmRafId);
-      this.sidebarPrewarmRafId = null;
-    }
     this.stopNotificationStream();
     this.subscriptions.unsubscribe();
   }
@@ -290,31 +276,12 @@ export class AppComponent implements OnInit, OnDestroy {
 
   onDesktopBurgerChange(event: Event): void {
     const input = event.target as HTMLInputElement | null;
-    this.sidebarCollapsed = !input?.checked;
+    this.sidebarOpen = !!input?.checked;
   }
 
   onDesktopBurgerKeyToggle(event: Event): void {
     event.preventDefault();
-    this.sidebarCollapsed = !this.sidebarCollapsed;
-  }
-
-  private scheduleSidebarPrewarm(): void {
-    if (typeof window === 'undefined') return;
-    if (!window.matchMedia('(max-width: 980px)').matches) return;
-
-    this.sidebarPrewarmTimer = setTimeout(() => {
-      this.sidebarPrewarmTimer = null;
-      if (this.sidebarOpen) return;
-      if (!window.matchMedia('(max-width: 980px)').matches) return;
-
-      this.sidebarPrewarm = true;
-      this.sidebarPrewarmRafId = requestAnimationFrame(() => {
-        this.sidebarPrewarmRafId = requestAnimationFrame(() => {
-          this.sidebarPrewarm = false;
-          this.sidebarPrewarmRafId = null;
-        });
-      });
-    }, 220);
+    this.sidebarOpen = !this.sidebarOpen;
   }
 
   logout(): void {
@@ -1050,6 +1017,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   @HostListener('document:keydown.escape')
   onDocumentEscape(): void {
+    this.sidebarOpen = false;
     this.notificationsOpen = false;
     this.profileMenuOpen = false;
   }

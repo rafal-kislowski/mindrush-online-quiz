@@ -3,9 +3,7 @@
 <div
   class="layout"
   [class.is-open]="sidebarOpen"
-  [class.is-sidebar-collapsed]="sidebarCollapsed"
   [class.is-sidebar-transition-ready]="sidebarTransitionsReady"
-  [class.is-sidebar-prewarm]="sidebarPrewarm"
 >
   <div class="overlay" (click)="closeSidebar()"></div>
 
@@ -328,16 +326,16 @@
           for="sidebar-burger-toggle"
           role="button"
           tabindex="0"
-          [class.is-collapsed]="sidebarCollapsed"
+          [class.is-collapsed]="!sidebarOpen"
           (keydown.enter)="onDesktopBurgerKeyToggle($event)"
           (keydown.space)="onDesktopBurgerKeyToggle($event)"
-          [attr.aria-expanded]="!sidebarCollapsed"
-          [attr.aria-label]="sidebarCollapsed ? 'Open menu' : 'Close menu'"
+          [attr.aria-expanded]="sidebarOpen"
+          [attr.aria-label]="sidebarOpen ? 'Close menu' : 'Open menu'"
         >
           <input
             type="checkbox"
             id="sidebar-burger-toggle"
-            [checked]="!sidebarCollapsed"
+            [checked]="sidebarOpen"
             (change)="onDesktopBurgerChange($event)"
             tabindex="-1"
             aria-hidden="true"
