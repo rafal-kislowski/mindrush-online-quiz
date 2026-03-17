@@ -231,7 +231,6 @@
                     <div class="achievement-card__content">
                       <div class="achievement-card__top">
                         <div class="achievement-card__title">{{ achievement.title }}</div>
-                        <div class="achievement-card__badge" *ngIf="achievement.unlocked">Unlocked</div>
                       </div>
 
                       <div class="achievement-card__desc">{{ achievement.description }}</div>
@@ -264,7 +263,7 @@
                     <span class="profile-tabs-row__count">({{ vm.achievementsUnlocked | number }}/{{ vm.achievementsTotal | number }})</span>
                   </div>
                   <div class="profile-tabs-row__subtitle">
-                    Unlocked {{ vm.achievementsUnlocked | number }} / {{ vm.achievementsTotal | number }}
+                    {{ vm.achievementsDescription }}
                   </div>
                 </div>
               </header>
@@ -286,7 +285,6 @@
                     <div class="achievement-card__content">
                       <div class="achievement-card__top">
                         <div class="achievement-card__title">{{ achievement.title }}</div>
-                        <div class="achievement-card__badge" *ngIf="achievement.unlocked">Unlocked</div>
                       </div>
 
                       <div class="achievement-card__desc">{{ achievement.description }}</div>
