@@ -74,7 +74,10 @@
     sans-serif;
   border-right: 1px solid var(--nav-border);
   box-shadow: 4px 0 16px rgba(0, 0, 0, 0.2);
-  overflow: hidden;
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   isolation: isolate;
   z-index: 30;
   backface-visibility: hidden;
@@ -124,34 +127,36 @@
 }
 
 .sidebar__scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 4px;
+  flex: 0 0 auto;
+  height: auto !important;
+  min-height: auto;
+  max-height: none !important;
+  overflow: visible !important;
+  padding-right: 0;
   padding-bottom: 12px;
+}
 
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
-
+/* Offcanvas scrollbar: subtle, thin, low-contrast. */
+.layout .sidebar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
 }
 
-.sidebar__scroll::-webkit-scrollbar {
-  width: 6px;
+.layout .sidebar::-webkit-scrollbar {
+  width: 4px !important;
 }
 
-.sidebar__scroll::-webkit-scrollbar-track {
-  background: transparent;
+.layout .sidebar::-webkit-scrollbar-track {
+  background: transparent !important;
 }
 
-.sidebar__scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.16);
+.layout .sidebar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16) !important;
 }
 
-.sidebar__scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+.layout .sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.24) !important;
 }
 
 .sidebar__bottomFixed {
@@ -1566,10 +1571,18 @@
   }
 
   .sidebar {
+    display: block;
+    height: 100dvh;
+    min-height: 100dvh;
+    max-height: 100dvh;
     width: clamp(250px, 78vw, 320px);
     padding-top: max(14px, env(safe-area-inset-top));
     border-right: 1px solid rgba(255, 255, 255, 0.14);
     padding-bottom: max(12px, env(safe-area-inset-bottom));
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   .sidebar__top {
@@ -1577,16 +1590,20 @@
   }
 
   .sidebar__scroll {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding-right: 2px;
+    display: block;
+    flex: none;
+    height: auto !important;
+    min-height: auto;
+    max-height: none;
+    overflow-y: visible !important;
+    overflow-x: visible !important;
+    padding-right: 0;
     padding-bottom: 8px;
   }
 
   .sidebar__bottomFixed {
-    flex: 0 0 auto;
+    display: block;
+    flex: none;
     margin-top: 10px;
     padding-top: 4px;
   }
