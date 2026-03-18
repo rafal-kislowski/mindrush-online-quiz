@@ -2,12 +2,28 @@
 
 Full-stack quiz platform (Spring Boot backend + Angular frontend).
 
+Live demo: `https://mindrush.rafalkislowski.pl`
+
 ## Tech stack
 - Java 17, Spring Boot 3
+- Angular 18, TypeScript, SCSS
 - Spring Web, Spring Security (JWT in HttpOnly cookies)
 - Spring Data JPA + MySQL
 - Flyway (versioned DB migrations)
-- Docker Compose (MySQL)
+- Docker Compose, GHCR, GitHub Actions
+
+## Deployment architecture
+- `CI` runs on every `push` and `pull_request`
+- `CD` runs after successful `CI` on branch `main`
+- backend and frontend are built as immutable Docker images and published to `ghcr.io`
+- the VPS pulls the exact image tags produced by the successful pipeline and recreates containers with `docker compose up -d`
+- public traffic is served through an existing reverse-proxy Docker network, while MindRush runs as a separate Docker stack behind it
+- MySQL data and uploaded media remain persistent in Docker volumes
+
+This separates responsibilities cleanly:
+- GitHub Actions verifies and packages the release
+- GHCR stores versioned deployment artifacts
+- the VPS only runs prebuilt images and applies the rollout
 
 ## Production pre-flight
 Before deploying on VPS, prepare environment variables and production profile:
@@ -19,6 +35,75 @@ Before deploying on VPS, prepare environment variables and production profile:
    - keep `APP_FLYWAY_BASELINE_ON_MIGRATE=true` (default),
    - first start will create Flyway history baseline.
 5. Rotate any previously used API/SMTP credentials before public demo deployment.
+
+## CI/CD for VPS
+This repository includes a production-style CI/CD path based on GitHub Actions + GHCR + Docker Compose on VPS:
+
+- `CI` workflow runs on every `push` and `pull_request`
+- `CD` workflow runs after successful `CI` on branch `main`
+- backend and frontend are built into versioned Docker images and pushed to `ghcr.io`
+- VPS pulls fresh images and updates containers automatically with `docker compose up -d`
+
+Why this is better than `git pull && docker compose build` on the server:
+- production uses immutable images built in CI, not ad-hoc builds on VPS
+- deploy is faster and more repeatable
+- you keep a clean separation between verification (`CI`) and release (`CD`)
+- rollback is easier because deployments are tied to image tags and commit SHAs
+
+### 1) Prepare the VPS once
+Requirements on the server:
+- Docker Engine
+- Docker Compose v2 plugin (`docker compose`)
+- an `.env` file placed in your deployment directory, for example `/opt/mindrush/.env`
+
+Bootstrap example on VPS:
+
+```bash
+sudo mkdir -p /opt/mindrush
+sudo chown -R $USER:$USER /opt/mindrush
+cd /opt/mindrush
+curl -o .env.example https://raw.githubusercontent.com/rafal-kislowski/mindrush-online-quiz/main/.env.example
+cp .env.example .env
+```
+
+Then edit `.env` and set production values, especially:
+- `JWT_SECRET`
+- `APP_CORS_ALLOWED_ORIGINS`
+- `APP_FRONTEND_BASE_URL`
+- `MYSQL_PASSWORD`
+- `MYSQL_ROOT_PASSWORD`
+- `AUTH_COOKIE_SECURE=true`
+
+### 2) Add GitHub repository secrets
+In GitHub repository settings -> `Secrets and variables` -> `Actions`, add:
+
+- `VPS_HOST` -> VPS IP or domain
+- `VPS_PORT` -> usually `22`
+- `VPS_USER` -> deployment user on VPS
+- `VPS_SSH_KEY` -> private SSH key for that user
+- `VPS_APP_DIR` -> deployment directory, for example `/opt/mindrush`
+
+### 3) What happens on deploy
+After every push to `main`:
+
+1. GitHub Actions runs tests and builds the app.
+2. CI builds Docker images for backend and frontend and pushes them to GHCR.
+3. Workflow copies `docker-compose.vps.yml` and the deploy script to the VPS.
+4. VPS logs into GHCR, pulls new images and recreates containers.
+
+Files used by the deployment:
+- `docker-compose.vps.yml`
+- `deploy/vps/remote-deploy.sh`
+- `.github/workflows/ci.yml`
+- `.github/workflows/cd.yml`
+
+### 4) First deployment notes
+- The production workflow deploys only from `main`.
+- MySQL is intentionally not published to the public internet in `docker-compose.vps.yml`.
+- Uploaded files remain persistent in Docker volume `backend_uploads`.
+- Database data remains persistent in Docker volume `mindrush_mysql_data`.
+- The frontend can join an existing reverse-proxy Docker network through `PROXY_NETWORK`.
+- If you use a custom domain, terminate HTTPS in front of the app (for example Nginx Proxy Manager, Traefik or Nginx on the VPS) and keep `AUTH_COOKIE_SECURE=true`.
 
 ## Dockerized stack (frontend + backend + db)
 The repository now supports running the whole app in containers:
