@@ -15,6 +15,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import pl.mindrush.backend.lobby.Lobby;
+import pl.mindrush.backend.lobby.LobbyParticipant;
 import pl.mindrush.backend.guest.GuestSessionRepository;
 import pl.mindrush.backend.lobby.LobbyParticipantRepository;
 import pl.mindrush.backend.lobby.LobbyRepository;
@@ -27,6 +29,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -36,7 +39,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "spring.jpa.hibernate.ddl-auto=create-drop",
-        "app.seed.enabled=true"
+        "app.seed.enabled=true",
+        "app.auth.require-verified-email=false"
 })
 @AutoConfigureMockMvc
 @Import(GameControllerTest.ClockTestConfig.class)
@@ -703,6 +707,41 @@ class GameControllerTest {
                 .andExpect(status().isNoContent());
     }
 
+    @Test
+    void startGame_whenSameAuthenticatedAccountOccupiesTwoLobbySlots_isBlocked() throws Exception {
+        String ownerSessionId = createGuestSession();
+        Cookie access = registerAndGetAccessCookie();
+        String firstPlayerSessionId = createGuestSession(access);
+        String secondPlayerSessionId = createGuestSession(access);
+
+        String lobbyCode = createLobby(ownerSessionId);
+        mockMvc.perform(post("/api/lobbies/" + lobbyCode + "/join")
+                        .cookie(new Cookie("guestSessionId", firstPlayerSessionId))
+                        .cookie(access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players.length()").value(2));
+
+        Lobby lobby = lobbyRepository.findByCode(lobbyCode).orElseThrow();
+        lobbyParticipantRepository.save(LobbyParticipant.createGuest(
+                lobby,
+                secondPlayerSessionId,
+                "SameAccountAlt",
+                clock.instant()
+        ));
+
+        Long quizId = firstQuizId();
+
+        mockMvc.perform(post("/api/lobbies/" + lobbyCode + "/game/start")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .cookie(access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quizId\":" + quizId + "}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("The same account cannot occupy multiple slots in one lobby."));
+    }
+
     private Long firstQuizId() throws Exception {
         MvcResult list = mockMvc.perform(get("/api/quizzes").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
@@ -729,6 +768,17 @@ class GameControllerTest {
         return sessionId;
     }
 
+    private String createGuestSession(Cookie accessCookie) throws Exception {
+        MvcResult res = mockMvc.perform(post("/api/guest/session")
+                        .cookie(accessCookie))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String setCookie = res.getResponse().getHeader(HttpHeaders.SET_COOKIE);
+        String sessionId = cookieValueFromSetCookie(setCookie, "guestSessionId");
+        assertThat(sessionId).isNotBlank();
+        return sessionId;
+    }
+
     private String createLobby(String ownerSessionId) throws Exception {
         MvcResult created = mockMvc.perform(post("/api/lobbies")
                         .cookie(new Cookie("guestSessionId", ownerSessionId))
@@ -747,6 +797,24 @@ class GameControllerTest {
                         .content("{}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.players.length()").value(2));
+    }
+
+    private Cookie registerAndGetAccessCookie() throws Exception {
+        String email = "game-user-" + UUID.randomUUID() + "@example.com";
+        String displayName = "GameUser_" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+
+        MvcResult res = mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","displayName":"%s","password":"Password123"}
+                                """.formatted(email, displayName)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String setCookie = String.join("\n", res.getResponse().getHeaders(HttpHeaders.SET_COOKIE));
+        String access = cookieValueFromSetCookie(setCookie, "accessToken");
+        assertThat(access).isNotBlank();
+        return new Cookie("accessToken", access);
     }
 
     private static String cookieValueFromSetCookie(String setCookie, String cookieName) {

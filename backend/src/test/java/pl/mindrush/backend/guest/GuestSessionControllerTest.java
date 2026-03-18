@@ -7,13 +7,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import jakarta.servlet.http.Cookie;
 
 import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.not;
@@ -112,12 +113,78 @@ class GuestSessionControllerTest {
         assertThat(updated.getLastSeenAt()).isAfter(Instant.EPOCH);
     }
 
+    @Test
+    void post_withoutAuth_doesNotClearExistingBoundUserId() throws Exception {
+        Cookie accessCookie = registerAndGetAccessCookie();
+        String sessionId = createGuestSessionId(accessCookie);
+
+        Long userIdBefore = repository.findById(sessionId)
+                .map(GuestSession::getUserId)
+                .orElseThrow();
+        assertThat(userIdBefore).isNotNull();
+
+        mockMvc.perform(post("/api/guest/session")
+                        .cookie(new Cookie("guestSessionId", sessionId)))
+                .andExpect(status().isCreated());
+
+        Long userIdAfter = repository.findById(sessionId)
+                .map(GuestSession::getUserId)
+                .orElseThrow();
+        assertThat(userIdAfter).isEqualTo(userIdBefore);
+    }
+
+    @Test
+    void heartbeat_withoutAuth_doesNotClearExistingBoundUserId() throws Exception {
+        Cookie accessCookie = registerAndGetAccessCookie();
+        String sessionId = createGuestSessionId(accessCookie);
+
+        Long userIdBefore = repository.findById(sessionId)
+                .map(GuestSession::getUserId)
+                .orElseThrow();
+        assertThat(userIdBefore).isNotNull();
+
+        mockMvc.perform(post("/api/guest/session/heartbeat")
+                        .cookie(new Cookie("guestSessionId", sessionId)))
+                .andExpect(status().isNoContent());
+
+        Long userIdAfter = repository.findById(sessionId)
+                .map(GuestSession::getUserId)
+                .orElseThrow();
+        assertThat(userIdAfter).isEqualTo(userIdBefore);
+    }
+
     private String createGuestSessionId() throws Exception {
         ResultActions res = mockMvc.perform(post("/api/guest/session"))
                 .andExpect(status().isCreated());
 
         String setCookie = res.andReturn().getResponse().getHeader(HttpHeaders.SET_COOKIE);
         return cookieValueFromSetCookie(setCookie, "guestSessionId").orElseThrow();
+    }
+
+    private String createGuestSessionId(Cookie accessCookie) throws Exception {
+        ResultActions res = mockMvc.perform(post("/api/guest/session")
+                        .cookie(accessCookie))
+                .andExpect(status().isCreated());
+
+        String setCookie = res.andReturn().getResponse().getHeader(HttpHeaders.SET_COOKIE);
+        return cookieValueFromSetCookie(setCookie, "guestSessionId").orElseThrow();
+    }
+
+    private Cookie registerAndGetAccessCookie() throws Exception {
+        String email = "guest-test-" + UUID.randomUUID() + "@example.com";
+        String displayName = "GuestTest_" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+
+        MvcResult result = mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","displayName":"%s","password":"Password123"}
+                                """.formatted(email, displayName)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String setCookie = String.join("\n", result.getResponse().getHeaders(HttpHeaders.SET_COOKIE));
+        String accessToken = cookieValueFromSetCookie(setCookie, "accessToken").orElseThrow();
+        return new Cookie("accessToken", accessToken);
     }
 
     private static Optional<String> cookieValueFromSetCookie(String setCookie, String cookieName) {

@@ -22,7 +22,10 @@ import java.util.Set;
 @Entity
 @Table(
         name = "app_users",
-        uniqueConstraints = @UniqueConstraint(name = "uq_app_user_email", columnNames = "email")
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uq_app_user_email", columnNames = "email"),
+                @UniqueConstraint(name = "uq_app_user_display_name", columnNames = "display_name")
+        }
 )
 public class AppUser {
 

@@ -447,6 +447,64 @@ class AuthControllerTest {
     }
 
     @Test
+    void register_rejectsDuplicateNicknameIgnoringCaseAndWhitespace() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"first@example.com","displayName":"El  Rufio","password":"Password123"}
+                                """))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"second@example.com","displayName":"  el rufio  ","password":"Password123"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Nickname is already taken"));
+    }
+
+    @Test
+    void updateDisplayName_rejectsExistingNicknameIgnoringCaseAndWhitespace() throws Exception {
+        AppUser taken = new AppUser(
+                "taken-name@example.com",
+                passwordEncoder.encode("Password123"),
+                "Taken Name",
+                Set.of(AppRole.USER),
+                clock.instant()
+        );
+        userRepository.save(taken);
+
+        AppUser user = new AppUser(
+                "rename-user@example.com",
+                passwordEncoder.encode("Password123"),
+                "OldName",
+                Set.of(AppRole.USER),
+                clock.instant()
+        );
+        user.setCoins(60_000);
+        user = userRepository.save(user);
+
+        MvcResult loginRes = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new Login(user.getEmail(), "Password123"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String setCookie = String.join("\n", loginRes.getResponse().getHeaders(HttpHeaders.SET_COOKIE));
+        String access = cookieValueFromSetCookie(setCookie, "accessToken").orElseThrow();
+
+        mockMvc.perform(post("/api/auth/profile/display-name")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"displayName":"  taken   name  "}
+                                """)
+                        .cookie(new jakarta.servlet.http.Cookie("accessToken", access)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Nickname is already taken"));
+    }
+
+    @Test
     void updateDisplayName_requiresEnoughCoins() throws Exception {
         AppUser user = new AppUser(
                 "settings-name-coins@example.com",

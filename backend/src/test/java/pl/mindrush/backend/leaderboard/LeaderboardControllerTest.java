@@ -60,8 +60,8 @@ class LeaderboardControllerTest {
 
     @Test
     void leaderboard_isPublic_andReturnsSortedByRp() throws Exception {
-        AppUser u1 = new AppUser("a@example.com", passwordEncoder.encode("Password123"), "Rafkens", Set.of(AppRole.USER), clock.instant());
-        AppUser u2 = new AppUser("b@example.com", passwordEncoder.encode("Password123"), "Rafkens", Set.of(AppRole.USER), clock.instant());
+        AppUser u1 = new AppUser("a@example.com", passwordEncoder.encode("Password123"), "RafkensA", Set.of(AppRole.USER), clock.instant());
+        AppUser u2 = new AppUser("b@example.com", passwordEncoder.encode("Password123"), "RafkensB", Set.of(AppRole.USER), clock.instant());
         userRepository.save(u1);
         userRepository.save(u2);
 
@@ -74,8 +74,8 @@ class LeaderboardControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].rankPoints").value(250))
                 .andExpect(jsonPath("$[1].rankPoints").value(100))
-                .andExpect(jsonPath("$[0].displayName").value(org.hamcrest.Matchers.containsString("#")))
-                .andExpect(jsonPath("$[1].displayName").value(org.hamcrest.Matchers.containsString("#")));
+                .andExpect(jsonPath("$[0].displayName").value("RafkensB"))
+                .andExpect(jsonPath("$[1].displayName").value("RafkensA"));
 
         mockMvc.perform(get("/api/leaderboard?page=1&size=1"))
                 .andExpect(status().isOk())

@@ -276,6 +276,9 @@ public class GameService {
             }
         }
 
+        List<LobbyParticipant> lobbyPlayers = participantRepository.findAllByLobbyIdOrderByJoinedAtAsc(lobby.getId());
+        validateLobbyPlayersForGameStart(lobby, lobbyPlayers);
+
         Optional<GameSession> ownerActive = findActiveGameSessionForGuestSession(guestSession.getId());
         if (ownerActive.isPresent() && !Objects.equals(ownerActive.get().getLobbyId(), lobby.getId())) {
             throw new ResponseStatusException(CONFLICT, "You already have an active game in progress. Finish it before starting another one.");
@@ -342,6 +345,7 @@ public class GameService {
 
         List<LobbyParticipant> lobbyPlayers = participantRepository.findAllByLobbyIdOrderByJoinedAtAsc(lobby.getId());
         if (lobbyPlayers.size() < 2) return Optional.empty();
+        validateLobbyPlayersForGameStart(lobby, lobbyPlayers);
         boolean allReady = lobbyPlayers.stream().allMatch(LobbyParticipant::isReady);
         if (!allReady) return Optional.empty();
 
@@ -366,6 +370,55 @@ public class GameService {
                 rankingEnabled,
                 lobby.getOwnerGuestSessionId()
         ));
+    }
+
+    private void validateLobbyPlayersForGameStart(Lobby lobby, List<LobbyParticipant> lobbyPlayers) {
+        if (lobby == null || lobbyPlayers == null || lobbyPlayers.isEmpty()) return;
+
+        Map<String, GuestSession> sessionsById = guestSessionsById(
+                lobbyPlayers.stream()
+                        .map(LobbyParticipant::getGuestSessionId)
+                        .filter(Objects::nonNull)
+                        .toList()
+        );
+        Map<Long, String> firstDisplayNameByUserId = new HashMap<>();
+
+        for (LobbyParticipant player : lobbyPlayers) {
+            if (player == null || player.getGuestSessionId() == null) continue;
+
+            Optional<GameSession> activeForSession = findActiveGameSessionForGuestSession(player.getGuestSessionId());
+            if (activeForSession.isPresent() && !Objects.equals(activeForSession.get().getLobbyId(), lobby.getId())) {
+                throw new ResponseStatusException(CONFLICT, "A lobby player already has another active game in progress.");
+            }
+
+            GuestSession session = sessionsById.get(player.getGuestSessionId());
+            Long userId = session == null ? null : session.getUserId();
+            if (userId == null) continue;
+
+            String existing = firstDisplayNameByUserId.putIfAbsent(userId, player.getDisplayName());
+            if (existing != null) {
+                throw new ResponseStatusException(CONFLICT, "The same account cannot occupy multiple slots in one lobby.");
+            }
+
+            for (String sessionId : guestSessionRepository.findIdsByUserId(userId)) {
+                if (Objects.equals(sessionId, player.getGuestSessionId())) continue;
+                Optional<GameSession> activeForUser = findActiveGameSessionForGuestSession(sessionId);
+                if (activeForUser.isPresent() && !Objects.equals(activeForUser.get().getLobbyId(), lobby.getId())) {
+                    throw new ResponseStatusException(CONFLICT, "A lobby player already has another active game in progress.");
+                }
+            }
+        }
+    }
+
+    private Map<String, GuestSession> guestSessionsById(List<String> guestSessionIds) {
+        if (guestSessionIds == null || guestSessionIds.isEmpty()) return Map.of();
+
+        Map<String, GuestSession> out = new HashMap<>();
+        for (GuestSession session : guestSessionRepository.findAllById(guestSessionIds)) {
+            if (session == null || session.getId() == null) continue;
+            out.put(session.getId(), session);
+        }
+        return out;
     }
 
     public GameStateDto getState(HttpServletRequest request, String lobbyCode) {

@@ -413,7 +413,7 @@ class LibraryQuizControllerTest {
         AppUser user = new AppUser(
                 email,
                 passwordEncoder.encode("Password123"),
-                "Player",
+                displayNameFor(email),
                 roles,
                 clock.instant()
         );
@@ -452,11 +452,21 @@ class LibraryQuizControllerTest {
         AppUser user = new AppUser(
                 email,
                 passwordEncoder.encode("Password123"),
-                "Owner",
+                displayNameFor(email),
                 Set.of(AppRole.USER),
                 clock.instant()
         );
         return userRepository.save(user);
+    }
+
+    private static String displayNameFor(String email) {
+        String localPart = email == null ? "user" : email.split("@", 2)[0];
+        String normalized = localPart.replaceAll("[^A-Za-z0-9_-]", "_");
+        if (normalized.isBlank()) {
+            normalized = "user";
+        }
+        String candidate = "User_" + normalized;
+        return candidate.length() <= 32 ? candidate : candidate.substring(0, 32);
     }
 
     private record Login(String email, String password) {}

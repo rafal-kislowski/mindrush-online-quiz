@@ -798,6 +798,7 @@ class LobbyControllerTest {
 
         MvcResult created = mockMvc.perform(post("/api/lobbies")
                         .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .cookie(access)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isCreated())
@@ -896,6 +897,83 @@ class LobbyControllerTest {
     }
 
     @Test
+    void createLobby_whenSameAuthenticatedAccountAlreadyOwnsLobbyOnAnotherSession_isBlocked() throws Exception {
+        Cookie access = registerAndGetAccessCookie();
+        String firstSessionId = createGuestSession(access);
+        String secondSessionId = createGuestSession(access);
+
+        MvcResult created = mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", firstSessionId))
+                        .cookie(access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String code = jsonValue(created.getResponse().getContentAsString(), "\"code\":\"", "\"").orElseThrow();
+
+        mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", secondSessionId))
+                        .cookie(access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("This account is already active in lobby " + code + " from another session."));
+    }
+
+    @Test
+    void createLobby_whenAuthenticatedCookieArrivesBeforeGuestSessionRefresh_isBlockedForSameAccount() throws Exception {
+        Cookie access = registerAndGetAccessCookie();
+        String firstSessionId = createGuestSession();
+        String secondSessionId = createGuestSession();
+
+        MvcResult created = mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", firstSessionId))
+                        .cookie(access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String code = jsonValue(created.getResponse().getContentAsString(), "\"code\":\"", "\"").orElseThrow();
+
+        mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", secondSessionId))
+                        .cookie(access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("This account is already active in lobby " + code + " from another session."));
+    }
+
+    @Test
+    void createLobby_withoutAccessCookie_doesNotClearExistingAuthenticatedSessionBinding() throws Exception {
+        Cookie access = registerAndGetAccessCookie();
+        String ownerSessionId = createGuestSession(access);
+
+        mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .cookie(access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated());
+
+        Long userIdBefore = guestSessionRepository.findById(ownerSessionId)
+                .map(pl.mindrush.backend.guest.GuestSession::getUserId)
+                .orElseThrow();
+        assertThat(userIdBefore).isNotNull();
+
+        mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated());
+
+        Long userIdAfter = guestSessionRepository.findById(ownerSessionId)
+                .map(pl.mindrush.backend.guest.GuestSession::getUserId)
+                .orElseThrow();
+        assertThat(userIdAfter).isEqualTo(userIdBefore);
+    }
+
+    @Test
     void joinLobby_whenGuestOwnsAnotherActiveLobby_isBlocked() throws Exception {
         String ownerSessionId = createGuestSession();
         String secondOwnerSessionId = createGuestSession();
@@ -966,6 +1044,68 @@ class LobbyControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void joinLobby_whenSameAuthenticatedAccountIsAlreadyInTargetLobbyOnAnotherSession_isBlocked() throws Exception {
+        Cookie access = registerAndGetAccessCookie();
+        String ownerSessionId = createGuestSession();
+        String firstPlayerSessionId = createGuestSession(access);
+        String secondPlayerSessionId = createGuestSession(access);
+
+        MvcResult created = mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String code = jsonValue(created.getResponse().getContentAsString(), "\"code\":\"", "\"").orElseThrow();
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", firstPlayerSessionId))
+                        .cookie(access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", secondPlayerSessionId))
+                        .cookie(access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("This account is already in lobby " + code + " from another session."));
+    }
+
+    @Test
+    void joinLobby_whenAuthenticatedCookieArrivesBeforeGuestSessionRefresh_isBlockedForSameAccount() throws Exception {
+        Cookie access = registerAndGetAccessCookie();
+        String ownerSessionId = createGuestSession();
+        String firstPlayerSessionId = createGuestSession();
+        String secondPlayerSessionId = createGuestSession();
+
+        MvcResult created = mockMvc.perform(post("/api/lobbies")
+                        .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String code = jsonValue(created.getResponse().getContentAsString(), "\"code\":\"", "\"").orElseThrow();
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", firstPlayerSessionId))
+                        .cookie(access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/lobbies/" + code + "/join")
+                        .cookie(new Cookie("guestSessionId", secondPlayerSessionId))
+                        .cookie(access)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("This account is already in lobby " + code + " from another session."));
     }
 
     @Test
@@ -1147,6 +1287,7 @@ class LobbyControllerTest {
 
         MvcResult created = mockMvc.perform(post("/api/lobbies")
                         .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .cookie(accessCookie)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isCreated())
@@ -1167,6 +1308,7 @@ class LobbyControllerTest {
         try {
             mockMvc.perform(post("/api/lobbies/" + code + "/selected-quiz")
                             .cookie(new Cookie("guestSessionId", ownerSessionId))
+                            .cookie(accessCookie)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"quizId\":" + pendingQuiz.getId() + "}"))
                     .andExpect(status().isNotFound());
@@ -1182,6 +1324,7 @@ class LobbyControllerTest {
 
         MvcResult created = mockMvc.perform(post("/api/lobbies")
                         .cookie(new Cookie("guestSessionId", ownerSessionId))
+                        .cookie(accessCookie)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isCreated())
@@ -1203,6 +1346,7 @@ class LobbyControllerTest {
         try {
             mockMvc.perform(post("/api/lobbies/" + code + "/selected-quiz")
                             .cookie(new Cookie("guestSessionId", ownerSessionId))
+                            .cookie(accessCookie)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"quizId\":" + approvedCustom.getId() + ",\"rankingEnabled\":true}"))
                     .andExpect(status().isConflict());
@@ -1401,13 +1545,14 @@ class LobbyControllerTest {
 
     private Cookie registerAndGetAccessCookie() throws Exception {
         String email = "user-" + UUID.randomUUID() + "@example.com";
+        String displayName = "User_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         String body = """
                 {
                   "email": "%s",
-                  "displayName": "User",
+                  "displayName": "%s",
                   "password": "Password123"
                 }
-                """.formatted(email);
+                """.formatted(email, displayName);
 
         MvcResult res = mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)

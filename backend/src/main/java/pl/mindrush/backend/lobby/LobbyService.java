@@ -109,7 +109,8 @@ public class LobbyService {
             }
             return lobbySummary(lobby, guestSession.getId());
         }
-        ensureNoActiveGameForGuestSession(guestSession.getId(), "create a lobby");
+        ensureAccountIsNotAlreadyActiveInLobby(guestSession, null);
+        ensureNoActiveGameForGuestSession(guestSession, "create a lobby");
 
         Instant now = Instant.now();
 
@@ -300,11 +301,13 @@ public class LobbyService {
         Lobby lobby = lobbyRepository.findByCode(code).orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Lobby not found"));
         boolean isOwner = guestSession.getId().equals(lobby.getOwnerGuestSessionId());
 
+        ensureAccountIsNotAlreadyActiveInLobby(guestSession, lobby);
+
         Optional<Lobby> existingJoinedLobby = findActiveLobbyForGuestSession(guestSession.getId());
         if (existingJoinedLobby.isPresent() && !existingJoinedLobby.get().getId().equals(lobby.getId())) {
             throw new ResponseStatusException(CONFLICT, "You are already in active lobby " + existingJoinedLobby.get().getCode());
         }
-        ensureNoActiveGameForGuestSession(guestSession.getId(), "join a lobby");
+        ensureNoActiveGameForGuestSession(guestSession, "join a lobby");
 
         if (lobby.getStatus() != LobbyStatus.OPEN) {
             throw new ResponseStatusException(CONFLICT, "Lobby is closed");
@@ -730,7 +733,49 @@ public class LobbyService {
                 .findFirst();
     }
 
-    private void ensureNoActiveGameForGuestSession(String guestSessionId, String actionLabel) {
+    private void ensureAccountIsNotAlreadyActiveInLobby(GuestSession guestSession, Lobby targetLobby) {
+        Long userId = guestSession == null ? null : guestSession.getUserId();
+        if (userId == null) return;
+
+        for (String sessionId : guestSessionIdsForUser(userId)) {
+            if (Objects.equals(sessionId, guestSession.getId())) continue;
+            Optional<Lobby> activeLobby = findActiveLobbyForGuestSession(sessionId);
+            if (activeLobby.isEmpty()) continue;
+
+            Lobby lobby = activeLobby.get();
+            if (targetLobby != null && Objects.equals(lobby.getId(), targetLobby.getId())) {
+                throw new ResponseStatusException(
+                        CONFLICT,
+                        "This account is already in lobby " + lobby.getCode() + " from another session."
+                );
+            }
+            throw new ResponseStatusException(
+                    CONFLICT,
+                    "This account is already active in lobby " + lobby.getCode() + " from another session."
+            );
+        }
+    }
+
+    private void ensureNoActiveGameForGuestSession(GuestSession guestSession, String actionLabel) {
+        if (guestSession == null) return;
+        ensureNoActiveGameForGuestSessionId(guestSession.getId(), actionLabel);
+
+        Long userId = guestSession.getUserId();
+        if (userId == null) return;
+
+        for (String sessionId : guestSessionIdsForUser(userId)) {
+            if (Objects.equals(sessionId, guestSession.getId())) continue;
+            Optional<GameSession> activeGame = gameService.findActiveGameSessionForGuestSession(sessionId);
+            if (activeGame.isPresent()) {
+                throw new ResponseStatusException(
+                        CONFLICT,
+                        "You already have an active game in progress. Finish it before you " + actionLabel + "."
+                );
+            }
+        }
+    }
+
+    private void ensureNoActiveGameForGuestSessionId(String guestSessionId, String actionLabel) {
         Optional<GameSession> activeGame = gameService.findActiveGameSessionForGuestSession(guestSessionId);
         if (activeGame.isEmpty()) return;
 
@@ -738,6 +783,14 @@ public class LobbyService {
                 CONFLICT,
                 "You already have an active game in progress. Finish it before you " + actionLabel + "."
         );
+    }
+
+    private List<String> guestSessionIdsForUser(Long userId) {
+        if (userId == null) return List.of();
+        return guestSessionRepository.findIdsByUserId(userId).stream()
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
     }
 
     private void maybeStartGameWhenAllPlayersReady(Lobby lobby) {

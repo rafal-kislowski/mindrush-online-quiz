@@ -5,13 +5,17 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import pl.mindrush.backend.JwtCookieAuthenticationFilter;
 
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
@@ -84,7 +88,9 @@ public class GuestSessionService {
             session.setDisplayName(generateGuestDisplayName());
         }
 
-        session.setUserId(userId);
+        if (userId != null) {
+            session.setUserId(userId);
+        }
         repository.save(session);
 
         ResponseCookie cookie = ResponseCookie.from(cookieName, session.getId())
@@ -107,7 +113,9 @@ public class GuestSessionService {
     }
 
     public GuestSession requireValidSession(HttpServletRequest request) {
-        return findValidSession(request).orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "Guest session is missing or expired"));
+        GuestSession session = findValidSession(request)
+                .orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "Guest session is missing or expired"));
+        return synchronizeAuthenticatedIdentity(session);
     }
 
     public String clearCookieHeader() {
@@ -166,8 +174,48 @@ public class GuestSessionService {
         if (preferredDisplayName != null && !preferredDisplayName.isBlank()) {
             session.setDisplayName(preferredDisplayName.trim());
         }
-        session.setUserId(userId);
+        if (userId != null) {
+            session.setUserId(userId);
+        }
         repository.save(session);
+    }
+
+    private GuestSession synchronizeAuthenticatedIdentity(GuestSession session) {
+        AuthenticatedIdentity identity = currentAuthenticatedIdentity();
+        boolean changed = false;
+
+        if (identity.userId() != null && !Objects.equals(session.getUserId(), identity.userId())) {
+            session.setUserId(identity.userId());
+            changed = true;
+        }
+
+        if (identity.displayName() != null && !identity.displayName().equals(session.getDisplayName())) {
+            session.setDisplayName(identity.displayName());
+            changed = true;
+        }
+
+        if (changed) {
+            repository.save(session);
+        }
+        return session;
+    }
+
+    private static AuthenticatedIdentity currentAuthenticatedIdentity() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return AuthenticatedIdentity.anonymous();
+        }
+
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof JwtCookieAuthenticationFilter.AuthenticatedUser au) {
+            String displayName = au.displayName();
+            return new AuthenticatedIdentity(
+                    au.id(),
+                    displayName == null || displayName.isBlank() ? null : displayName.trim()
+            );
+        }
+
+        return AuthenticatedIdentity.anonymous();
     }
 
     private String generateGuestDisplayName() {
@@ -190,5 +238,11 @@ public class GuestSessionService {
     }
 
     public record Result(GuestSession session, String headerName, String headerValue) {
+    }
+
+    private record AuthenticatedIdentity(Long userId, String displayName) {
+        private static AuthenticatedIdentity anonymous() {
+            return new AuthenticatedIdentity(null, null);
+        }
     }
 }

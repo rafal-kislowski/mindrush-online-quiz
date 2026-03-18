@@ -40,3 +40,5 @@ frontend/dist/
 uploads/
 backend/uploads/
 frontend/.angular/
+
+backend/.m2/

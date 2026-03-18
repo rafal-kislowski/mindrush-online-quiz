@@ -1,6 +1,7 @@
 package pl.mindrush.backend;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -67,18 +68,20 @@ public class AuthService {
         if (userRepository.existsByEmailIgnoreCase(normalized)) {
             throw new ResponseStatusException(BAD_REQUEST, "Email already registered");
         }
+        String normalizedDisplayName = normalizeDisplayName(displayName);
+        ensureDisplayNameAvailable(normalizedDisplayName, null);
 
         Instant now = clock.instant();
         AppUser user = new AppUser(
                 normalized,
                 passwordEncoder.encode(password),
-                normalizeDisplayName(displayName),
+                normalizedDisplayName,
                 Set.of(AppRole.USER),
                 now
         );
         user.setEmailVerified(false);
         user.setEmailVerifiedAt(null);
-        user = userRepository.save(user);
+        user = saveRegisteredUser(user, normalizedDisplayName);
 
         sendVerificationEmail(user, true);
 
@@ -217,6 +220,7 @@ public class AuthService {
         if (nextDisplayName.equalsIgnoreCase(currentDisplayName)) {
             throw new ResponseStatusException(BAD_REQUEST, "New nickname must be different from current nickname");
         }
+        ensureDisplayNameAvailable(nextDisplayName, user.getId());
 
         Instant now = clock.instant();
         Instant lastChangeAt = user.getLastDisplayNameChangeAt();
@@ -240,7 +244,7 @@ public class AuthService {
         user.setCoins(user.getCoins() - DISPLAY_NAME_CHANGE_COST_COINS);
         user.setDisplayName(nextDisplayName);
         user.setLastDisplayNameChangeAt(now);
-        userRepository.save(user);
+        saveUpdatedDisplayName(user);
         return toAuthUserDto(user);
     }
 
@@ -296,6 +300,7 @@ public class AuthService {
     private static String normalizeDisplayName(String displayName) {
         String d = displayName == null ? "" : displayName.trim();
         if (d.isBlank()) throw new ResponseStatusException(BAD_REQUEST, "Nickname is required");
+        d = d.replaceAll("\\s+", " ");
         if (d.length() < 3 || d.length() > 32) throw new ResponseStatusException(BAD_REQUEST, "Nickname must be 3-32 characters");
         // Allowed: letters, digits, space, dash, underscore
         for (int i = 0; i < d.length(); i++) {
@@ -308,6 +313,37 @@ public class AuthService {
             if (!ok) throw new ResponseStatusException(BAD_REQUEST, "Nickname contains invalid characters");
         }
         return d;
+    }
+
+    private void ensureDisplayNameAvailable(String displayName, Long excludedUserId) {
+        boolean taken = excludedUserId == null
+                ? userRepository.existsByDisplayNameIgnoreCase(displayName)
+                : userRepository.existsByDisplayNameIgnoreCaseAndIdNot(displayName, excludedUserId);
+        if (taken) {
+            throw new ResponseStatusException(BAD_REQUEST, "Nickname is already taken");
+        }
+    }
+
+    private AppUser saveRegisteredUser(AppUser user, String displayName) {
+        try {
+            return userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException ex) {
+            if (userRepository.existsByEmailIgnoreCase(user.getEmail())) {
+                throw new ResponseStatusException(BAD_REQUEST, "Email already registered", ex);
+            }
+            if (userRepository.existsByDisplayNameIgnoreCase(displayName)) {
+                throw new ResponseStatusException(BAD_REQUEST, "Nickname is already taken", ex);
+            }
+            throw ex;
+        }
+    }
+
+    private void saveUpdatedDisplayName(AppUser user) {
+        try {
+            userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResponseStatusException(BAD_REQUEST, "Nickname is already taken", ex);
+        }
     }
 
     private static void ensureNotBanned(AppUser user) {
