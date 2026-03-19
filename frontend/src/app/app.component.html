@@ -533,5 +533,27 @@
   </div>
 </div>
 
+<div
+  class="demo-modal"
+  *ngIf="showDemoNoticeModal"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="demo-notice-title"
+  aria-describedby="demo-notice-message"
+>
+  <div class="demo-modal__backdrop" (click)="dismissDemoNotice()"></div>
+  <section class="demo-modal__card">
+    <div class="demo-modal__eyebrow">{{ demoBannerLabel }}</div>
+    <h2 class="demo-modal__title" id="demo-notice-title">This is a public demo</h2>
+    <p class="demo-modal__message" id="demo-notice-message">{{ demoBannerMessage }}</p>
+    <p class="demo-modal__meta" *ngIf="demoResetLabel(appInfo?.nextResetAt) as nextReset">
+      Next reset: {{ nextReset }}
+    </p>
+    <button class="demo-modal__action" type="button" (click)="dismissDemoNotice()">
+      I understand
+    </button>
+  </section>
+</div>
+
 <app-toast-viewport></app-toast-viewport>
 

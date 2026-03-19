@@ -427,7 +427,10 @@
 }
 
 .config-panel--picker {
-  min-height: clamp(420px, 56vh, 620px);
+  min-height: 0;
+  height: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 /* Casual should animate as one block.
@@ -489,7 +492,7 @@
 
 .picker-shell,
 .picker-panel {
-  flex: 1;
+  flex: 0 1 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;

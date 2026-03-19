@@ -175,7 +175,7 @@ public class LobbyService {
                 .map(GuestSession::getId)
                 .orElse(null);
 
-        List<Lobby> lobbies = lobbyRepository.findAllByStatusOrderByCreatedAtDesc(LobbyStatus.OPEN);
+        List<Lobby> lobbies = lobbyRepository.findAllByStatusInOrderByCreatedAtDesc(List.of(LobbyStatus.OPEN, LobbyStatus.IN_GAME));
         if (lobbies.isEmpty()) return List.of();
 
         List<String> lobbyIds = lobbies.stream().map(Lobby::getId).toList();

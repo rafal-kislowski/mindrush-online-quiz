@@ -30,6 +30,7 @@ jobs:
     env:
       BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/mindrush-online-quiz-backend:${{ github.event.workflow_run.head_sha }}
       FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/mindrush-online-quiz-frontend:${{ github.event.workflow_run.head_sha }}
+      DEMO_APP_DIR: ${{ secrets.VPS_DEMO_APP_DIR }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -83,7 +84,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
-          source: docker-compose.vps.yml,deploy/vps/remote-deploy.sh,.env.example
+          source: docker-compose.vps.yml,deploy/vps/remote-deploy.sh,.env.example,.env.demo.example
           target: ${{ secrets.VPS_APP_DIR }}
           overwrite: true
 
@@ -91,6 +92,40 @@ jobs:
         uses: appleboy/ssh-action@v1.2.0
         env:
           APP_DIR: ${{ secrets.VPS_APP_DIR }}
+          COMPOSE_FILE: docker-compose.vps.yml
+          ENV_FILE: .env
+          DEPLOY_ENV_FILE: .env.deploy
+          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          envs: APP_DIR,COMPOSE_FILE,ENV_FILE,DEPLOY_ENV_FILE,BACKEND_IMAGE,FRONTEND_IMAGE,GHCR_USERNAME,GHCR_TOKEN
+          script: |
+            chmod +x "${APP_DIR}/deploy/vps/remote-deploy.sh"
+            bash "${APP_DIR}/deploy/vps/remote-deploy.sh"
+
+      - name: Copy deployment files to demo VPS directory
+        if: ${{ env.DEMO_APP_DIR != '' }}
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          source: docker-compose.vps.yml,deploy/vps/remote-deploy.sh,.env.example,.env.demo.example
+          target: ${{ env.DEMO_APP_DIR }}
+          overwrite: true
+
+      - name: Deploy demo on VPS
+        if: ${{ env.DEMO_APP_DIR != '' }}
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          APP_DIR: ${{ env.DEMO_APP_DIR }}
           COMPOSE_FILE: docker-compose.vps.yml
           ENV_FILE: .env
           DEPLOY_ENV_FILE: .env.deploy

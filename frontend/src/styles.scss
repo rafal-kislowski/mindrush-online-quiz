@@ -2576,10 +2576,19 @@ input[type="color"]::-moz-color-swatch {
 }
 
 .lobby-page .picker-list {
-  margin-top: 12px;
-  padding: 14px 14px 18px;
+  --mr-picker-list-visible-rows: 4;
+  --mr-picker-list-gap: 12px;
+  --mr-picker-list-pad-top: 10px;
+  --mr-picker-list-pad-bottom: 10px;
+  margin-top: 10px;
+  padding: var(--mr-picker-list-pad-top) 14px var(--mr-picker-list-pad-bottom);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  --mr-picker-list-h: clamp(340px, 50vh, 520px);
+  --mr-picker-list-h: calc(
+    (var(--mr-quiz-tile-min-h) * var(--mr-picker-list-visible-rows)) +
+    (var(--mr-picker-list-gap) * (var(--mr-picker-list-visible-rows) - 1)) +
+    var(--mr-picker-list-pad-top) +
+    var(--mr-picker-list-pad-bottom)
+  );
   flex: 0 0 var(--mr-picker-list-h);
   height: var(--mr-picker-list-h);
   min-height: var(--mr-picker-list-h);
@@ -2588,6 +2597,10 @@ input[type="color"]::-moz-color-swatch {
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: rgba(56, 189, 248, 0.35) transparent;
+}
+
+.lobby-page .picker-list.picker-list--fit {
+  overflow-y: hidden;
 }
 
 .lobby-page .picker-list.picker-list--scope-forward-a,
@@ -2668,8 +2681,10 @@ input[type="color"]::-moz-color-swatch {
   .lobby-page .picker-list {
     /* Make quiz cards span wider on mobile/tablet. */
     margin-top: 10px;
-    padding: 12px 4px 16px;
-    --mr-picker-list-h: clamp(280px, 46vh, 460px);
+    --mr-picker-list-gap: 10px;
+    --mr-picker-list-pad-top: 10px;
+    --mr-picker-list-pad-bottom: 10px;
+    padding: var(--mr-picker-list-pad-top) 4px var(--mr-picker-list-pad-bottom);
   }
 
   /* Mobile: remove heavy card shadows in picker grid (looks cramped on small screens). */
@@ -4942,8 +4957,9 @@ input[type="color"]::-moz-color-swatch {
 }
 
 .lobby-page .quiz-grid.quiz-grid--picker {
-  margin: 12px auto 0;
+  margin: 0 auto;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--mr-picker-list-gap, 12px);
 }
 
 @media (min-width: 1100px) {

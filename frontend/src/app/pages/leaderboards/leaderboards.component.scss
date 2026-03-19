@@ -3,6 +3,9 @@
   height: 100%;
   --lb-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --outer-gap: clamp(10px, 1.4vw, 18px);
+  --lb-visible-rows: 5;
+  --lb-row-gap: 4px;
+  --lb-row-height: 54px;
 }
 
 .page {
@@ -11,12 +14,14 @@
   min-height: calc(100svh - 64px);
   height: auto;
   padding: calc(var(--outer-gap) + 6px);
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .frame {
   width: min(1280px, 100%);
+  margin-inline: auto;
   height: auto;
   min-height: 0;
   padding: clamp(22px, 2.8vw, 44px);
@@ -31,7 +36,7 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.10);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   gap: clamp(12px, 1.4vw, 18px);
@@ -196,22 +201,52 @@
 }
 
 .table-wrap {
+  --lb-table-height: calc(
+    (var(--lb-row-height) * var(--lb-visible-rows)) +
+    (var(--lb-row-gap) * (var(--lb-visible-rows) - 1)) +
+    12px
+  );
   padding: 12px 0 0;
-  max-height: none;
-  overflow: visible;
-  flex: 1;
+  height: var(--lb-table-height);
+  min-height: var(--lb-table-height);
+  max-height: var(--lb-table-height);
+  overflow: auto;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--lb-row-gap);
+  min-height: 0;
+  padding-right: 4px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
   opacity: 0;
   transform: translateY(10px);
   animation: lbPanelIn 520ms var(--lb-ease-out) 80ms both;
+}
+
+.table-wrap::-webkit-scrollbar {
+  width: 6px;
+}
+
+.table-wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.table-wrap::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.table-wrap::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.24);
 }
 
 .row {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  min-height: var(--lb-row-height);
   padding: 10px 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   position: relative;
@@ -366,7 +401,10 @@
 }
 
 .empty {
+  min-height: calc(var(--lb-row-height) * var(--lb-visible-rows));
   padding: 18px 0;
+  display: grid;
+  place-items: center;
   color: rgba(255, 255, 255, 0.6);
   font-weight: 700;
 }
@@ -638,11 +676,6 @@
 @media (max-width: 720px) {
   .page {
     padding: calc(var(--outer-gap) + 2px);
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
   }
 
   .frame {
@@ -681,8 +714,23 @@
   }
 
   .table-wrap {
+    --lb-row-height: 50px;
     padding: 10px 0 0;
-    max-height: none;
+    height: calc(
+      (var(--lb-row-height) * var(--lb-visible-rows)) +
+      (var(--lb-row-gap) * (var(--lb-visible-rows) - 1)) +
+      10px
+    );
+    min-height: calc(
+      (var(--lb-row-height) * var(--lb-visible-rows)) +
+      (var(--lb-row-gap) * (var(--lb-visible-rows) - 1)) +
+      10px
+    );
+    max-height: calc(
+      (var(--lb-row-height) * var(--lb-visible-rows)) +
+      (var(--lb-row-gap) * (var(--lb-visible-rows) - 1)) +
+      10px
+    );
   }
 
   .name {

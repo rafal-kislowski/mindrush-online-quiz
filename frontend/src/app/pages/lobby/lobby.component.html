@@ -1123,7 +1123,12 @@
                     </div>
                   </div>
 
-                  <div class="picker-list" [ngClass]="pickerListAnimClass" role="region" aria-label="Quiz list">
+                  <div
+                    class="picker-list"
+                    [ngClass]="[pickerListAnimClass, pickerFitsWithoutScroll ? 'picker-list--fit' : '']"
+                    role="region"
+                    aria-label="Quiz list"
+                  >
                     <ng-container *ngIf="filteredQuizzes as visibleQuizzes">
                       <div class="quiz-grid quiz-grid--picker">
                         <button

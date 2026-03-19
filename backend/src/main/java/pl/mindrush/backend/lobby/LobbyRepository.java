@@ -10,6 +10,7 @@ public interface LobbyRepository extends JpaRepository<Lobby, String> {
     Optional<Lobby> findByCode(String code);
     boolean existsByCode(String code);
     List<Lobby> findAllByStatusOrderByCreatedAtDesc(LobbyStatus status);
+    List<Lobby> findAllByStatusInOrderByCreatedAtDesc(List<LobbyStatus> statuses);
     Optional<Lobby> findFirstByOwnerGuestSessionIdAndStatusInOrderByCreatedAtDesc(String ownerGuestSessionId, List<LobbyStatus> statuses);
     long countBySelectedQuizIdAndStatus(Long selectedQuizId, LobbyStatus status);
     List<Lobby> findAllBySelectedQuizIdAndStatus(Long selectedQuizId, LobbyStatus status);

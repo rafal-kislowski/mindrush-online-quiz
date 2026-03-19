@@ -230,6 +230,17 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.pickerListAnimFlip ? 'picker-list--scope-forward-a' : 'picker-list--scope-forward-b';
   }
 
+  get pickerGridColumns(): number {
+    if (typeof window === 'undefined') return 3;
+    if (window.innerWidth <= 920) return 1;
+    if (window.innerWidth >= 1100) return 3;
+    return 2;
+  }
+
+  get pickerFitsWithoutScroll(): boolean {
+    return Math.ceil(this.filteredQuizzes.length / this.pickerGridColumns) <= 4;
+  }
+
   get readyActionLabel(): string {
     if (!this.hasSelectedQuiz) return 'Select quiz first';
     if (!this.hasRequiredPlayers) return 'Waiting for players';
@@ -1563,14 +1574,14 @@ export class LobbyComponent implements OnInit, AfterViewInit, OnDestroy {
   quizAvatarStyle(q: QuizListItemDto | null): { [key: string]: string } {
     if (!q) {
       return {
-        background: 'rgba(255, 255, 255, 0.06)',
-        color: 'rgba(255, 255, 255, 0.92)',
+        background: 'rgba(56, 189, 248, 0.4)',
+        color: 'rgba(255, 255, 255, 0.94)',
       };
     }
     const imageUrl = this.normalizeNullableUrl(q.avatarImageUrl ?? null);
-    const bgStart = this.normalizeNullableColor(q.avatarBgStart ?? null) ?? '#30D0FF';
+    const bgStart = this.normalizeNullableColor(q.avatarBgStart ?? null) ?? 'rgba(56, 189, 248, 0.4)';
     const bgEnd = this.normalizeNullableColor(q.avatarBgEnd ?? null);
-    const textColor = this.normalizeNullableColor(q.avatarTextColor ?? null) ?? '#0A0E1C';
+    const textColor = this.normalizeNullableColor(q.avatarTextColor ?? null) ?? 'rgba(255, 255, 255, 0.94)';
 
     if (imageUrl) {
       return {

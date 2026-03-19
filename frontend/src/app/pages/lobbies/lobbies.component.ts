@@ -182,8 +182,8 @@ export class LobbiesComponent implements OnInit, OnDestroy {
       filtered = filtered.filter((row) => {
         if (this.roomFilter === 'private') return row.hasPassword;
         if (this.roomFilter === 'public') return !row.hasPassword;
-        if (this.roomFilter === 'available') return row.playerCount < row.maxPlayers;
-        if (this.roomFilter === 'full') return row.playerCount >= row.maxPlayers;
+        if (this.roomFilter === 'available') return this.isOpenWithFreeSlots(row);
+        if (this.roomFilter === 'full') return row.status === 'OPEN' && row.playerCount >= row.maxPlayers;
         return true;
       });
     }
@@ -301,6 +301,7 @@ export class LobbiesComponent implements OnInit, OnDestroy {
 
   joinButtonLabel(row: ActiveLobbyDto): string {
     if (this.isOwnLobby(row)) return 'Open';
+    if (row.status === 'IN_GAME') return 'Live';
     if (!this.isOpenWithFreeSlots(row)) return 'Full';
     return 'Join';
   }

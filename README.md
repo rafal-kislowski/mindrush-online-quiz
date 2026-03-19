@@ -2,7 +2,11 @@
 
 Full-stack quiz platform (Spring Boot backend + Angular frontend).
 
-Live demo: `https://mindrush.rafalkislowski.pl`
+## Live Demo
+`https://demo-mindrush.rafalkislowski.pl`
+
+Public demo uses synthetic data and resets daily.
+Recommended flow: enter as guest and browse leaderboards, active lobbies, quiz library, and live game flow.
 
 ## Tech stack
 - Java 17, Spring Boot 3
@@ -35,6 +39,21 @@ Before deploying on VPS, prepare environment variables and production profile:
    - keep `APP_FLYWAY_BASELINE_ON_MIGRATE=true` (default),
    - first start will create Flyway history baseline.
 5. Rotate any previously used API/SMTP credentials before public demo deployment.
+
+## Demo profile
+For a portfolio/public demo, run a separate deployment with `SPRING_PROFILES_ACTIVE=demo` and a separate database.
+
+What the `demo` profile does:
+- disables mail, OpenAI, and bootstrap admin
+- seeds starter quizzes plus a curated demo leaderboard
+- creates a few believable demo lobbies and keeps light simulated activity running
+- exposes a visible frontend banner and `/api/app/info`
+- resets demo data on startup and on a daily cron (`app.demo.reset.*`)
+
+Recommended approach:
+- never point `demo` at your production database
+- keep `demo` on a separate subdomain / compose stack
+- tell visitors that demo data is synthetic and resets daily
 
 ## CI/CD for VPS
 This repository includes a production-style CI/CD path based on GitHub Actions + GHCR + Docker Compose on VPS:
@@ -82,6 +101,7 @@ In GitHub repository settings -> `Secrets and variables` -> `Actions`, add:
 - `VPS_USER` -> deployment user on VPS
 - `VPS_SSH_KEY` -> private SSH key for that user
 - `VPS_APP_DIR` -> deployment directory, for example `/opt/mindrush`
+- `VPS_DEMO_APP_DIR` -> optional second deployment directory for public demo, for example `/opt/mindrush-demo`
 
 ### 3) What happens on deploy
 After every push to `main`:
@@ -104,6 +124,33 @@ Files used by the deployment:
 - Database data remains persistent in Docker volume `mindrush_mysql_data`.
 - The frontend can join an existing reverse-proxy Docker network through `PROXY_NETWORK`.
 - If you use a custom domain, terminate HTTPS in front of the app (for example Nginx Proxy Manager, Traefik or Nginx on the VPS) and keep `AUTH_COOKIE_SECURE=true`.
+
+### Parallel prod + demo on one VPS
+The repository can now run two independent stacks from the same `docker-compose.vps.yml` as long as:
+- production and demo use different VPS directories
+- each directory has its own `.env`
+- production and demo use different databases
+- demo uses the `demo` Spring profile and its own subdomain
+
+Suggested layout:
+- prod app dir: `/home/portfolio/mindrush-online-quiz`
+- demo app dir: `/home/portfolio/mindrush-online-quiz-demo`
+- prod env: create `/home/portfolio/mindrush-online-quiz/.env`
+- demo env: create `/home/portfolio/mindrush-online-quiz-demo/.env` from `.env.demo.example`
+
+Suggested demo env values:
+- `SPRING_PROFILES_ACTIVE=demo`
+- `MYSQL_DATABASE=mindrush_demo`
+- `APP_CORS_ALLOWED_ORIGINS=https://demo-mindrush.rafalkislowski.pl`
+- `APP_FRONTEND_BASE_URL=https://demo-mindrush.rafalkislowski.pl`
+- `FRONTEND_PORT=8084`
+- `PROXY_FRONTEND_HOSTNAME=demo-mindrush-frontend`
+- `APP_MAIL_ENABLED=false`
+- `OPENAI_ENABLED=false`
+- `ADMIN_EMAIL=`
+- `ADMIN_PASSWORD=`
+
+Use a different `PROXY_FRONTEND_HOSTNAME` for each stack so the reverse proxy can route prod and demo to separate frontend containers on the shared Docker network.
 
 ## Dockerized stack (frontend + backend + db)
 The repository now supports running the whole app in containers:

@@ -8,10 +8,12 @@ import {
   RouterOutlet,
 } from '@angular/router';
 import { Subscription, catchError, combineLatest, distinctUntilChanged, filter, finalize, forkJoin, interval, map, of, startWith, switchMap } from 'rxjs';
+import { AppInfoApi } from './core/api/app-info.api';
 import { AuthService } from './core/auth/auth.service';
 import { GameApi } from './core/api/game.api';
 import { LobbyApi } from './core/api/lobby.api';
 import { NotificationApi, NotificationStreamEventDto, UserNotificationDto } from './core/api/notification.api';
+import { AppInfoDto } from './core/models/app-info.models';
 import { ActiveGameDto } from './core/models/game.models';
 import { LobbyDto } from './core/models/lobby.models';
 import { SessionService } from './core/session/session.service';
@@ -91,7 +93,9 @@ interface AppNotification {
   styleUrl: './app.component.scss',
 })
 export class AppComponent implements OnInit, OnDestroy {
+  private readonly demoNoticeStorageKey = 'mindrush.demo-notice.dismissed';
   private readonly particlesService = inject(ParticlesService);
+  private readonly appInfoApi = inject(AppInfoApi);
   private readonly sessionService = inject(SessionService);
   private readonly authService = inject(AuthService);
   private readonly gameApi = inject(GameApi);
@@ -103,6 +107,12 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly subscriptions = new Subscription();
   private readonly intFormatter = new Intl.NumberFormat('en-US');
+  private readonly demoResetFormatter = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
   readonly session$ = this.sessionService.session$;
   readonly authUser$ = this.authService.user$;
   readonly isAdmin$ = this.authService.user$.pipe(map(u => !!u?.roles?.includes('ADMIN')));
@@ -153,8 +163,10 @@ export class AppComponent implements OnInit, OnDestroy {
   sidebarTransitionsReady = false;
   contentWide = false;
   contentFull = false;
+  appInfo: AppInfoDto | null = null;
   currentLobby: LobbyDto | null = null;
   currentGame: ActiveGameDto | null = null;
+  demoNoticeDismissed = false;
   notifications: AppNotification[] = [];
   notificationFilter: 'all' | 'unread' = 'all';
   notificationsOpen = false;
@@ -197,6 +209,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.particlesService.initParticles();
+    this.loadAppInfo();
     if ('scrollRestoration' in history) {
       history.scrollRestoration = 'manual';
     }
@@ -524,6 +537,31 @@ export class AppComponent implements OnInit, OnDestroy {
     return this.intFormatter.format(v);
   }
 
+  get showDemoBanner(): boolean {
+    return !!this.appInfo?.demo;
+  }
+
+  get showDemoNoticeModal(): boolean {
+    return this.showDemoBanner && !this.demoNoticeDismissed;
+  }
+
+  get demoBannerLabel(): string {
+    return String(this.appInfo?.bannerLabel ?? '').trim() || 'Public demo';
+  }
+
+  get demoBannerMessage(): string {
+    return String(this.appInfo?.bannerMessage ?? '').trim()
+      || 'Demo data resets daily. Selected leaderboard entries and lobby activity are simulated.';
+  }
+
+  demoResetLabel(value: string | null | undefined): string | null {
+    const raw = String(value ?? '').trim();
+    if (!raw) return null;
+    const timestamp = Date.parse(raw);
+    if (!Number.isFinite(timestamp)) return null;
+    return this.demoResetFormatter.format(new Date(timestamp));
+  }
+
   private startCurrentLobbyTracking(): void {
     this.subscriptions.add(
       interval(5000)
@@ -600,6 +638,49 @@ export class AppComponent implements OnInit, OnDestroy {
       .subscribe((game) => {
         this.currentGame = game;
       });
+  }
+
+  private loadAppInfo(): void {
+    this.appInfoApi.get()
+      .pipe(catchError(() => of(null)))
+      .subscribe((info) => {
+        this.appInfo = info;
+        this.syncDemoNoticeState();
+      });
+  }
+
+  dismissDemoNotice(): void {
+    if (!this.showDemoBanner) return;
+    this.demoNoticeDismissed = true;
+
+    try {
+      window.localStorage.setItem(this.demoNoticeStorageKey, this.demoNoticeSignature());
+    } catch {
+    }
+  }
+
+  private syncDemoNoticeState(): void {
+    if (!this.showDemoBanner) {
+      this.demoNoticeDismissed = false;
+      return;
+    }
+
+    const expectedSignature = this.demoNoticeSignature();
+    let storedSignature = '';
+    try {
+      storedSignature = window.localStorage.getItem(this.demoNoticeStorageKey) ?? '';
+    } catch {
+      storedSignature = '';
+    }
+    this.demoNoticeDismissed = storedSignature === expectedSignature;
+  }
+
+  private demoNoticeSignature(): string {
+    return [
+      'v1',
+      this.demoBannerLabel,
+      this.demoBannerMessage,
+    ].join('|');
   }
 
   private resetViewScrollToTop(): void {
@@ -1017,6 +1098,10 @@ export class AppComponent implements OnInit, OnDestroy {
 
   @HostListener('document:keydown.escape')
   onDocumentEscape(): void {
+    if (this.showDemoNoticeModal) {
+      this.dismissDemoNotice();
+      return;
+    }
     this.sidebarOpen = false;
     this.notificationsOpen = false;
     this.profileMenuOpen = false;

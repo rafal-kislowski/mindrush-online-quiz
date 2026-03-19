@@ -555,7 +555,12 @@
                   </div>
                 </div>
 
-                <div class="picker-list" [ngClass]="pickerScopeAnimClass" role="region" aria-label="Quiz list">
+                <div
+                  class="picker-list"
+                  [ngClass]="[pickerScopeAnimClass, pickerFitsWithoutScroll ? 'picker-list--fit' : '']"
+                  role="region"
+                  aria-label="Quiz list"
+                >
                   <div class="quiz-grid quiz-grid--picker">
                     <button
                       class="quiz-card"

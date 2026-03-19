@@ -1,7 +1,6 @@
 services:
   mysql:
     image: mysql:8.4
-    container_name: mindrush-mysql
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-mindrush}
@@ -18,7 +17,6 @@ services:
 
   backend:
     image: ${BACKEND_IMAGE:?BACKEND_IMAGE is required}
-    container_name: mindrush-backend
     restart: unless-stopped
     depends_on:
       mysql:
@@ -57,19 +55,19 @@ services:
 
   frontend:
     image: ${FRONTEND_IMAGE:?FRONTEND_IMAGE is required}
-    container_name: mindrush-frontend
     restart: unless-stopped
     depends_on:
       - backend
     ports:
       - "${FRONTEND_PORT:-80}:80"
     networks:
-      - default
-      - proxy
+      default:
+      proxy:
+        aliases:
+          - ${PROXY_FRONTEND_HOSTNAME:-mindrush-frontend}
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin:latest
-    container_name: mindrush-phpmyadmin
     profiles:
       - tools
     restart: unless-stopped

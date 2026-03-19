@@ -205,6 +205,17 @@ export class CasualComponent implements OnInit, AfterViewInit, OnDestroy {
     return !!this.selectedQuizId;
   }
 
+  get pickerGridColumns(): number {
+    if (typeof window === 'undefined') return 3;
+    if (window.innerWidth <= 920) return 1;
+    if (window.innerWidth >= 1100) return 3;
+    return 2;
+  }
+
+  get pickerFitsWithoutScroll(): boolean {
+    return Math.ceil(this.filteredQuizzes.length / this.pickerGridColumns) <= 4;
+  }
+
   get threeLivesAnsweredBest(): string {
     const answered = this.threeLivesBest?.answered;
     if (typeof answered !== 'number' || !Number.isFinite(answered) || answered < 0) {

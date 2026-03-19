@@ -222,6 +222,7 @@
           class="row"
           *ngFor="let row of pagedRows; trackBy: trackByCode"
           [class.is-own]="isOwnLobby(row)"
+          [class.is-live]="row.status === 'IN_GAME'"
           [class.is-unjoinable]="!canJoin(row) && !isOwnLobby(row)"
           [class.is-joining]="joiningCode === row.code"
         >
