@@ -24,6 +24,7 @@
 # Environment / secrets
 # =========================
 .env
+.env.demo
 *.local
 application-local.properties
 application-local.yml

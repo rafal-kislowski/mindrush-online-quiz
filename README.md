@@ -1,6 +1,67 @@
 ﻿# MindRush - Quiz Online
 
-Full-stack quiz platform (Spring Boot backend + Angular frontend).
+MindRush is a full-stack multiplayer quiz platform built with Spring Boot and Angular.
+
+It combines real-time lobby gameplay, guest and authenticated user flows, quiz management, and production-style deployment in a portfolio-ready product.
+
+## TL;DR
+- Real-time multiplayer quiz platform with live lobbies and gameplay
+- Guest sessions and authenticated accounts secured with HttpOnly cookie-based auth
+- Quiz creation, moderation, progression, leaderboards, and notifications
+- CI/CD delivery with Docker, GHCR, GitHub Actions, and VPS deployment
+
+## Highlights
+- Real-time lobby flow with WebSocket updates, chat, ready state, and game lifecycle handling
+- Guest-first onboarding that lets users enter the product before registration
+- Custom quiz workflow with editing, moderation, and media upload support
+- Profile progression with XP, rank points, achievements, and persistent player stats
+- Separate public demo environment with synthetic data, scheduled resets, and reduced integrations
+- Production-style deployment based on immutable Docker images published from CI
+
+## Core Features
+- Real-time multiplayer quiz flow with lobbies, ranked and casual modes, and live state updates
+- Guest sessions for anonymous play and authenticated accounts secured with JWT-based HttpOnly cookies
+- Quiz library, moderation, achievements, notifications, and leaderboard features
+- Dockerized delivery pipeline with GitHub Actions, GHCR, and VPS deployment
+
+## Application Preview
+Main dashboard view presenting the landing experience, game modes, quick actions, and leaderboard panel.
+
+<p align="center">
+  <img src="docs/images/mindrush-dashboard-overview.jpg" alt="MindRush application dashboard preview" width="100%" />
+</p>
+
+### Selected Views
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/images/mindrush-lobby-chat.jpg" alt="Lobby setup and live chat" width="100%" />
+      <br />
+      <strong>Lobby setup and live chat</strong><br />
+      Configure the room, review players, and coordinate the match before the game starts.
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/images/mindrush-quiz-editor.jpg" alt="Quiz editor and question management" width="100%" />
+      <br />
+      <strong>Quiz editor and question management</strong><br />
+      Create and update question sets, manage answers, and work with the custom quiz flow.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/images/mindrush-gameplay-question.jpg" alt="Real-time quiz gameplay" width="100%" />
+      <br />
+      <strong>Real-time gameplay</strong><br />
+      Timed questions with instant answer selection designed for a clear multiplayer experience.
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/images/mindrush-profile-progression.jpg" alt="Profile and progression" width="100%" />
+      <br />
+      <strong>Profile and progression</strong><br />
+      Track XP, rank points, player statistics, and achievement progress in the account dashboard.
+    </td>
+  </tr>
+</table>
 
 ## Live Demo
 `https://demo-mindrush.rafalkislowski.pl`
@@ -8,15 +69,61 @@ Full-stack quiz platform (Spring Boot backend + Angular frontend).
 Public demo uses synthetic data and resets daily.
 Recommended flow: enter as guest and browse leaderboards, active lobbies, quiz library, and live game flow.
 
-## Tech stack
-- Java 17, Spring Boot 3
-- Angular 18, TypeScript, SCSS
-- Spring Web, Spring Security (JWT in HttpOnly cookies)
-- Spring Data JPA + MySQL
-- Flyway (versioned DB migrations)
-- Docker Compose, GHCR, GitHub Actions
+## Tech Stack
+**Frontend**
+- Angular 18
+- TypeScript
+- SCSS
+- STOMP / WebSocket client
 
-## Deployment architecture
+**Backend**
+- Java 17
+- Spring Boot 3
+- Spring Web
+- Spring Security with JWT in HttpOnly cookies
+- Spring Data JPA
+- MySQL
+- Flyway
+
+**Infrastructure**
+- Docker Compose
+- GitHub Container Registry (GHCR)
+- GitHub Actions
+
+## Architecture
+- Angular frontend communicates with the Spring Boot backend through REST endpoints and live WebSocket channels
+- Authentication, quiz management, lobby actions, and admin workflows are handled on the backend
+- MySQL stores application data, while Flyway manages versioned schema evolution
+- CI builds immutable Docker images, publishes them to GHCR, and deploys them to a VPS stack
+
+### High-Level Flow
+`Angular frontend`
+-> `REST / WebSocket`
+-> `Spring Boot API`
+-> `MySQL`
+
+Deployment path:
+`GitHub Actions`
+-> `GHCR`
+-> `VPS + Docker Compose`
+
+## Key Engineering Decisions
+### JWT in HttpOnly cookies
+Authentication uses short-lived access tokens and refresh tokens stored in HttpOnly cookies instead of browser storage.
+
+### Guest sessions as first-class users
+The platform supports anonymous gameplay through server-managed guest sessions, allowing users to enter the product before registration.
+
+### Presence handling beyond unload events
+Because browser disconnect events are unreliable, the app uses heartbeat-based presence tracking and backend cleanup for stale sessions.
+
+### Separate demo environment
+The public demo runs on a dedicated `demo` profile with synthetic data, reduced integrations, and scheduled resets.
+
+### Immutable CI/CD pipeline
+Production deployment is based on Docker images built in CI, published to GHCR, and pulled on the VPS instead of building directly on the server.
+
+## Deployment Architecture
 - `CI` runs on every `push` and `pull_request`
 - `CD` runs after successful `CI` on branch `main`
 - backend and frontend are built as immutable Docker images and published to `ghcr.io`
@@ -255,17 +362,22 @@ Notes:
 - Guest `displayName` is generated server-side (safe characters, no user input).
 
 ### Presence (disconnect handling)
-Browsers don’t always fire `beforeunload` / `sendBeacon` (crash, sleep, network loss), so the app also uses a heartbeat + server cleanup:
-- Frontend sends `POST /api/guest/session/heartbeat` periodically (every ~10s).
+Browsers don’t always fire `beforeunload` / `sendBeacon` reliably (crash, sleep, network loss, background-tab throttling), so the app uses heartbeat tracking, WebSocket disconnect grace, and backend cleanup:
+- Frontend sends `POST /api/guest/session/heartbeat` periodically.
+- WebSocket disconnects are buffered with a short reconnect grace period before removal.
 - Backend removes stale guests from **OPEN** lobbies only (never during `IN_GAME`).
 
-Config (optional):
+Config (current defaults):
 ```properties
-# How long a guest can be “silent” before being treated as disconnected
-lobby.presence.timeout=PT25S
+# Background-tab tolerant inactivity timeout
+lobby.presence.timeout=PT15M
 
-# Cleanup frequency
-lobby.presence.cleanup.fixedDelayMs=5000
+# Short grace window after WebSocket disconnect
+lobby.presence.reconnect-grace=PT45S
+lobby.presence.reconnect-grace.cleanup.fixedDelayMs=2000
+
+# Empty lobby retention before cleanup
+lobby.empty.ttl=PT10M
 ```
 
 ## Auth (email/password)
@@ -395,7 +507,7 @@ Notes:
 - In Postman, call `POST /api/guest/session` first (cookie jar must be enabled) and keep the returned `guestSessionId` cookie for lobby requests.
 - `close` prevents new players from joining (status becomes `CLOSED`).
 - If the owner leaves and another player remains, ownership is transferred to the remaining player.
-- If the last player leaves, lobby is marked empty and removed by cleanup scheduler after TTL (`lobby.empty.ttl`, default `PT45S`).
+- If the last player leaves, lobby is marked empty and removed by cleanup scheduler after TTL (`lobby.empty.ttl`, default `PT10M`).
 - Leaving the lobby is blocked while a game is in progress (`IN_GAME`).
 
 ## Quizzes (read-only)
@@ -601,6 +713,15 @@ cd backend
 cd ..\frontend
 npm test -- --watch=false --browsers=ChromeHeadless
 ```
+
+## Ongoing Development
+MindRush is actively evolving. New features, UX improvements, and infrastructure refinements are added continuously as the application grows.
+
+Current improvement directions:
+- adding an in-app shop for premium features and cosmetic items
+- introducing purchasable profile customization such as avatars and visual account upgrades
+- preparing a sandbox payment integration (for example PayU Sandbox) for future premium and cosmetic purchases
+- continuing to expand the product with new gameplay and platform features
 
 ## License
 MIT - see `LICENSE`.
