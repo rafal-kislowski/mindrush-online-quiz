@@ -761,9 +761,13 @@ public class GameService {
             Long userId = gs.getUserId();
             if (userId != null) {
                 appUserRepository.findById(userId).ifPresent(u -> {
-                    u.setXp(u.getXp() + xpDelta);
-                    u.setRankPoints(u.getRankPoints() + rankPointsDelta);
-                    u.setCoins(u.getCoins() + coinsDelta);
+                    Instant now = clock.instant();
+                    int boostedXpDelta = applyBoostMultiplier(xpDelta, u.getXpBoostExpiresAt(), now);
+                    int boostedRankPointsDelta = applyBoostMultiplier(rankPointsDelta, u.getRankPointsBoostExpiresAt(), now);
+                    int boostedCoinsDelta = applyBoostMultiplier(coinsDelta, u.getCoinsBoostExpiresAt(), now);
+                    u.setXp(u.getXp() + boostedXpDelta);
+                    u.setRankPoints(u.getRankPoints() + boostedRankPointsDelta);
+                    u.setCoins(u.getCoins() + boostedCoinsDelta);
                     appUserRepository.save(u);
                 });
                 return;
@@ -774,6 +778,33 @@ public class GameService {
             gs.setCoins(gs.getCoins() + coinsDelta);
             guestSessionRepository.save(gs);
         });
+    }
+
+    private static int applyBoostMultiplier(int baseDelta, Instant boostExpiresAt, Instant now) {
+        if (baseDelta <= 0) return baseDelta;
+        if (boostExpiresAt == null || now == null || !boostExpiresAt.isAfter(now)) {
+            return baseDelta;
+        }
+        long boosted = (long) baseDelta * 2L;
+        return (int) Math.min(Integer.MAX_VALUE, boosted);
+    }
+
+    private static Integer applyBoostForSummary(Integer baseDelta, Instant boostExpiresAt, Instant rewardTime) {
+        if (baseDelta == null) return null;
+        return applyBoostMultiplier(baseDelta, boostExpiresAt, rewardTime);
+    }
+
+    private static Integer rewardBonusDelta(Integer baseDelta, Integer finalDelta) {
+        if (baseDelta == null || finalDelta == null) return null;
+        int bonus = finalDelta - baseDelta;
+        return Math.max(0, bonus);
+    }
+
+    private Instant rewardReferenceTime(GameSession session) {
+        if (session == null) return clock.instant();
+        if (session.getRewardsAppliedAt() != null) return session.getRewardsAppliedAt();
+        if (session.getEndedAt() != null) return session.getEndedAt();
+        return clock.instant();
     }
 
     public void tickDueSessions() {
@@ -878,6 +909,8 @@ public class GameService {
         Map<String, Boolean> authenticatedByGuestSessionId = resolveAuthenticatedByGuestSessionId(players);
         Map<String, Boolean> premiumByGuestSessionId = resolvePremiumByGuestSessionId(players);
         Map<String, Integer> rankPointsByGuestSessionId = resolveRankPointsByGuestSessionId(players);
+        Map<String, RewardBoostState> rewardBoostStateByGuestSessionId = resolveRewardBoostStateByGuestSessionId(players);
+        Instant rewardsReferenceTime = rewardReferenceTime(session);
         GameSessionMode mode = sessionMode(session);
         long totalQuestions = countSessionQuestionPool(session);
         int responseTotalQuestions = (int) totalQuestions;
@@ -896,6 +929,25 @@ public class GameService {
                     .map(p -> {
                         PlayerTotals t = totalsByGuest.getOrDefault(p.getGuestSessionId(), PlayerTotals.empty());
                         PlayerRewards r = rewards.get(p.getGuestSessionId());
+                        Integer xpBaseDelta = r == null || !rewardsPolicy.xpEnabled() ? null : r.xpDelta();
+                        Integer coinsBaseDelta = r == null || !rewardsPolicy.coinsEnabled() ? null : r.coinsDelta();
+                        Integer rankPointsBaseDelta = r == null || !rewardsPolicy.rankPointsEnabled() ? null : r.rankPointsDelta();
+                        RewardBoostState boostState = rewardBoostStateByGuestSessionId.get(p.getGuestSessionId());
+                        Integer xpFinalDelta = applyBoostForSummary(
+                                xpBaseDelta,
+                                boostState == null ? null : boostState.xpBoostExpiresAt(),
+                                rewardsReferenceTime
+                        );
+                        Integer coinsFinalDelta = applyBoostForSummary(
+                                coinsBaseDelta,
+                                boostState == null ? null : boostState.coinsBoostExpiresAt(),
+                                rewardsReferenceTime
+                        );
+                        Integer rankPointsFinalDelta = applyBoostForSummary(
+                                rankPointsBaseDelta,
+                                boostState == null ? null : boostState.rankPointsBoostExpiresAt(),
+                                rewardsReferenceTime
+                        );
                         return new GamePlayerDto(
                                 p.getDisplayName(),
                                 authenticatedByGuestSessionId.getOrDefault(p.getGuestSessionId(), false),
@@ -906,9 +958,15 @@ public class GameService {
                                 t.correctAnswers(),
                                 t.totalAnswerTimeMs(),
                                 t.totalCorrectAnswerTimeMs(),
-                                r == null || !rewardsPolicy.xpEnabled() ? null : r.xpDelta(),
-                                r == null || !rewardsPolicy.coinsEnabled() ? null : r.coinsDelta(),
-                                r == null || !rewardsPolicy.rankPointsEnabled() ? null : r.rankPointsDelta(),
+                                xpBaseDelta,
+                                coinsBaseDelta,
+                                rankPointsBaseDelta,
+                                xpFinalDelta,
+                                coinsFinalDelta,
+                                rankPointsFinalDelta,
+                                rewardBonusDelta(xpBaseDelta, xpFinalDelta),
+                                rewardBonusDelta(coinsBaseDelta, coinsFinalDelta),
+                                rewardBonusDelta(rankPointsBaseDelta, rankPointsFinalDelta),
                                 rankPointsByGuestSessionId.get(p.getGuestSessionId()),
                                 r == null ? null : r.winner()
                         );
@@ -950,6 +1008,12 @@ public class GameService {
                                 t.correctAnswers(),
                                 t.totalAnswerTimeMs(),
                                 t.totalCorrectAnswerTimeMs(),
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
                                 null,
                                 null,
                                 null,
@@ -1004,6 +1068,12 @@ public class GameService {
                     t.correctAnswers(),
                     t.totalAnswerTimeMs(),
                     t.totalCorrectAnswerTimeMs(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
                     null,
                     null,
                     null,
@@ -1175,6 +1245,60 @@ public class GameService {
             out.put(session.getId(), userId != null && premiumByUserId.getOrDefault(userId, false));
         }
         return out;
+    }
+
+    private Map<String, RewardBoostState> resolveRewardBoostStateByGuestSessionId(List<GamePlayer> players) {
+        if (players == null || players.isEmpty()) return Map.of();
+
+        List<String> ids = players.stream()
+                .map(GamePlayer::getGuestSessionId)
+                .filter(Objects::nonNull)
+                .filter(id -> !id.isBlank())
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) return Map.of();
+
+        List<GuestSession> sessions = guestSessionRepository.findAllById(ids);
+        if (sessions.isEmpty()) return Map.of();
+
+        List<Long> userIds = sessions.stream()
+                .map(GuestSession::getUserId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Map<Long, RewardBoostState> boostsByUserId = new HashMap<>();
+        if (!userIds.isEmpty()) {
+            for (AppUser user : appUserRepository.findAllById(userIds)) {
+                if (user == null || user.getId() == null) continue;
+                boostsByUserId.put(
+                        user.getId(),
+                        new RewardBoostState(
+                                user.getXpBoostExpiresAt(),
+                                user.getRankPointsBoostExpiresAt(),
+                                user.getCoinsBoostExpiresAt()
+                        )
+                );
+            }
+        }
+
+        Map<String, RewardBoostState> out = new HashMap<>();
+        for (GuestSession session : sessions) {
+            if (session == null || session.getId() == null) continue;
+            Long userId = session.getUserId();
+            if (userId == null) continue;
+            RewardBoostState boostState = boostsByUserId.get(userId);
+            if (boostState == null) continue;
+            out.put(session.getId(), boostState);
+        }
+        return out;
+    }
+
+    private record RewardBoostState(
+            Instant xpBoostExpiresAt,
+            Instant rankPointsBoostExpiresAt,
+            Instant coinsBoostExpiresAt
+    ) {
     }
 
     private record PlayerTotals(long totalPoints, long correctAnswers, long totalAnswerTimeMs,

@@ -87,21 +87,7 @@ public class AuthController {
         }
         Object p = authentication.getPrincipal();
         if (p instanceof JwtCookieAuthenticationFilter.AuthenticatedUser au) {
-            return userRepository.findById(au.id())
-                    .map(u -> ResponseEntity.ok(new AuthService.AuthUserDto(
-                            u.getId(),
-                            u.getEmail(),
-                            u.getDisplayName(),
-                            u.getRoles().stream().map(Enum::name).sorted().toList(),
-                            u.getRankPoints(),
-                            u.getXp(),
-                            u.getCoins(),
-                            u.isEmailVerified(),
-                            u.getCreatedAt(),
-                            u.getLastLoginAt(),
-                            u.getLastDisplayNameChangeAt()
-                    )))
-                    .orElseGet(() -> ResponseEntity.status(401).build());
+            return ResponseEntity.ok(authService.getCurrentUser(au.id()));
         }
         return ResponseEntity.status(401).build();
     }

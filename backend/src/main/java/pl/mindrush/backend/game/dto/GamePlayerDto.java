@@ -17,6 +17,12 @@ public record GamePlayerDto(
         Integer xpDelta,
         Integer coinsDelta,
         Integer rankPointsDelta,
+        Integer xpFinalDelta,
+        Integer coinsFinalDelta,
+        Integer rankPointsFinalDelta,
+        Integer xpBonusDelta,
+        Integer coinsBonusDelta,
+        Integer rankPointsBonusDelta,
         Integer rankPoints,
         Boolean winner
 ) {

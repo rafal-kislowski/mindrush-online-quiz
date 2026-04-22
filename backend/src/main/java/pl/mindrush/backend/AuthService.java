@@ -10,6 +10,7 @@ import org.springframework.web.server.ResponseStatusException;
 import pl.mindrush.backend.config.AppAuthProperties;
 import pl.mindrush.backend.config.AppMailProperties;
 import pl.mindrush.backend.mail.AuthMailWorkflowService;
+import pl.mindrush.backend.shop.PremiumAccessService;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -36,6 +37,7 @@ public class AuthService {
     private final AppMailProperties mailProperties;
     private final AuthActionTokenService actionTokenService;
     private final AuthMailWorkflowService authMailWorkflowService;
+    private final PremiumAccessService premiumAccessService;
 
     public AuthService(
             Clock clock,
@@ -48,7 +50,8 @@ public class AuthService {
             AppAuthProperties authProperties,
             AppMailProperties mailProperties,
             AuthActionTokenService actionTokenService,
-            AuthMailWorkflowService authMailWorkflowService
+            AuthMailWorkflowService authMailWorkflowService,
+            PremiumAccessService premiumAccessService
     ) {
         this.clock = clock;
         this.userRepository = userRepository;
@@ -61,6 +64,7 @@ public class AuthService {
         this.mailProperties = mailProperties;
         this.actionTokenService = actionTokenService;
         this.authMailWorkflowService = authMailWorkflowService;
+        this.premiumAccessService = premiumAccessService;
     }
 
     public AuthResult register(String email, String password, String displayName) {
@@ -124,7 +128,7 @@ public class AuthService {
             throw new ResponseStatusException(UNAUTHORIZED, "Refresh token expired");
         }
 
-        AppUser user = token.getUser();
+        AppUser user = premiumAccessService.synchronizeUser(token.getUser());
         if (user != null && user.getRoles().contains(AppRole.BANNED)) {
             token.setRevoked(true);
             refreshTokenRepository.save(token);
@@ -271,9 +275,18 @@ public class AuthService {
         refreshTokenRepository.deleteAllByUser_Id(user.getId());
     }
 
+    public AuthUserDto getCurrentUser(long userId) {
+        AppUser user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "Authentication is required"));
+        ensureNotBanned(user);
+        user = premiumAccessService.synchronizeUser(user);
+        return toAuthUserDto(user);
+    }
+
     private AuthResult issueTokens(AppUser user) {
         ensureNotBanned(user);
         ensureVerifiedForLogin(user);
+        user = premiumAccessService.synchronizeUser(user);
         Instant now = clock.instant();
         user.setLastLoginAt(now);
         userRepository.save(user);
@@ -356,7 +369,7 @@ public class AuthService {
         AppUser user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "Authentication is required"));
         ensureNotBanned(user);
-        return user;
+        return premiumAccessService.synchronizeUser(user);
     }
 
     private void ensureVerifiedForLogin(AppUser user) {
@@ -392,7 +405,12 @@ public class AuthService {
                 user.isEmailVerified(),
                 user.getCreatedAt(),
                 user.getLastLoginAt(),
-                user.getLastDisplayNameChangeAt()
+                user.getLastDisplayNameChangeAt(),
+                user.getPremiumActivatedAt(),
+                user.getPremiumExpiresAt(),
+                user.getXpBoostExpiresAt(),
+                user.getRankPointsBoostExpiresAt(),
+                user.getCoinsBoostExpiresAt()
         );
     }
 
@@ -445,7 +463,12 @@ public class AuthService {
             boolean emailVerified,
             Instant createdAt,
             Instant lastLoginAt,
-            Instant lastDisplayNameChangeAt
+            Instant lastDisplayNameChangeAt,
+            Instant premiumActivatedAt,
+            Instant premiumExpiresAt,
+            Instant xpBoostExpiresAt,
+            Instant rankPointsBoostExpiresAt,
+            Instant coinsBoostExpiresAt
     ) {}
 
     public record AuthResult(AuthUserDto user, ResponseCookies cookies) {}

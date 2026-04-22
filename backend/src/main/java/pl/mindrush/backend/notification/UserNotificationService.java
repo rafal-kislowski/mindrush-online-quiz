@@ -28,6 +28,7 @@ public class UserNotificationService {
 
     private static final int MAX_LIMIT = 100;
     private static final TypeReference<Map<String, Object>> MAP_REF = new TypeReference<>() {};
+    private static final String PREMIUM_NOTIFICATION_AVATAR = "/shop/Premium_account_icon.png";
 
     private final UserNotificationRepository notificationRepository;
     private final UserNotificationStreamService streamService;
@@ -253,6 +254,81 @@ public class UserNotificationService {
         )));
         notification.setDedupeKey(dedupeKey);
         notification.setCreatedAt(now);
+        notificationRepository.save(notification);
+
+        publishRefresh(userId);
+    }
+
+    public void createPremiumActivatedNotification(Long userId, Instant premiumEndsAt) {
+        createPremiumActivatedNotification(userId, premiumEndsAt, false);
+    }
+
+    public void createPremiumActivatedNotification(Long userId, Instant premiumEndsAt, boolean extended) {
+        if (userId == null) return;
+        String eventType = extended ? "extended" : "activated";
+        String dedupeKey = "premium:%s:%s".formatted(eventType, premiumEndsAt == null ? "unknown" : premiumEndsAt.toEpochMilli());
+        if (notificationRepository.existsByUserIdAndDedupeKey(userId, dedupeKey)) {
+            return;
+        }
+
+        UserNotification notification = new UserNotification();
+        notification.setUserId(userId);
+        notification.setCategory(UserNotificationCategory.SYSTEM);
+        notification.setSeverity(UserNotificationSeverity.SUCCESS);
+        notification.setDecision(null);
+        notification.setTitle(extended ? "Premium extended" : "Premium activated");
+        notification.setSubtitle("MindRush Premium");
+        notification.setText(extended
+                ? "Your premium time was successfully extended."
+                : "Your premium account is active and all premium limits are now enabled.");
+        notification.setMeta(premiumEndsAt == null
+                ? (extended ? "Extended now" : "Active now")
+                : (extended ? "Extended until " + premiumEndsAt : "Active until " + premiumEndsAt));
+        notification.setAvatarImageUrl(PREMIUM_NOTIFICATION_AVATAR);
+        notification.setAvatarBgStart("#F6C453");
+        notification.setAvatarBgEnd("#2F8DFF");
+        notification.setAvatarTextColor("#09111F");
+        notification.setRoutePath("/shop/premium");
+        notification.setRouteQueryJson(null);
+        notification.setPayloadJson(toJsonString(Map.of(
+                "type", extended ? "premium_extended" : "premium_activated",
+                "premiumEndsAt", premiumEndsAt == null ? "" : premiumEndsAt.toString()
+        )));
+        notification.setDedupeKey(dedupeKey);
+        notification.setCreatedAt(clock.instant());
+        notificationRepository.save(notification);
+
+        publishRefresh(userId);
+    }
+
+    public void createPremiumExpiredNotification(Long userId, Instant premiumExpiredAt) {
+        if (userId == null) return;
+        String dedupeKey = "premium:expired:%s".formatted(premiumExpiredAt == null ? "unknown" : premiumExpiredAt.toEpochMilli());
+        if (notificationRepository.existsByUserIdAndDedupeKey(userId, dedupeKey)) {
+            return;
+        }
+
+        UserNotification notification = new UserNotification();
+        notification.setUserId(userId);
+        notification.setCategory(UserNotificationCategory.SYSTEM);
+        notification.setSeverity(UserNotificationSeverity.WARNING);
+        notification.setDecision(null);
+        notification.setTitle("Premium expired");
+        notification.setSubtitle("MindRush Premium");
+        notification.setText("Your premium time has ended. Existing content stays intact, but premium-only limits are no longer available.");
+        notification.setMeta(premiumExpiredAt == null ? "Expired" : "Expired at " + premiumExpiredAt);
+        notification.setAvatarImageUrl(PREMIUM_NOTIFICATION_AVATAR);
+        notification.setAvatarBgStart("#F6C453");
+        notification.setAvatarBgEnd("#23304B");
+        notification.setAvatarTextColor("#FFFFFF");
+        notification.setRoutePath("/shop/premium");
+        notification.setRouteQueryJson(null);
+        notification.setPayloadJson(toJsonString(Map.of(
+                "type", "premium_expired",
+                "premiumExpiredAt", premiumExpiredAt == null ? "" : premiumExpiredAt.toString()
+        )));
+        notification.setDedupeKey(dedupeKey);
+        notification.setCreatedAt(clock.instant());
         notificationRepository.save(notification);
 
         publishRefresh(userId);

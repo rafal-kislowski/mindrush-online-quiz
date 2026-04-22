@@ -13,6 +13,7 @@ import pl.mindrush.backend.RefreshTokenRepository;
 import pl.mindrush.backend.mail.QuizModerationMailWorkflowService;
 import pl.mindrush.backend.media.MediaStorageService;
 import pl.mindrush.backend.notification.UserNotificationService;
+import pl.mindrush.backend.shop.PremiumAccessService;
 
 import java.net.URI;
 import java.time.Instant;
@@ -57,6 +58,7 @@ public class QuizLibraryService {
     private final UserAchievementService userAchievementService;
     private final QuizModerationMailWorkflowService quizModerationMailWorkflowService;
     private final QuizUsageGuardService quizUsageGuardService;
+    private final PremiumAccessService premiumAccessService;
 
     public QuizLibraryService(
             QuizRepository quizRepository,
@@ -72,7 +74,8 @@ public class QuizLibraryService {
             UserNotificationService userNotificationService,
             UserAchievementService userAchievementService,
             QuizModerationMailWorkflowService quizModerationMailWorkflowService,
-            QuizUsageGuardService quizUsageGuardService
+            QuizUsageGuardService quizUsageGuardService,
+            PremiumAccessService premiumAccessService
     ) {
         this.quizRepository = quizRepository;
         this.categoryRepository = categoryRepository;
@@ -88,6 +91,7 @@ public class QuizLibraryService {
         this.userAchievementService = userAchievementService;
         this.quizModerationMailWorkflowService = quizModerationMailWorkflowService;
         this.quizUsageGuardService = quizUsageGuardService;
+        this.premiumAccessService = premiumAccessService;
     }
 
     @Transactional(readOnly = true)
@@ -776,6 +780,7 @@ public class QuizLibraryService {
     private QuizLibraryPolicyProperties.TierLimits limitsForUser(Long userId) {
         AppUser user = appUserRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "User not found"));
+        user = premiumAccessService.synchronizeUser(user);
         return policyProperties.forRoles(user.getRoles());
     }
 

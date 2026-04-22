@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Premium status updated</title>
+</head>
+<body style="margin:0;padding:0;background:#0b1220;color:#e5edf8;font-family:Segoe UI,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#0b1220;padding:28px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#121b2d;border:1px solid rgba(255,255,255,0.12);border-radius:18px;overflow:hidden;">
+          <tr>
+            <td style="padding:28px 28px 10px 28px;">
+              <p style="margin:0 0 8px 0;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#f7c96a;font-weight:700;">MindRush Premium</p>
+              <h1 style="margin:0;font-size:28px;line-height:1.15;color:#ffffff;" th:text="${premiumEventTitle}">Premium activated</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 28px 10px 28px;">
+              <p style="margin:0;font-size:15px;line-height:1.6;color:#d7e2f3;">
+                Hi <strong th:text="${displayName}">Player</strong>,<br>
+                <span th:text="${premiumIntroText}">your premium order has been paid and activated. Premium time has been added to your account immediately.</span>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 28px 0 28px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#0f1728;border:1px solid rgba(255,255,255,0.08);border-radius:14px;">
+                <tr>
+                  <td style="padding:18px 18px 18px 18px;">
+                    <p style="margin:0 0 8px 0;font-size:14px;color:#f7fbff;"><strong>Order ID:</strong> <span th:text="${orderId}">ORDER-ID</span></p>
+                    <p style="margin:0 0 8px 0;font-size:14px;color:#f7fbff;"><strong>Plan:</strong> <span th:text="${planName}">1 month</span></p>
+                    <p style="margin:0 0 8px 0;font-size:14px;color:#f7fbff;"><strong th:text="${addedTimeLabel}">Activated time</strong>: <span th:text="${addedTimeValue}">3 days</span></p>
+                    <p style="margin:0;font-size:14px;color:#f7fbff;"><strong>Premium active until:</strong> <span th:text="${premiumEndsAt}">2026-01-01 12:00 UTC</span></p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 28px 24px 28px;">
+              <a th:href="${actionUrl}" href="http://localhost:4200/shop/premium"
+                 target="_blank" rel="noopener noreferrer"
+                 style="display:inline-block;padding:14px 24px;border-radius:12px;border:1px solid #5da7ff;background:#2f8dff;font-weight:800;font-size:15px;line-height:20px;color:#ffffff !important;text-decoration:none;">
+                Open premium page
+              </a>
+              <p style="margin:14px 0 0 0;font-size:12px;line-height:1.55;color:#c5d5ed;">
+                Support:
+                <a th:href="'mailto:' + ${supportEmail}" href="mailto:support@mindrush.local"
+                   th:text="${supportEmail}"
+                   style="color:#cfe5ff !important;text-decoration:underline;">
+                  support@mindrush.local
+                </a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

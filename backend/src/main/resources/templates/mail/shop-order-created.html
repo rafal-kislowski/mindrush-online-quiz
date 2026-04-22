@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order received</title>
+</head>
+<body style="margin:0;padding:0;background:#0b1220;color:#e5edf8;font-family:Segoe UI,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#0b1220;padding:28px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:700px;background:#121b2d;border:1px solid rgba(255,255,255,0.12);border-radius:18px;overflow:hidden;">
+          <tr>
+            <td style="padding:28px 28px 10px 28px;">
+              <p style="margin:0 0 8px 0;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#f7c96a;font-weight:700;">MindRush Shop</p>
+              <h1 style="margin:0;font-size:28px;line-height:1.15;color:#ffffff;">Order received</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 28px 10px 28px;">
+              <p style="margin:0;font-size:15px;line-height:1.6;color:#d7e2f3;">
+                Hi <strong th:text="${displayName}">Player</strong>,<br>
+                your order was created successfully.
+              </p>
+            </td>
+          </tr>
+          <tr th:if="${showSimulationInfo}">
+            <td style="padding:0 28px 10px 28px;">
+              <p style="margin:0;font-size:13px;line-height:1.5;color:#9fb1cb;">
+                Payment step in this environment is simulated. Fulfillment logic is active and server-side validated.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:8px 28px 0 28px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#0f1728;border:1px solid rgba(255,255,255,0.08);border-radius:14px;">
+                <tr>
+                  <td style="padding:18px 18px 6px 18px;color:#9fb1cb;font-size:12px;font-weight:700;text-transform:uppercase;">Order summary</td>
+                </tr>
+                <tr>
+                  <td style="padding:0 18px 16px 18px;">
+                    <p style="margin:0 0 6px 0;font-size:14px;color:#f7fbff;"><strong>Reference:</strong> <span th:text="${orderReference}">ORDER-REF</span></p>
+                    <p style="margin:0 0 6px 0;font-size:14px;color:#f7fbff;"><strong>Items:</strong> <span th:text="${itemsCount}">1</span></p>
+                    <p th:if="${showProvider}" style="margin:0;font-size:14px;color:#f7fbff;"><strong>Provider:</strong> <span th:text="${paymentProvider}">SIMULATED</span></p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:0 18px 18px 18px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+                      <thead>
+                        <tr>
+                          <th align="left" style="padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.10);font-size:12px;color:#9fb1cb;text-transform:uppercase;">Product</th>
+                          <th align="left" style="padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.10);font-size:12px;color:#9fb1cb;text-transform:uppercase;">Plan</th>
+                          <th align="right" style="padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.10);font-size:12px;color:#9fb1cb;text-transform:uppercase;">Qty</th>
+                          <th align="right" style="padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.10);font-size:12px;color:#9fb1cb;text-transform:uppercase;">Unit</th>
+                          <th align="right" style="padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.10);font-size:12px;color:#9fb1cb;text-transform:uppercase;">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr th:each="line : ${lineItems}">
+                          <td style="padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;color:#f7fbff;" th:text="${line.productName}">MindRush Premium</td>
+                          <td style="padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;color:#dce8fb;" th:text="${line.planName}">1 month</td>
+                          <td align="right" style="padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;color:#dce8fb;" th:text="${line.quantity}">1</td>
+                          <td align="right" style="padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;color:#dce8fb;" th:text="${line.unitPriceLabel}">49.99 PLN</td>
+                          <td align="right" style="padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;color:#f7fbff;font-weight:700;" th:text="${line.lineTotalLabel}">49.99 PLN</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:0 18px 18px 18px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+                      <tbody>
+                        <tr th:each="total : ${totals}">
+                          <td style="padding:4px 0;font-size:14px;color:#9fb1cb;" th:text="${'Total (' + total.currency + ')'}">Total (PLN)</td>
+                          <td align="right" style="padding:4px 0;font-size:16px;color:#f7fbff;font-weight:700;" th:text="${total.amountLabel}">49.99 PLN</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:18px 28px 24px 28px;">
+              <a th:href="${actionUrl}" href="http://localhost:4200/shop"
+                 target="_blank" rel="noopener noreferrer"
+                 style="display:inline-block;padding:14px 24px;border-radius:12px;border:1px solid #5da7ff;background:#2f8dff;font-weight:800;font-size:15px;line-height:20px;color:#ffffff !important;text-decoration:none;"
+                 th:text="${actionLabel}">
+                Open shop
+              </a>
+              <p style="margin:14px 0 0 0;font-size:12px;line-height:1.55;color:#c5d5ed;">
+                Need help? Contact
+                <a th:href="'mailto:' + ${supportEmail}" href="mailto:support@mindrush.local"
+                   th:text="${supportEmail}"
+                   style="color:#cfe5ff !important;text-decoration:underline;">
+                  support@mindrush.local
+                </a>.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

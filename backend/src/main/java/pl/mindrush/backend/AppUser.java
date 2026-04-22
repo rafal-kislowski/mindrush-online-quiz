@@ -78,6 +78,21 @@ public class AppUser {
     @Column(name = "last_display_name_change_at")
     private Instant lastDisplayNameChangeAt;
 
+    @Column(name = "premium_activated_at")
+    private Instant premiumActivatedAt;
+
+    @Column(name = "premium_expires_at")
+    private Instant premiumExpiresAt;
+
+    @Column(name = "xp_boost_expires_at")
+    private Instant xpBoostExpiresAt;
+
+    @Column(name = "rank_points_boost_expires_at")
+    private Instant rankPointsBoostExpiresAt;
+
+    @Column(name = "coins_boost_expires_at")
+    private Instant coinsBoostExpiresAt;
+
     protected AppUser() {
     }
 
@@ -96,6 +111,11 @@ public class AppUser {
         this.lastPasswordResetEmailSentAt = null;
         this.lastLoginAt = null;
         this.lastDisplayNameChangeAt = null;
+        this.premiumActivatedAt = null;
+        this.premiumExpiresAt = null;
+        this.xpBoostExpiresAt = null;
+        this.rankPointsBoostExpiresAt = null;
+        this.coinsBoostExpiresAt = null;
     }
 
     public Long getId() {
@@ -158,6 +178,26 @@ public class AppUser {
         return lastDisplayNameChangeAt;
     }
 
+    public Instant getPremiumActivatedAt() {
+        return premiumActivatedAt;
+    }
+
+    public Instant getPremiumExpiresAt() {
+        return premiumExpiresAt;
+    }
+
+    public Instant getXpBoostExpiresAt() {
+        return xpBoostExpiresAt;
+    }
+
+    public Instant getRankPointsBoostExpiresAt() {
+        return rankPointsBoostExpiresAt;
+    }
+
+    public Instant getCoinsBoostExpiresAt() {
+        return coinsBoostExpiresAt;
+    }
+
     public void setPasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
     }
@@ -204,5 +244,25 @@ public class AppUser {
 
     public void setLastDisplayNameChangeAt(Instant lastDisplayNameChangeAt) {
         this.lastDisplayNameChangeAt = lastDisplayNameChangeAt;
+    }
+
+    public void setPremiumActivatedAt(Instant premiumActivatedAt) {
+        this.premiumActivatedAt = premiumActivatedAt;
+    }
+
+    public void setPremiumExpiresAt(Instant premiumExpiresAt) {
+        this.premiumExpiresAt = premiumExpiresAt;
+    }
+
+    public void setXpBoostExpiresAt(Instant xpBoostExpiresAt) {
+        this.xpBoostExpiresAt = xpBoostExpiresAt;
+    }
+
+    public void setRankPointsBoostExpiresAt(Instant rankPointsBoostExpiresAt) {
+        this.rankPointsBoostExpiresAt = rankPointsBoostExpiresAt;
+    }
+
+    public void setCoinsBoostExpiresAt(Instant coinsBoostExpiresAt) {
+        this.coinsBoostExpiresAt = coinsBoostExpiresAt;
     }
 }
