@@ -10,11 +10,6 @@
   <aside class="sidebar">
     <div class="sidebar__top">
       <div class="sidebar__head">
-        
-        <div class="brand" routerLink="/">
-          <div class="brand__name">MindRush</div>
-        </div>
-
         <button
           class="sidebar__close"
           type="button"
@@ -95,6 +90,33 @@
               </dd>
             </div>
           </dl>
+
+          <section class="profile-card__bonuses" aria-label="Active bonuses">
+            <div class="profile-card__bonusesTitle">Active bonuses</div>
+            <div class="profile-card__bonusesList">
+              <div
+                class="profile-card__bonusItem"
+                *ngFor="let slot of [0, 1, 2, 3]; let i = index"
+                [class.is-empty]="!p.activeBonuses[i]"
+                [attr.tabindex]="p.activeBonuses[i] ? 0 : null"
+                [attr.aria-label]="p.activeBonuses[i] ? (p.activeBonuses[i].label + '. ' + p.activeBonuses[i].remainingLabel) : 'Empty bonus slot'"
+              >
+                <ng-container *ngIf="p.activeBonuses[i] as bonus; else sidebarBonusEmpty">
+                  <span class="profile-card__bonusIconWrap">
+                    <img class="profile-card__bonusIcon" [src]="bonus.iconPath" [alt]="bonus.label" loading="lazy" />
+                  </span>
+                  <span class="profile-card__bonusTooltip" role="tooltip">
+                    <span class="profile-card__bonusTooltipTitle">{{ bonus.label }}</span>
+                    <span>{{ bonus.remainingLabel }}</span>
+                    <span class="profile-card__bonusTooltipMeta">to {{ bonus.expiresLabel }}</span>
+                  </span>
+                </ng-container>
+                <ng-template #sidebarBonusEmpty>
+                  <span class="profile-card__bonusPlaceholder" aria-hidden="true"></span>
+                </ng-template>
+              </div>
+            </div>
+          </section>
         </article>
       </div>
 
@@ -243,6 +265,16 @@
             </span>
             <span>Quiz Management</span>
           </a>
+          <a class="app-item" routerLink="/admin/products" routerLinkActive="active">
+            <span class="app-ico app-ico--orange" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M16 10a4 4 0 0 1-8 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M3.103 6.034h17.794" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M3.4 5.467a2 2 0 0 0-.4 1.2V20a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.667a2 2 0 0 0-.4-1.2l-2-2.667A2 2 0 0 0 17 2H7a2 2 0 0 0-1.6.8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
+            <span>Product Management</span>
+          </a>
           <a class="app-item" routerLink="/admin/quiz-submissions" routerLinkActive="active">
             <span class="app-ico app-ico--orange" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none">
@@ -258,64 +290,6 @@
       </ng-container>
     </div>
 
-    <div class="sidebar__bottomFixed">
-      <div class="social" aria-hidden="true">
-        <span class="social__dot"
-          ><svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="lucide lucide-facebook-icon lucide-facebook"
-          >
-            <path
-              d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"
-            /></svg
-        ></span>
-
-        <span class="social__dot"
-          ><svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="lucide lucide-youtube-icon lucide-youtube"
-          >
-            <path
-              d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17"
-            />
-            <path d="m10 15 5-3-5-3z" /></svg
-        ></span>
-        <span class="social__dot"
-          ><svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="lucide lucide-instagram-icon lucide-instagram"
-          >
-            <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
-            <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-            <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" /></svg
-        ></span>
-      </div>
-
-    </div>
   </aside>
 
   <div class="main">
@@ -383,6 +357,21 @@
           </button>
         </ng-container>
         <ng-container *ngIf="authUser$ | async as user; else guestActions">
+          <ng-container *ngIf="cartItemCount$ | async as cartItemCount">
+            <button
+              class="btn app-cart__trigger"
+              type="button"
+              (click)="openCart($event)"
+              aria-label="Cart"
+              [attr.data-has-items]="cartItemCount > 0"
+            >
+              <i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>
+              <span class="app-cart__badge" *ngIf="cartItemCount">
+                {{ cartItemCount > 99 ? '99+' : cartItemCount }}
+              </span>
+            </button>
+          </ng-container>
+
           <div class="app-notifications" #notificationsMenu>
             <button
               class="btn app-notifications__trigger"

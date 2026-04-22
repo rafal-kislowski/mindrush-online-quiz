@@ -150,6 +150,18 @@
             </div>
           </div>
 
+          <div class="library-premium-banner" *ngIf="premiumExpiredWarning as premiumWarning">
+            <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+            <span>{{ premiumWarning }}</span>
+          </div>
+
+          <div class="library-overlimit" *ngIf="overLimitWarnings.length">
+            <div class="library-overlimit__item" *ngFor="let warning of overLimitWarnings">
+              <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+              <span>{{ warning }}</span>
+            </div>
+          </div>
+
           <div class="view-screen__body">
 
             <section class="config-panel config-panel--picker" aria-label="My quizzes">

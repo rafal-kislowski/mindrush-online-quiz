@@ -327,9 +327,10 @@
                           {{ playerRankName(p) }}
                         </span>
                         <span
-                          *ngIf="showRankingPointsInSummary && p.rankPointsDelta != null"
+                          *ngIf="showRankingPointsInSummary && (p.rankPointsFinalDelta != null || p.rankPointsDelta != null)"
                           class="mr-game-results-rp-inline"
                           [class]="rankPointsInlineClass(p)"
+                          [attr.title]="showRankingPointsInSummary && rankPointsBonusValue(p) > 0 ? 'Bonus RP: +' + rankPointsBonusValue(p) : null"
                         >
                           {{ rankPointsInline(p) }}
                         </span>
@@ -348,11 +349,21 @@
                           <i class="fa-regular fa-clock" aria-hidden="true"></i>
                           <b>{{ formatMs(p.totalAnswerTimeMs) }}</b>
                         </span>
-                        <span class="mr-game-results-xp" aria-label="XP delta" *ngIf="!isTrainingMode && p.xpDelta != null">
+                        <span
+                          class="mr-game-results-xp"
+                          aria-label="XP delta"
+                          *ngIf="!isTrainingMode && xpDeltaValue(p) != null"
+                          [attr.title]="xpBonusValue(p) > 0 ? 'Bonus XP: +' + xpBonusValue(p) : null"
+                        >
                           <i class="fa-solid fa-bolt" aria-hidden="true"></i>
-                          <b>{{ formatDelta(p.xpDelta, 'XP') }}</b>
+                          <b>{{ formatDelta(xpDeltaValue(p), 'XP') }}</b>
                         </span>
-                        <span class="mr-game-results-coins" aria-label="Coins delta" *ngIf="!isTrainingMode && coinsDeltaValue(p) != null">
+                        <span
+                          class="mr-game-results-coins"
+                          aria-label="Coins delta"
+                          *ngIf="!isTrainingMode && coinsDeltaValue(p) != null"
+                          [attr.title]="coinsBonusValue(p) > 0 ? 'Bonus coins: +' + coinsBonusValue(p) : null"
+                        >
                           <i class="fa-solid fa-coins" aria-hidden="true"></i>
                           <b>{{ formatSigned(coinsDeltaValue(p)) }}</b>
                         </span>

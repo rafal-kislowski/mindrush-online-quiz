@@ -393,7 +393,20 @@ export class GameComponent implements OnInit, OnDestroy {
     return `${sign}${rounded}`;
   }
 
+  xpDeltaValue(player: GamePlayerDto): number | null {
+    const boosted = this.toFiniteInt(player.xpFinalDelta);
+    if (boosted != null) return boosted;
+    return this.toFiniteInt(player.xpDelta);
+  }
+
+  xpBonusValue(player: GamePlayerDto): number {
+    return Math.max(0, this.toFiniteInt(player.xpBonusDelta) ?? 0);
+  }
+
   coinsDeltaValue(player: GamePlayerDto): number | null {
+    const boosted = this.toFiniteInt(player.coinsFinalDelta);
+    if (boosted != null) return boosted;
+
     const direct = Number(player.coinsDelta);
     if (Number.isFinite(direct)) return Math.trunc(direct);
 
@@ -408,16 +421,27 @@ export class GameComponent implements OnInit, OnDestroy {
     return Math.max(0, Math.trunc(score / 20) + winnerBonus);
   }
 
+  coinsBonusValue(player: GamePlayerDto): number {
+    return Math.max(0, this.toFiniteInt(player.coinsBonusDelta) ?? 0);
+  }
+
   rankPointsInline(player: GamePlayerDto): string {
     const value = this.rankPointsDeltaValue(player);
     const sign = value > 0 ? '+' : '';
     return `(${sign}${value} RP)`;
   }
 
+  rankPointsBonusValue(player: GamePlayerDto): number {
+    return Math.max(0, this.toFiniteInt(player.rankPointsBonusDelta) ?? 0);
+  }
+
   get showRankingPointsInSummary(): boolean {
     if (this.isTrainingMode) return false;
     const players = this.state?.players ?? [];
-    return players.some((p) => p.rankPointsDelta != null && Number.isFinite(Number(p.rankPointsDelta)));
+    return players.some((p) =>
+      (p.rankPointsFinalDelta != null && Number.isFinite(Number(p.rankPointsFinalDelta))) ||
+      (p.rankPointsDelta != null && Number.isFinite(Number(p.rankPointsDelta)))
+    );
   }
 
   rankPointsInlineClass(player: GamePlayerDto): 'is-positive' | 'is-negative' | 'is-zero' {
@@ -465,15 +489,21 @@ export class GameComponent implements OnInit, OnDestroy {
   }
 
   private rankPointsDeltaValue(player: GamePlayerDto): number {
-    const n = Number(player.rankPointsDelta);
-    if (!Number.isFinite(n)) return 0;
-    return Math.trunc(n);
+    const boosted = this.toFiniteInt(player.rankPointsFinalDelta);
+    if (boosted != null) return boosted;
+    return this.toFiniteInt(player.rankPointsDelta) ?? 0;
   }
 
   private playerRankPoints(player: GamePlayerDto): number {
     const n = Number(player.rankPoints);
     if (!Number.isFinite(n)) return 0;
     return Math.max(0, Math.trunc(n));
+  }
+
+  private toFiniteInt(value: number | null | undefined): number | null {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return null;
+    return Math.trunc(parsed);
   }
 
   get answeredCount(): number {

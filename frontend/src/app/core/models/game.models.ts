@@ -26,6 +26,12 @@ export interface GamePlayerDto {
   xpDelta?: number | null;
   coinsDelta?: number | null;
   rankPointsDelta?: number | null;
+  xpFinalDelta?: number | null;
+  coinsFinalDelta?: number | null;
+  rankPointsFinalDelta?: number | null;
+  xpBonusDelta?: number | null;
+  coinsBonusDelta?: number | null;
+  rankPointsBonusDelta?: number | null;
   rankPoints?: number | null;
   winner?: boolean | null;
 }

@@ -18,11 +18,11 @@ describe('AppComponent', () => {
     expect(app).toBeTruthy();
   });
 
-  it('should render the brand', () => {
+  it('should render main navigation', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.brand')?.textContent).toContain('MindRush');
+    expect(compiled.querySelector('.menu .text')?.textContent).toContain('Dashboard');
   });
 
   it('should include Library in menu items', () => {

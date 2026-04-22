@@ -10,6 +10,11 @@ import {
 import { Subscription, catchError, combineLatest, distinctUntilChanged, filter, finalize, forkJoin, interval, map, of, startWith, switchMap } from 'rxjs';
 import { AppInfoApi } from './core/api/app-info.api';
 import { AuthService } from './core/auth/auth.service';
+import {
+  activeBonusIconPath,
+  activeBonusRemainingLabel,
+  buildActiveBonuses,
+} from './core/bonus/active-bonuses';
 import { GameApi } from './core/api/game.api';
 import { LobbyApi } from './core/api/lobby.api';
 import { NotificationApi, NotificationStreamEventDto, UserNotificationDto } from './core/api/notification.api';
@@ -17,6 +22,7 @@ import { AppInfoDto } from './core/models/app-info.models';
 import { ActiveGameDto } from './core/models/game.models';
 import { LobbyDto } from './core/models/lobby.models';
 import { SessionService } from './core/session/session.service';
+import { ShopCartService } from './core/shop/shop-cart.service';
 import { computeLevelProgress, levelTheme, rankForPoints } from './core/progression/progression';
 import { ParticlesService } from './core/ui/particles.service';
 import { PlayerAvatarComponent } from './core/ui/player-avatar.component';
@@ -105,6 +111,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly soundEffects = inject(SoundEffectsService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly shopCart = inject(ShopCartService);
   private readonly subscriptions = new Subscription();
   private readonly intFormatter = new Intl.NumberFormat('en-US');
   private readonly demoResetFormatter = new Intl.DateTimeFormat('en-US', {
@@ -116,9 +123,11 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly session$ = this.sessionService.session$;
   readonly authUser$ = this.authService.user$;
   readonly isAdmin$ = this.authService.user$.pipe(map(u => !!u?.roles?.includes('ADMIN')));
+  readonly cartItemCount$ = this.shopCart.itemCount$;
+  private readonly bonusNow$ = interval(30_000).pipe(startWith(0), map(() => Date.now()));
 
-  readonly profileVm$ = combineLatest([this.authService.user$, this.sessionService.session$]).pipe(
-    map(([user, session]) => {
+  readonly profileVm$ = combineLatest([this.authService.user$, this.sessionService.session$, this.bonusNow$]).pipe(
+    map(([user, session, nowMs]) => {
       const isAuthenticated = !!user;
       const displayName = user?.displayName ?? session?.displayName ?? 'Guest';
       const roles = user?.roles ?? [];
@@ -127,6 +136,15 @@ export class AppComponent implements OnInit, OnDestroy {
       const rankPoints = user?.rankPoints ?? session?.rankPoints ?? 0;
       const xp = user?.xp ?? session?.xp ?? 0;
       const coins = user?.coins ?? session?.coins ?? 0;
+      const activeBonuses = buildActiveBonuses(user, nowMs)
+        .map((bonus) => ({
+          key: bonus.key,
+          label: bonus.label,
+          iconPath: activeBonusIconPath(bonus.key),
+          remainingLabel: activeBonusRemainingLabel(bonus.expiresAtMs, nowMs),
+          expiresLabel: this.bonusExpiryLabel(bonus.expiresAtMs),
+        }))
+        .sort((a, b) => (a.key === 'premium' ? -1 : b.key === 'premium' ? 1 : 0));
 
       const lvl = computeLevelProgress(xp);
       const theme = levelTheme(lvl.level);
@@ -146,6 +164,7 @@ export class AppComponent implements OnInit, OnDestroy {
         isHighRank: rankPoints >= 1200,
         xp,
         coins,
+        activeBonuses,
         level: lvl.level,
         levelTextColor: theme.text,
         ringStrong: theme.ringStrong,
@@ -264,9 +283,10 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private updateContentFlags(url: string): void {
     const path = (url ?? '').split('?')[0]?.split('#')[0] ?? '';
-    this.contentWide = path.startsWith('/create-quiz') || path.startsWith('/admin/quiz-submissions');
+    this.contentWide = path.startsWith('/create-quiz') || path.startsWith('/admin/products') || path.startsWith('/admin/quiz-submissions');
     this.contentFull =
       path === '/' ||
+      path.startsWith('/shop') ||
       path.startsWith('/play-solo') ||
       path.startsWith('/solo-game') ||
       path.startsWith('/profile') ||
@@ -302,10 +322,16 @@ export class AppComponent implements OnInit, OnDestroy {
     this.authService.logout().subscribe(() => {
       this.currentLobby = null;
       this.currentGame = null;
+      this.shopCart.clear();
       this.resetNotificationsState();
       this.stopNotificationStream();
       this.router.navigate(['/']);
     });
+  }
+
+  openCart(event?: Event): void {
+    event?.stopPropagation();
+    void this.router.navigate(['/shop', 'cart']);
   }
 
   get notificationCount(): number {
@@ -535,6 +561,11 @@ export class AppComponent implements OnInit, OnDestroy {
   formatInt(n: number | null | undefined): string {
     const v = Math.max(0, Math.floor(n ?? 0));
     return this.intFormatter.format(v);
+  }
+
+  private bonusExpiryLabel(expiresAtMs: number | null): string {
+    if (expiresAtMs == null || !Number.isFinite(expiresAtMs)) return 'No expiry';
+    return this.demoResetFormatter.format(new Date(expiresAtMs));
   }
 
   get showDemoBanner(): boolean {
@@ -851,22 +882,36 @@ export class AppComponent implements OnInit, OnDestroy {
   private mapNotification(item: UserNotificationDto): AppNotification {
     const category = this.normalizeCategory(item.category);
     const severity = this.normalizeSeverity(item.severity);
+    const routePath = String(item.routePath ?? '').trim();
+    const title = String(item.title ?? '').trim();
+    const subtitle = String(item.subtitle ?? '').trim();
+    const normalizedRoute = routePath.toLowerCase();
+    const normalizedTitle = title.toLowerCase();
+    const normalizedSubtitle = subtitle.toLowerCase();
+    const hasPremiumMeaning =
+      normalizedRoute === '/shop/premium' ||
+      normalizedTitle.includes('premium activated') ||
+      normalizedTitle.includes('premium expired') ||
+      normalizedSubtitle.includes('mindrush premium');
+    const rawAvatarImageUrl = String(item.avatarImageUrl ?? '').trim();
+    const avatarImageUrl = rawAvatarImageUrl || (hasPremiumMeaning ? '/shop/Premium_account_icon.png' : null);
+
     return {
       id: Number(item.id),
       category,
       severity,
-      title: String(item.title ?? '').trim() || 'Notification',
+      title: title || 'Notification',
       subtitle: item.subtitle ?? null,
       text: item.text ?? null,
       meta: item.meta ?? null,
       createdAt: item.createdAt ?? null,
       readAt: item.readAt ?? null,
       decision: item.decision ?? null,
-      avatarImageUrl: item.avatarImageUrl ?? null,
+      avatarImageUrl,
       avatarBgStart: item.avatarBgStart ?? null,
       avatarBgEnd: item.avatarBgEnd ?? null,
       avatarTextColor: item.avatarTextColor ?? null,
-      routeCommands: this.routeCommandsFor(item.routePath),
+      routeCommands: this.routeCommandsFor(routePath),
       routeQueryParams: this.normalizeRouteQuery(item.routeQueryParams),
     };
   }

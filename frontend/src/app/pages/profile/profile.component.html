@@ -125,19 +125,40 @@
                   </div>
 
                   <aside class="profile-resources" aria-label="Profile resources">
-                    <article class="profile-resource-card profile-resource-card--xp">
-                      <div class="profile-resource-card__icon"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></div>
-                      <div class="profile-resource-card__text">
-                        <div class="profile-resource-card__label">XP</div>
-                        <div class="profile-resource-card__value">{{ vm.totalXp | number }}</div>
-                      </div>
-                    </article>
-
                     <article class="profile-resource-card profile-resource-card--coin">
                       <div class="profile-resource-card__icon"><i class="fa-solid fa-coins" aria-hidden="true"></i></div>
                       <div class="profile-resource-card__text">
                         <div class="profile-resource-card__label">Gold Coin</div>
                         <div class="profile-resource-card__value">{{ vm.coins | number }}</div>
+                      </div>
+                    </article>
+
+                    <article class="profile-resource-card profile-resource-card--bonuses">
+                      <div class="profile-resource-card__text">
+                        <div class="profile-resource-card__label">Active bonuses</div>
+                        <div class="profile-bonuses-list">
+                          <div
+                            class="profile-bonuses-item"
+                            *ngFor="let slot of [0, 1, 2, 3]; let i = index"
+                            [class.is-empty]="!vm.activeBonuses[i]"
+                            [attr.tabindex]="vm.activeBonuses[i] ? 0 : null"
+                            [attr.aria-label]="vm.activeBonuses[i] ? (vm.activeBonuses[i].label + '. ' + vm.activeBonuses[i].remainingLabel) : 'Empty bonus slot'"
+                          >
+                            <ng-container *ngIf="vm.activeBonuses[i] as bonus; else profileBonusEmpty">
+                              <span class="profile-bonuses-item__icon-wrap">
+                                <img class="profile-bonuses-item__icon" [src]="bonus.iconPath" [alt]="bonus.label" loading="lazy" />
+                              </span>
+                              <span class="profile-bonuses-item__tooltip" role="tooltip">
+                                <span class="profile-bonuses-item__tooltip-title">{{ bonus.label }}</span>
+                                <span>{{ bonus.remainingLabel }}</span>
+                                <span class="profile-bonuses-item__tooltip-meta">to {{ bonus.expiresLabel }}</span>
+                              </span>
+                            </ng-container>
+                            <ng-template #profileBonusEmpty>
+                              <span class="profile-bonuses-item__placeholder" aria-hidden="true"></span>
+                            </ng-template>
+                          </div>
+                        </div>
                       </div>
                     </article>
                   </aside>

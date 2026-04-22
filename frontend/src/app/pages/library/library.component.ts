@@ -13,6 +13,8 @@ import {
   QuizModerationStatus,
   QuizStatus,
 } from '../../core/api/library-quiz.api';
+import { AuthService } from '../../core/auth/auth.service';
+import { AuthUserDto } from '../../core/models/auth.models';
 import { ToastService } from '../../core/ui/toast.service';
 
 const MIN_TIME_LIMIT_SECONDS = 5;
@@ -137,6 +139,7 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
 
   myQuizzes: LibraryQuizListItemDto[] = [];
   policy: LibraryPolicyDto = DEFAULT_POLICY;
+  authUser: AuthUserDto | null = null;
   selectedQuiz: LibraryQuizDetailDto | null = null;
   selectedQuestionId: number | null = null;
   minePageIndex = 0;
@@ -214,6 +217,7 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
 
   constructor(
     private readonly api: LibraryQuizApi,
+    private readonly auth: AuthService,
     private readonly toast: ToastService,
     private readonly router: Router,
     private readonly route: ActivatedRoute
@@ -233,6 +237,9 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadDismissedModerationSignatures();
     this.refreshLists();
     this.questionSearchSub = new Subscription();
+    this.questionSearchSub.add(this.auth.user$.subscribe((user) => {
+      this.authUser = user;
+    }));
     this.questionSearchSub.add(this.route.queryParamMap.subscribe((params) => {
       const rawQuizId = Number(params.get('openQuiz'));
       if (!Number.isFinite(rawQuizId) || rawQuizId <= 0) return;
@@ -386,6 +393,52 @@ export class LibraryComponent implements OnInit, AfterViewInit, OnDestroy {
 
   get canCreateQuiz(): boolean {
     return this.policy.ownedCount < this.policy.maxOwnedQuizzes;
+  }
+
+  get premiumExpiredWarning(): string | null {
+    const raw = String(this.authUser?.premiumExpiresAt ?? '').trim();
+    if (!raw) return null;
+    const expiresAt = Date.parse(raw);
+    if (!Number.isFinite(expiresAt) || expiresAt > Date.now()) return null;
+    return 'Premium expired. Existing quizzes stay intact, but premium-only increases are blocked until premium is renewed.';
+  }
+
+  get overLimitWarnings(): string[] {
+    const warnings: string[] = [];
+    if (this.policy.ownedCount > this.policy.maxOwnedQuizzes) {
+      warnings.push(
+        `You currently own ${this.policy.ownedCount} quizzes, above the active tier limit of ${this.policy.maxOwnedQuizzes}. Existing quizzes stay available, but you cannot create more until the count is reduced or premium is active again.`
+      );
+    }
+    if (this.policy.publishedCount > this.policy.maxPublishedQuizzes) {
+      warnings.push(
+        `You currently have ${this.policy.publishedCount} published quizzes, above the active tier limit of ${this.policy.maxPublishedQuizzes}. Existing published quizzes remain visible, but new submissions cannot exceed the current tier.`
+      );
+    }
+    if (this.policy.pendingCount > this.policy.maxPendingSubmissions) {
+      warnings.push(
+        `You currently have ${this.policy.pendingCount} pending submissions, above the active tier limit of ${this.policy.maxPendingSubmissions}. Existing pending submissions stay in review, but additional submissions are blocked for now.`
+      );
+    }
+
+    const quiz = this.selectedQuiz;
+    const questionCount = quiz?.questions?.length ?? 0;
+    if (quiz && questionCount > this.policy.maxQuestionsPerQuiz) {
+      warnings.push(
+        `This quiz has ${questionCount} questions, above the active tier limit of ${this.policy.maxQuestionsPerQuiz}. You can still edit existing content, but you cannot add more questions until the quiz is back within the current tier.`
+      );
+    }
+    if (quiz?.questionTimeLimitSeconds && quiz.questionTimeLimitSeconds > this.policy.maxQuestionTimeLimitSeconds) {
+      warnings.push(
+        `This quiz uses ${quiz.questionTimeLimitSeconds}s per question, above the active tier max of ${this.policy.maxQuestionTimeLimitSeconds}s. Lower it before saving quiz details under the current tier.`
+      );
+    }
+    if (quiz?.questionsPerGame && quiz.questionsPerGame > this.policy.maxQuestionsPerGame) {
+      warnings.push(
+        `This quiz uses ${quiz.questionsPerGame} questions per game, above the active tier max of ${this.policy.maxQuestionsPerGame}. Lower it before saving quiz details under the current tier.`
+      );
+    }
+    return warnings;
   }
 
   get canAddQuestion(): boolean {

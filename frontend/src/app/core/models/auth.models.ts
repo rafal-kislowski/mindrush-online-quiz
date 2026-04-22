@@ -10,4 +10,9 @@ export interface AuthUserDto {
   createdAt?: string | null;
   lastLoginAt?: string | null;
   lastDisplayNameChangeAt?: string | null;
+  premiumActivatedAt?: string | null;
+  premiumExpiresAt?: string | null;
+  xpBoostExpiresAt?: string | null;
+  rankPointsBoostExpiresAt?: string | null;
+  coinsBoostExpiresAt?: string | null;
 }

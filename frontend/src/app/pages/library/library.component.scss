@@ -275,6 +275,53 @@
   color: rgba(176, 215, 255, 0.95);
 }
 
+.library-overlimit {
+  display: grid;
+  gap: 10px;
+}
+
+.library-premium-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(167, 198, 240, 0.2);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018)),
+    rgba(10, 19, 36, 0.34);
+  color: rgba(221, 233, 250, 0.9);
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.library-premium-banner i {
+  color: rgba(255, 205, 77, 0.82);
+  margin-top: 2px;
+}
+
+.library-overlimit__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(246, 196, 83, 0.24);
+  background:
+    linear-gradient(180deg, rgba(246, 196, 83, 0.12), rgba(246, 196, 83, 0.04)),
+    rgba(10, 19, 36, 0.42);
+  color: rgba(255, 245, 220, 0.96);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.library-overlimit__item i {
+  color: rgba(255, 205, 77, 0.96);
+  margin-top: 2px;
+}
+
 @media (max-width: 720px) {
   .lib-top {
     grid-template-columns: 1fr;

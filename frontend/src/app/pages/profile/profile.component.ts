@@ -11,11 +11,16 @@ import {
   inject,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { Subscription, catchError, combineLatest, map, of, shareReplay, switchMap } from 'rxjs';
+import { Subscription, catchError, combineLatest, interval, map, of, shareReplay, startWith, switchMap } from 'rxjs';
 import { AchievementApi, AchievementItemDto, AchievementListResponseDto } from '../../core/api/achievement.api';
 import { apiErrorMessage } from '../../core/api/api-error.util';
 import { LibraryQuizApi, LibraryQuizListItemDto } from '../../core/api/library-quiz.api';
 import { AuthService } from '../../core/auth/auth.service';
+import {
+  activeBonusIconPath,
+  activeBonusRemainingLabel,
+  buildActiveBonuses,
+} from '../../core/bonus/active-bonuses';
 import { computeLevelProgress, levelTheme, rankForPoints } from '../../core/progression/progression';
 import { ProfileInsightsService } from '../../core/profile/profile-insights.service';
 import { PlayerAvatarComponent } from '../../core/ui/player-avatar.component';
@@ -78,6 +83,7 @@ export class ProfileComponent implements AfterViewInit, OnDestroy {
   private readonly libraryQuizApi = inject(LibraryQuizApi);
   private readonly achievementApi = inject(AchievementApi);
   private readonly toast = inject(ToastService);
+  private readonly bonusNow$ = interval(30_000).pipe(startWith(0), map(() => Date.now()));
   private readonly subscriptions = new Subscription();
   private marqueeRafId: number | null = null;
   private tabHeightRafId: number | null = null;
@@ -128,8 +134,8 @@ export class ProfileComponent implements AfterViewInit, OnDestroy {
     shareReplay({ bufferSize: 1, refCount: true })
   );
 
-  readonly vm$ = combineLatest([this.auth.user$, this.profileInsights.state$, this.approvedQuizzes$, this.achievements$]).pipe(
-    map(([user, insights, approvedQuizzes, achievements]) => {
+  readonly vm$ = combineLatest([this.auth.user$, this.profileInsights.state$, this.approvedQuizzes$, this.achievements$, this.bonusNow$]).pipe(
+    map(([user, insights, approvedQuizzes, achievements, nowMs]) => {
       if (!user) return null;
       this.reconcileQuizPagination(approvedQuizzes);
       const rank = rankForPoints(user.rankPoints ?? 0);
@@ -153,10 +159,18 @@ export class ProfileComponent implements AfterViewInit, OnDestroy {
         ? Math.max(0, Math.min(100, Math.round((achievementsUnlocked * 100) / achievementsTotal)))
         : 0;
       const displayNameNextChangeAtMs = this.nextDisplayNameChangeAt(user.lastDisplayNameChangeAt);
-      const nowMs = Date.now();
       const displayNameCooldownActive = displayNameNextChangeAtMs != null && displayNameNextChangeAtMs > nowMs;
       const displayNameCanAfford = (user.coins ?? 0) >= ProfileComponent.DISPLAY_NAME_CHANGE_COST;
       const displayNameCanChangeNow = !displayNameCooldownActive && displayNameCanAfford;
+      const activeBonuses = buildActiveBonuses(user, nowMs)
+        .map((bonus) => ({
+          key: bonus.key,
+          label: bonus.label,
+          iconPath: activeBonusIconPath(bonus.key),
+          remainingLabel: activeBonusRemainingLabel(bonus.expiresAtMs, nowMs),
+          expiresLabel: this.formatDateTimeFromMillis(bonus.expiresAtMs) ?? 'No expiry',
+        }))
+        .sort((a, b) => (a.key === 'premium' ? -1 : b.key === 'premium' ? 1 : 0));
 
       return {
         displayName: user.displayName,
@@ -188,6 +202,7 @@ export class ProfileComponent implements AfterViewInit, OnDestroy {
         displayNameCooldownActive,
         displayNameCanChangeNow,
         displayNameNextChangeLabel: this.formatDateTimeFromMillis(displayNameNextChangeAtMs),
+        activeBonuses,
         achievementsTitle: String(achievements.title ?? '').trim() || 'Achievements',
         achievementsDescription: String(achievements.description ?? '').trim()
           || 'Unlock milestones by playing and progressing.',
