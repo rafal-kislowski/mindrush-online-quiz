@@ -1,0 +1,532 @@
+﻿<section class="page" (click)="closeMenus()">
+  <div class="shop-shell" aria-label="Shop">
+    <svg class="svg-defs" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient
+          id="mrTitleGradShop"
+          x1="0"
+          y1="0"
+          x2="0"
+          y2="20"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop offset="0" style="stop-color: rgba(255, 205, 77, 0.9)" />
+          <stop offset="1" style="stop-color: rgba(56, 189, 248, 0.9)" />
+        </linearGradient>
+        <symbol id="mrTitleMarkShop" viewBox="0 0 10 20">
+          <path
+            d="M5 1c2.1 0 3.2 1.6 3.2 3.5v11C8.2 17.4 7.1 19 5 19S1.8 17.4 1.8 15.5v-11C1.8 2.6 2.9 1 5 1Z"
+            fill="url(#mrTitleGradShop)"
+          />
+        </symbol>
+      </defs>
+    </svg>
+
+    <div class="shop-head">
+      <div class="title">
+        <h1>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path d="M16 10a4 4 0 0 1-8 0" />
+            <path d="M3.103 6.034h17.794" />
+            <path d="M3.4 5.467a2 2 0 0 0-.4 1.2V20a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.667a2 2 0 0 0-.4-1.2l-2-2.667A2 2 0 0 0 17 2H7a2 2 0 0 0-1.6.8z" />
+          </svg>
+          {{ viewTitle }}
+        </h1>
+      </div>
+
+      <button class="back mr-back-btn" type="button" (click)="goBack(); $event.stopPropagation()" aria-label="Back">
+        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+        <span>Back</span>
+      </button>
+    </div>
+
+    <div class="shop-top" *ngIf="isCatalogView">
+      <div class="currency-filter" role="tablist" aria-label="Shop currency filter">
+        <button
+          class="currency-filter__item"
+          type="button"
+          role="tab"
+          *ngFor="let option of currencyFilterOptions"
+          [class.is-active]="currencyFilter === option.value"
+          [attr.aria-selected]="currencyFilter === option.value"
+          (click)="setCurrencyFilter(option.value)"
+        >
+          <i class="fa-solid" [ngClass]="option.icon" aria-hidden="true"></i>
+          <span>{{ option.label }}</span>
+        </button>
+      </div>
+    </div>
+
+    <section class="view-screen" [ngClass]="viewTransitionClass" *ngIf="isCatalogView">
+      <div class="view-screen__body view-screen__body--catalog">
+        <div class="toolbar" aria-label="Shop catalog controls">
+          <label class="toolbar__searchWrap">
+            <span class="toolbar__icon" aria-hidden="true">
+              <i class="fa-solid fa-magnifying-glass"></i>
+            </span>
+            <input
+              class="toolbar__search"
+              type="text"
+              [ngModel]="searchTerm"
+              (ngModelChange)="onSearchTermChange($event)"
+              placeholder="Search products..."
+              aria-label="Search products"
+            />
+          </label>
+
+          <div class="toolbar__control mr-select-wrap" [class.menu-open]="openMenu === 'sort'">
+            <button
+              class="mr-select mr-select--compact mr-select--sort"
+              type="button"
+              aria-haspopup="listbox"
+              [attr.aria-expanded]="openMenu === 'sort'"
+              (click)="toggleMenu('sort', $event)"
+              aria-label="Catalog sorting"
+            >
+              <span class="mr-select__left">
+                <span class="mr-select__icon" aria-hidden="true">
+                  <i class="fa-solid fa-arrow-down-wide-short"></i>
+                </span>
+                <span class="mr-select__value">{{ sortLabel }}</span>
+              </span>
+              <span class="mr-select__caret" aria-hidden="true"></span>
+            </button>
+
+            <div class="mr-select__menu" *ngIf="openMenu === 'sort'" role="listbox" (click)="$event.stopPropagation()">
+              <button class="mr-select__item" type="button" [class.active]="sort === 'featured'" (click)="setSort('featured', $event)">Featured</button>
+              <button class="mr-select__item" type="button" [class.active]="sort === 'priceAsc'" (click)="setSort('priceAsc', $event)">Price low-high</button>
+              <button class="mr-select__item" type="button" [class.active]="sort === 'priceDesc'" (click)="setSort('priceDesc', $event)">Price high-low</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="catalog-stage">
+          <div class="catalog-scroll">
+            <div class="catalog-grid" *ngIf="!catalogLoading; else catalogLoadingTpl">
+              <button
+                class="product-card"
+                type="button"
+                *ngFor="let item of pagedCatalog; trackBy: trackProduct"
+                (click)="openProduct(item)"
+              >
+                <div class="product-card__body">
+                  <div class="product-card__media" [class.product-card__media--empty]="!productHeroImage(item.slug, item.heroImageUrl)">
+                    <ng-container *ngIf="productHeroImage(item.slug, item.heroImageUrl) as heroImage; else productImageFallback">
+                      <img [src]="heroImage" [alt]="item.title" />
+                    </ng-container>
+                    <ng-template #productImageFallback>
+                      <i class="fa-regular fa-image" aria-hidden="true"></i>
+                      <span>Product image slot</span>
+                    </ng-template>
+                  </div>
+
+                  <div class="product-card__summary">
+                    <div class="product-card__head">
+                      <h3>{{ item.title }}</h3>
+                      <div class="product-card__planCount" *ngIf="item.pricingPlans.length > 1">
+                        {{ item.pricingPlans.length + ' options' }}
+                      </div>
+                    </div>
+
+                    <div class="product-card__meta">
+                      <ng-container *ngIf="lowestPlan(item) as plan; else productCardPriceFallback">
+                        <div
+                          class="product-card__priceBlock"
+                          [class.product-card__priceBlock--compact]="item.pricingPlans.length <= 1"
+                        >
+                          <div class="product-card__priceRow">
+                            <span class="product-card__price">{{ formatMoneyAmount(plan.grossAmountMinor, plan.currency) }}</span>
+                            <span class="shop-money-icon" *ngIf="isCoinsCurrency(plan.currency)" aria-label="Coins">
+                              <i class="fa-solid fa-coins shop-coin-icon" aria-hidden="true"></i>
+                            </span>
+                            <span class="product-card__priceTerm" [class.product-card__priceTerm--hidden]="item.pricingPlans.length <= 1">
+                              <ng-container *ngIf="planLabelHasCoinsWord(plan.label); else productCardDefaultPlanLabel">
+                                <span class="product-card__priceTermText">
+                                  {{ item.pricingMode === 'ONE_TIME' ? planLabelWithoutCoinsWord(plan.label) : ('/ ' + planLabelWithoutCoinsWord(plan.label)) }}
+                                </span>
+                                <span class="shop-money-icon" aria-label="Coins">
+                                  <i class="fa-solid fa-coins shop-coin-icon" aria-hidden="true"></i>
+                                </span>
+                              </ng-container>
+                              <ng-template #productCardDefaultPlanLabel>
+                                {{ item.pricingMode === 'ONE_TIME' ? plan.label : ('/ ' + plan.label) }}
+                              </ng-template>
+                            </span>
+                          </div>
+                          <span class="product-card__priceHint" [class.product-card__priceHint--hidden]="item.pricingPlans.length <= 1">starting option</span>
+                        </div>
+                      </ng-container>
+                      <ng-template #productCardPriceFallback>
+                        <div class="product-card__priceBlock product-card__priceBlock--compact">
+                          <span class="product-card__price">{{ lowestPlanLabel(item) }}</span>
+                        </div>
+                      </ng-template>
+                    </div>
+                  </div>
+                </div>
+
+                <span class="product-card__cta">
+                  <i class="fa-solid" [ngClass]="currencyFilter === 'coins' ? 'fa-bolt' : 'fa-cart-shopping'" aria-hidden="true"></i>
+                  <span>{{ currencyFilter === 'coins' ? 'Buy now' : (item.pricingPlans.length ? 'Choose option' : 'View product') }}</span>
+                </span>
+              </button>
+            </div>
+
+            <ng-template #catalogLoadingTpl>
+              <div class="empty">Loading shop catalog...</div>
+            </ng-template>
+
+            <div class="empty" *ngIf="!catalogLoading && !pagedCatalog.length">
+              No products available right now.
+            </div>
+          </div>
+
+          <div class="pager" *ngIf="!catalogLoading && sortedCatalog.length">
+            <div class="pager__nav">
+              <button class="pager__btn" type="button" (click)="prevPage()" [disabled]="pageIndex <= 0" aria-label="Previous page">
+                <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+              </button>
+              <div class="pager__text">Page {{ pageIndex + 1 }} / {{ catalogTotalPages }}</div>
+              <button class="pager__btn" type="button" (click)="nextPage()" [disabled]="pageIndex + 1 >= catalogTotalPages" aria-label="Next page">
+                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+              </button>
+            </div>
+
+            <div class="footer-right">
+              <div class="muted pager__entries">
+                Showing {{ catalogFrom }} to {{ catalogTo }} of {{ sortedCatalog.length }} entries
+              </div>
+              <div
+                class="mr-select-wrap mr-select-wrap--up pager__select-wrap"
+                [class.menu-open]="openMenu === 'pageSize'"
+              >
+                <button
+                  class="mr-select pager__select-btn"
+                  type="button"
+                  aria-haspopup="listbox"
+                  [attr.aria-expanded]="openMenu === 'pageSize'"
+                  (click)="toggleMenu('pageSize', $event)"
+                  aria-label="Rows per page"
+                >
+                  <span class="mr-select__value">{{ pageSizeLabel }}</span>
+                  <span class="mr-select__caret" aria-hidden="true"></span>
+                </button>
+
+                <div class="mr-select__menu" *ngIf="openMenu === 'pageSize'" role="listbox" (click)="$event.stopPropagation()">
+                  <button class="mr-select__item" type="button" *ngFor="let size of pageSizeOptions" [class.active]="pageSize === size" (click)="setPageSize(size, $event)">
+                    Show {{ size }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view-screen" [ngClass]="viewTransitionClass" *ngIf="isDetailView">
+      <div class="empty" *ngIf="productLoading">Loading product...</div>
+      <div class="empty" *ngIf="!productLoading && !product">Product is unavailable.</div>
+
+      <div class="view-screen__body view-screen__body--detail" *ngIf="!productLoading && product as product">
+        <div class="product-layout">
+          <section class="product-main">
+            <article class="hero-card">
+              <div class="hero-card__media" [class.product-card__media--empty]="!productHeroImage(product.slug, product.heroImageUrl)">
+                <ng-container *ngIf="productHeroImage(product.slug, product.heroImageUrl) as heroImage; else detailHeroFallback">
+                  <img [src]="heroImage" [alt]="product.title" />
+                </ng-container>
+                <ng-template #detailHeroFallback>
+                  <i class="fa-regular fa-image" aria-hidden="true"></i>
+                  <span>Product image slot</span>
+                </ng-template>
+              </div>
+              <div class="hero-card__content">
+                <div class="hero-card__eyebrow" *ngIf="product.badgeLabel">{{ product.badgeLabel }}</div>
+                <h3>{{ product.title }}</h3>
+                <p class="hero-card__subtitle" *ngIf="product.subtitle">{{ product.subtitle }}</p>
+                <p class="hero-card__description" *ngIf="product.description">{{ product.description }}</p>
+                <div class="hero-card__trustGrid" aria-label="Product trust highlights" *ngIf="productTrustHighlights(product).length">
+                  <div class="hero-card__trustCell" *ngFor="let point of productTrustHighlights(product)">
+                    <strong>
+                      <i class="fa-solid" [ngClass]="point.icon" aria-hidden="true"></i>
+                      <span>{{ point.title }}</span>
+                    </strong>
+                    <span>{{ point.detail }}</span>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article class="plans-panel" *ngIf="product.pricingPlans.length > 1; else noPlansConfigured">
+              <div class="panel-head">
+                <h4>{{ productPricingLabel(product) }}</h4>
+              </div>
+              <div class="plans-grid">
+                <button
+                  class="plan-card"
+                  type="button"
+                  *ngFor="let plan of product.pricingPlans; trackBy: trackPlan"
+                  [class.is-selected]="selectedPlanCode === plan.code"
+                  [attr.aria-pressed]="selectedPlanCode === plan.code"
+                  (click)="selectPlan(plan.code)"
+                >
+                  <div class="plan-card__surface">
+                    <span class="plan-card__ribbon" *ngIf="selectedPlanCode === plan.code" aria-hidden="true"></span>
+                    <div class="plan-card__top">
+                      <div class="plan-card__heading">
+                        <div class="plan-card__titleBlock">
+                          <strong>
+                            <ng-container *ngIf="planLabelHasCoinsWord(plan.label); else detailPlanDefaultLabel">
+                              <span class="plan-card__titleText">{{ planLabelWithoutCoinsWord(plan.label) }}</span>
+                              <span class="shop-money-icon" aria-label="Coins">
+                                <i class="fa-solid fa-coins shop-coin-icon" aria-hidden="true"></i>
+                              </span>
+                            </ng-container>
+                            <ng-template #detailPlanDefaultLabel>
+                              {{ plan.label }}
+                            </ng-template>
+                          </strong>
+                        </div>
+                      </div>
+                      <div class="plan-card__priceBlock">
+                        <span class="plan-card__price">{{ formatMoneyAmount(plan.grossAmountMinor, plan.currency) }}</span>
+                        <span class="shop-money-icon" *ngIf="isCoinsCurrency(plan.currency)" aria-label="Coins">
+                          <i class="fa-solid fa-coins shop-coin-icon" aria-hidden="true"></i>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </article>
+            <ng-template #noPlansConfigured>
+              <article class="plans-panel" *ngIf="!product.pricingPlans.length">
+                <div class="panel-head">
+                  <h4>Purchase options</h4>
+                </div>
+                <div class="empty empty--compact">This product does not have purchase options yet.</div>
+              </article>
+            </ng-template>
+
+            <article class="feature-panel" *ngIf="product.advantages.length">
+              <div class="panel-head">
+                <h4>Product advantages</h4>
+              </div>
+              <div
+                class="benefit-grid"
+                [class.benefit-grid--single]="product.advantages.length === 1"
+                [class.benefit-grid--double]="product.advantages.length === 2"
+              >
+                <article class="benefit-card" *ngFor="let feature of product.advantages; let i = index">
+                  <h5 class="benefit-card__title">
+                    <span class="benefit-card__icon" aria-hidden="true">
+                      <i class="fa-solid" [ngClass]="feature.icon || (i === 0 ? 'fa-layer-group' : i === 1 ? 'fa-list-check' : i === 2 ? 'fa-stopwatch' : i === 3 ? 'fa-certificate' : 'fa-hourglass-end')"></i>
+                    </span>
+                    <span>{{ feature.title || 'Product benefit' }}</span>
+                  </h5>
+                  <ul class="benefit-card__list">
+                    <li *ngFor="let bullet of feature.bullets">{{ bullet }}</li>
+                  </ul>
+                </article>
+              </div>
+            </article>
+          </section>
+
+          <aside class="product-side">
+            <article class="checkout-card">
+              <div class="panel-head panel-head--compact">
+                <h4>{{ selectedPlanIsCoins ? 'Buy now' : 'Add to cart' }}</h4>
+              </div>
+
+              <div class="checkout-summary" *ngIf="selectedPlan as plan">
+                <div class="checkout-summary__row">
+                  <span>{{ shouldShowPlanSelection ? 'Selected option' : 'Selected product' }}</span>
+                  <strong>{{ checkoutSelectionLabel(plan) }}</strong>
+                </div>
+                <div class="checkout-summary__row">
+                  <span>Price</span>
+                  <strong class="shop-checkout-price">
+                    <span>{{ formatMoneyAmount(plan.grossAmountMinor, plan.currency) }}</span>
+                    <i class="fa-solid fa-coins shop-coin-icon" *ngIf="isCoinsCurrency(plan.currency)" aria-hidden="true"></i>
+                  </strong>
+                </div>
+                <div class="checkout-summary__row" *ngIf="selectedPlanIsCoins && authUser">
+                  <span>Your balance</span>
+                  <strong class="shop-checkout-price">
+                    <span>{{ formatMoneyAmount(userCoinsBalance, 'COINS') }}</span>
+                    <i class="fa-solid fa-coins shop-coin-icon" aria-hidden="true"></i>
+                  </strong>
+                </div>
+              </div>
+
+              <div class="checkout-note" *ngIf="!authUser && selectedPlanIsCoins">
+                Log in to buy this product with game coins.
+              </div>
+
+              <div class="checkout-note" *ngIf="!authUser && !selectedPlanIsCoins">
+                Viewing is public. Log in to process payment simulation for cart items.
+              </div>
+
+              <div class="checkout-note" *ngIf="authUser && !selectedPlan">
+                This product is visible in catalog, but no purchase option is configured yet.
+              </div>
+
+              <div class="checkout-note checkout-note--danger" *ngIf="lacksCoinsForSelectedPlan">
+                <div>You do not have enough coins to buy this product.</div>
+                <div class="checkout-note__meta">
+                  Missing:
+                  <strong class="shop-checkout-price">
+                    <span>{{ formatMoneyAmount(missingCoinsForSelectedPlan, 'COINS') }}</span>
+                    <i class="fa-solid fa-coins shop-coin-icon" aria-hidden="true"></i>
+                  </strong>
+                </div>
+              </div>
+
+              <button
+                class="btn primary checkout-card__action"
+                type="button"
+                (click)="selectedPlanIsCoins ? buySelectedPlanWithCoins() : addToCart()"
+                [disabled]="!selectedPlan || coinsPurchaseSubmitting || (selectedPlanIsCoins && !!authUser && !hasEnoughCoinsForSelectedPlan)"
+              >
+                {{
+                  selectedPlanIsCoins
+                    ? (coinsPurchaseSubmitting ? 'Processing...' : (lacksCoinsForSelectedPlan ? 'Not enough coins' : 'Buy now'))
+                    : (selectedPlanInCart ? 'Add one more' : 'Add to cart')
+                }}
+              </button>
+
+            </article>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="view-screen" [ngClass]="viewTransitionClass" *ngIf="isCartView">
+      <div class="view-screen__body view-screen__body--detail">
+        <div class="product-layout cart-layout">
+          <section class="product-main cart-main">
+            <article class="feature-panel cart-panel">
+              <div class="panel-head">
+                <h4>Selected products</h4>
+                <span>{{ cartItemsCount }} item{{ cartItemsCount === 1 ? '' : 's' }}</span>
+              </div>
+
+              <div class="empty empty--compact" *ngIf="!cartItems.length">
+                Cart is empty. Add products from the shop catalog.
+              </div>
+
+              <div class="cart-list" *ngIf="cartItems.length">
+                <article class="cart-item" *ngFor="let item of cartItems; trackBy: trackCartItem">
+                  <a class="cart-item__thumb" [routerLink]="['/shop', item.productSlug]" [attr.aria-label]="'Open ' + item.productTitle">
+                    <ng-container *ngIf="cartProductImage(item) as image; else cartImageFallback">
+                      <img [src]="image" [alt]="item.productTitle" loading="lazy" />
+                    </ng-container>
+                    <ng-template #cartImageFallback>
+                      <i class="fa-regular fa-image" aria-hidden="true"></i>
+                    </ng-template>
+                  </a>
+
+                  <div class="cart-item__identity">
+                    <a class="cart-item__titleLink" [routerLink]="['/shop', item.productSlug]">{{ item.productTitle }}</a>
+                    <span>{{ item.planLabel }}</span>
+                    <span class="cart-item__unitHint">
+                      {{ formatMoneyAmount(item.grossAmountMinor, item.currency) }}
+                      <i class="fa-solid fa-coins shop-coin-icon" *ngIf="isCoinsCurrency(item.currency)" aria-hidden="true"></i>
+                      / item
+                    </span>
+                  </div>
+
+                  <span class="cart-item__qty">
+                    <button class="cart-item__qtyBtn" type="button" (click)="decrementCartItem(item)" aria-label="Decrease quantity">
+                      <i class="fa-solid fa-minus" aria-hidden="true"></i>
+                    </button>
+                    <b>{{ item.quantity }}</b>
+                    <button class="cart-item__qtyBtn" type="button" (click)="incrementCartItem(item)" aria-label="Increase quantity">
+                      <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                    </button>
+                  </span>
+
+                  <span class="cart-item__total">
+                    {{ formatMoneyAmount(cartLineTotalAmountMinor(item), item.currency) }}
+                    <i class="fa-solid fa-coins shop-coin-icon" *ngIf="isCoinsCurrency(item.currency)" aria-hidden="true"></i>
+                  </span>
+
+                  <button class="cart-item__removeIcon" type="button" (click)="removeCartItem(item)" aria-label="Remove from cart">
+                    <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                  </button>
+                </article>
+              </div>
+            </article>
+          </section>
+
+          <aside class="product-side">
+            <article class="checkout-card">
+              <div class="panel-head panel-head--compact">
+                <h4>Checkout</h4>
+              </div>
+
+              <div class="checkout-summary">
+                <div class="checkout-summary__row">
+                  <span>Total items</span>
+                  <strong>{{ cartItemsCount }}</strong>
+                </div>
+                <div class="checkout-summary__row" *ngFor="let total of cartTotalsByCurrency">
+                  <span>Total ({{ total.currency }})</span>
+                  <strong class="shop-checkout-price">
+                    <span>{{ formatMoneyAmount(total.amountMinor, total.currency) }}</span>
+                    <i class="fa-solid fa-coins shop-coin-icon" *ngIf="isCoinsCurrency(total.currency)" aria-hidden="true"></i>
+                  </strong>
+                </div>
+              </div>
+
+              <div class="checkout-note" *ngIf="!authUser">
+                Viewing is public. Log in to process payment simulation for cart items.
+              </div>
+
+              <div class="shop-paymentActions">
+                <button
+                  class="btn secondary checkout-card__action checkout-card__action--status"
+                  type="button"
+                  (click)="processCartPayment('PENDING')"
+                  [disabled]="cartActionSubmitting || cartItemsCount <= 0"
+                >
+                  {{ cartActionSubmitting ? 'Processing...' : 'Payment pending' }}
+                </button>
+                <button
+                  class="btn success checkout-card__action checkout-card__action--status"
+                  type="button"
+                  (click)="processCartPayment('SUCCESS')"
+                  [disabled]="cartActionSubmitting || cartItemsCount <= 0"
+                >
+                  {{ cartActionSubmitting ? 'Processing...' : 'Payment passed' }}
+                </button>
+                <button
+                  class="btn danger checkout-card__action checkout-card__action--status"
+                  type="button"
+                  (click)="processCartPayment('FAILURE')"
+                  [disabled]="cartActionSubmitting || cartItemsCount <= 0"
+                >
+                  {{ cartActionSubmitting ? 'Processing...' : 'Payment failed' }}
+                </button>
+              </div>
+            </article>
+          </aside>
+        </div>
+      </div>
+    </section>
+  </div>
+</section>
+

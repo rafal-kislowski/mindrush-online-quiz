@@ -1,0 +1,704 @@
+<main class="admin-dashboard lobby-page">
+  <section class="admin-grid">
+    <article class="admin-shell" aria-label="Admin shop products">
+      <div class="admin-shell__inner">
+        <section class="admin">
+          <div class="admin__card">
+            <svg class="svg-defs" aria-hidden="true" focusable="false">
+              <defs>
+                <linearGradient
+                  id="mrTitleGradAdminProducts"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="20"
+                  gradientUnits="userSpaceOnUse"
+                >
+                  <stop offset="0" style="stop-color: rgba(255, 205, 77, 0.85)" />
+                  <stop offset="1" style="stop-color: rgba(56, 189, 248, 0.85)" />
+                </linearGradient>
+                <symbol id="mrTitleMarkAdminProducts" viewBox="0 0 10 20">
+                  <path
+                    d="M5 1c2.1 0 3.2 1.6 3.2 3.5v11C8.2 17.4 7.1 19 5 19S1.8 17.4 1.8 15.5v-11C1.8 2.6 2.9 1 5 1Z"
+                    fill="url(#mrTitleGradAdminProducts)"
+                  />
+                </symbol>
+              </defs>
+            </svg>
+
+            <div class="admin__head card__top" [class.admin__head--compact]="isEditorOpen">
+              <div class="title">
+                <h1>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <path d="M16 10a4 4 0 0 1-8 0" />
+                    <path d="M3.103 6.034h17.794" />
+                    <path d="M3.4 5.467a2 2 0 0 0-.4 1.2V20a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.667a2 2 0 0 0-.4-1.2l-2-2.667A2 2 0 0 0 17 2H7a2 2 0 0 0-1.6.8z" />
+                  </svg>
+                  {{ currentProductId != null ? 'Editing Product' : 'Admin Products' }}
+                </h1>
+              </div>
+
+              <div class="admin__head-action">
+                <button class="back mr-back-btn" type="button" (click)="handleBack()" aria-label="Back">
+                  <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                  <span>Back</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="shop-admin-alert shop-admin-alert--danger" *ngIf="error">
+              <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+              <span>{{ error }}</span>
+            </div>
+
+            <div class="panel panel--table" *ngIf="!isEditorOpen">
+              <div class="panel__left">
+                <div class="lib-top" aria-label="Product management info">
+                  <div class="lib-top__text">
+                    <h2 class="section-title">
+                      <svg class="section-title__mark" aria-hidden="true" focusable="false">
+                        <use href="#mrTitleMarkAdminProducts"></use>
+                      </svg>
+                      Product management
+                    </h2>
+                    <div class="muted section-hint">
+                      Review storefront products, edit product structure and manage publication states.
+                    </div>
+                  </div>
+                </div>
+
+                <div class="admin-status-row">
+                  <div class="segmented segmented--3 picker-sources" role="tablist" aria-label="Product statuses">
+                    <button
+                      class="segmented__btn"
+                      type="button"
+                      role="tab"
+                      [class.active]="statusTab.value === 'ACTIVE'"
+                      [attr.aria-selected]="statusTab.value === 'ACTIVE'"
+                      (click)="statusTab.setValue('ACTIVE')"
+                    >
+                      <span class="segmented__icon" aria-hidden="true"><i class="fa-solid fa-circle-check"></i></span>
+                      Active
+                    </button>
+                    <button
+                      class="segmented__btn"
+                      type="button"
+                      role="tab"
+                      [class.active]="statusTab.value === 'DRAFT'"
+                      [attr.aria-selected]="statusTab.value === 'DRAFT'"
+                      (click)="statusTab.setValue('DRAFT')"
+                    >
+                      <span class="segmented__icon" aria-hidden="true"><i class="fa-regular fa-pen-to-square"></i></span>
+                      Draft
+                    </button>
+                    <button
+                      class="segmented__btn"
+                      type="button"
+                      role="tab"
+                      [class.active]="statusTab.value === 'TRASHED'"
+                      [attr.aria-selected]="statusTab.value === 'TRASHED'"
+                      (click)="statusTab.setValue('TRASHED')"
+                    >
+                      <span class="segmented__icon" aria-hidden="true"><i class="fa-regular fa-trash-can"></i></span>
+                      Trash
+                    </button>
+                  </div>
+
+                  <button class="btn primary admin-create-btn" type="button" (click)="startCreate()">
+                    <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                    New product
+                  </button>
+                </div>
+
+                <div class="picker-filters" aria-label="Product filters">
+                  <input
+                    class="picker-filters__search"
+                    [formControl]="search"
+                    placeholder="Search products..."
+                    aria-label="Search products"
+                  />
+
+                  <div class="mr-select-wrap picker-sort" [class.menu-open]="openMenu === 'sort'">
+                    <button
+                      class="mr-select mr-select--purple"
+                      type="button"
+                      (click)="toggleMenu('sort', $event)"
+                      [attr.aria-expanded]="openMenu === 'sort'"
+                      aria-haspopup="listbox"
+                      aria-label="Sort products"
+                    >
+                      <span class="mr-select__left">
+                        <span class="mr-select__icon" aria-hidden="true"><i class="fa-solid fa-arrow-down-wide-short"></i></span>
+                        <span class="mr-select__label">{{ sortLabel }}</span>
+                      </span>
+                      <span class="mr-select__caret" aria-hidden="true"></span>
+                    </button>
+
+                    <div class="mr-select__menu" role="listbox" *ngIf="openMenu === 'sort'" (click)="$event.stopPropagation()">
+                      <button class="mr-select__item" type="button" [class.active]="sort.value === 'newest'" (click)="setSort('newest', $event)">Newest first</button>
+                      <button class="mr-select__item" type="button" [class.active]="sort.value === 'oldest'" (click)="setSort('oldest', $event)">Oldest first</button>
+                      <button class="mr-select__item" type="button" [class.active]="sort.value === 'name_az'" (click)="setSort('name_az', $event)">Name A-Z</button>
+                      <button class="mr-select__item" type="button" [class.active]="sort.value === 'price_low'" (click)="setSort('price_low', $event)">Price low-high</button>
+                      <button class="mr-select__item" type="button" [class.active]="sort.value === 'price_high'" (click)="setSort('price_high', $event)">Price high-low</button>
+                    </div>
+                  </div>
+
+                </div>
+
+                <div class="table-wrap" *ngIf="!loadingList; else productsLoadingTpl">
+                  <div class="qtable" role="table" aria-label="Products table" (scroll)="closeProductActions()">
+                    <div class="qtable__head" role="rowgroup" aria-hidden="true">
+                      <div class="qrow" role="row">
+                        <div class="cell">Product</div>
+                        <div class="cell right actions">Action</div>
+                      </div>
+                    </div>
+
+                    <div role="rowgroup">
+                      <div class="muted qtable__empty" *ngIf="!pagedProducts.length">No results.</div>
+
+                      <div class="qrow" role="row" *ngFor="let item of pagedProducts">
+                        <div class="cell title" role="cell">
+                          <span class="avatar shop-admin-avatar" [ngStyle]="productCardStyle(item)" aria-hidden="true">
+                            <ng-container *ngIf="!productCardImage(item)">{{ productCardInitial(item) }}</ng-container>
+                          </span>
+
+                          <div class="title__text">
+                            <div class="title__name">{{ item.title }}</div>
+                            <div class="muted title__meta">
+                              <span class="mr-meta-row">
+                                <span class="mr-flag" [class.mr-flag--on]="item.checkoutEnabled" [class.mr-flag--off]="!item.checkoutEnabled">
+                                  Checkout {{ item.checkoutEnabled ? 'On' : 'Off' }}
+                                </span>
+                                <span class="mr-flag mr-flag--blue">{{ item.planCount }} options</span>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="cell right actions" role="cell">
+                          <button class="icon-btn" type="button" (click)="openProduct(item.id)" aria-label="Edit product">
+                            <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+                          </button>
+
+                          <div class="mr-select-wrap" style="width: 34px" [class.menu-open]="openProductActionsId === item.id" (click)="$event.stopPropagation()">
+                            <button class="icon-btn" type="button" (click)="toggleProductActions(item.id, $event)" aria-label="Product actions">
+                              <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="mr-select__menu mr-select__menu--actions-floating" role="menu" *ngIf="openProductActionsId as productId" [ngStyle]="productActionsMenuStyle" (click)="$event.stopPropagation()">
+                    <button class="mr-select__item" type="button" role="menuitem" (click)="openProduct(productId)">Edit</button>
+                    <button class="mr-select__item" type="button" role="menuitem" (click)="setRowStatus(productId, 'ACTIVE', $event)">Publish</button>
+                    <button class="mr-select__item" type="button" role="menuitem" (click)="setRowStatus(productId, 'DRAFT', $event)">Move to draft</button>
+                    <button class="mr-select__item" type="button" role="menuitem" (click)="setRowStatus(productId, 'TRASHED', $event)">Move to trash</button>
+                  </div>
+
+                  <div class="table-footer" *ngIf="filteredProducts.length">
+                    <div class="pager">
+                      <button class="icon-btn" type="button" (click)="prevPage()" [disabled]="pageIndex === 0" aria-label="Previous page">
+                        <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                      </button>
+                      <div class="pager__text">Page {{ pageIndex + 1 }} / {{ totalPages }}</div>
+                      <button class="icon-btn" type="button" (click)="nextPage()" [disabled]="pageIndex >= totalPages - 1" aria-label="Next page">
+                        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                      </button>
+                    </div>
+
+                    <div class="footer-right">
+                      <div class="muted">
+                        Showing {{ pageFrom }} to {{ pageTo }} of {{ filteredProducts.length }} entries
+                      </div>
+
+                      <div class="mr-select-wrap mr-select-wrap--sm mr-select-wrap--up" [class.menu-open]="openMenu === 'pageSize'">
+                        <button
+                          class="mr-select"
+                          type="button"
+                          (click)="toggleMenu('pageSize', $event)"
+                          [attr.aria-expanded]="openMenu === 'pageSize'"
+                          aria-haspopup="listbox"
+                          aria-label="Page size"
+                        >
+                          <span class="mr-select__label">{{ pageSizeLabel }}</span>
+                          <span class="mr-select__caret" aria-hidden="true"></span>
+                        </button>
+                        <div class="mr-select__menu" role="listbox" *ngIf="openMenu === 'pageSize'" (click)="$event.stopPropagation()">
+                          <button class="mr-select__item" type="button" *ngFor="let size of pageSizeOptions" [class.active]="pageSize.value === size" (click)="setPageSize(size, $event)">
+                            Show {{ size }}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <ng-template #productsLoadingTpl>
+                  <div class="muted table-empty-state">Loading products...</div>
+                </ng-template>
+              </div>
+            </div>
+
+            <section class="view-screen" *ngIf="isEditorOpen" style="display: flex; flex-direction: column; min-height: 0; overflow: hidden;">
+              <div class="empty" *ngIf="loadingProduct">Loading product...</div>
+
+              <form
+                class="view-screen__body view-screen__body--detail"
+                style="display: flex; flex-direction: column; gap: 12px; min-height: 0; flex: 1 1 auto; overflow: auto; max-height: var(--mr-admin-main-view-h); padding-right: 10px; padding-bottom: 2px;"
+                [formGroup]="productForm"
+                *ngIf="!loadingProduct"
+                (ngSubmit)="saveProduct()"
+              >
+                <div class="product-layout">
+                  <section class="product-main">
+                    <article class="hero-card">
+                      <div class="hero-card__media shop-admin-heroMedia" [class.shop-admin-heroMedia--empty]="!productForm.controls.heroImageUrl.value">
+                        <ng-container *ngIf="productForm.controls.heroImageUrl.value as heroImage; else heroImageFallback">
+                          <img [src]="heroImage" [alt]="productForm.controls.title.value || 'Product image preview'" />
+                        </ng-container>
+                        <ng-template #heroImageFallback>
+                          <i class="fa-regular fa-image" aria-hidden="true"></i>
+                          <span>Product image preview</span>
+                        </ng-template>
+
+                        <div class="shop-admin-heroTools">
+                          <label class="shop-admin-uploadBtn">
+                            <input type="file" hidden [attr.accept]="'image/jpeg,image/png,image/webp,image/gif'" (change)="uploadHeroImage($event)" />
+                            <span>{{ uploadingHero ? 'Uploading...' : 'Upload image' }}</span>
+                          </label>
+                          <button class="shop-admin-clearBtn" type="button" *ngIf="productForm.controls.heroImageUrl.value" (click)="clearHeroImage()">
+                            Remove image
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="hero-card__content">
+                        <input
+                          class="shop-admin-inline shop-admin-inline--eyebrow"
+                          formControlName="badgeLabel"
+                          maxlength="80"
+                          placeholder="Badge label"
+                        />
+                        <input
+                          class="shop-admin-inline shop-admin-inline--title"
+                          formControlName="title"
+                          maxlength="120"
+                          placeholder="Product title"
+                        />
+                        <textarea
+                          class="shop-admin-inline shop-admin-inline--subtitle"
+                          formControlName="subtitle"
+                          rows="2"
+                          maxlength="220"
+                          placeholder="Subtitle shown under the main title"
+                        ></textarea>
+                        <textarea
+                          class="shop-admin-inline shop-admin-inline--description"
+                          formControlName="description"
+                          rows="4"
+                          maxlength="2000"
+                          placeholder="Product description"
+                        ></textarea>
+
+                        <div class="hero-card__trustGrid" aria-label="Product trust highlights" formArrayName="trustHighlights">
+                          <div class="hero-card__trustCell shop-admin-trustCell" *ngFor="let highlight of trustHighlightsArray.controls; let i = index" [formGroupName]="i">
+                            <div class="shop-admin-iconFieldRow">
+                              <input class="shop-admin-miniField shop-admin-miniField--icon" formControlName="icon" maxlength="64" placeholder="fa-shield-halved" />
+                              <span class="shop-admin-iconPreviewBox" aria-hidden="true">
+                                <i [ngClass]="iconPreviewClasses(highlight.controls['icon'].value, trustHighlightFallbackIcon(i))"></i>
+                              </span>
+                            </div>
+                            <input class="shop-admin-miniField" formControlName="title" maxlength="120" placeholder="Highlight title" />
+                            <textarea class="shop-admin-miniField shop-admin-miniField--textarea" formControlName="detail" rows="2" maxlength="220" placeholder="Highlight detail"></textarea>
+                            <div class="shop-admin-trustActions">
+                              <button class="shop-admin-planRemoveBtn shop-admin-planRemoveBtn--subtle" type="button" (click)="removeTrustHighlight(i)" aria-label="Remove trust highlight">
+                                <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                                Remove highlight
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <button class="shop-admin-addInline" type="button" (click)="addTrustHighlight()">Add trust highlight</button>
+                      </div>
+                    </article>
+
+                    <article class="plans-panel">
+                      <div class="panel-head">
+                        <h4>Purchase options</h4>
+                        <span>{{ pricingPlansArray.length }} configured</span>
+                      </div>
+
+                      <div class="shop-admin-pricingMode segmented segmented--2" role="tablist" aria-label="Pricing mode">
+                        <button
+                          class="segmented__btn"
+                          type="button"
+                          role="tab"
+                          [class.active]="productForm.controls.pricingMode.value === 'SUBSCRIPTION'"
+                          [attr.aria-selected]="productForm.controls.pricingMode.value === 'SUBSCRIPTION'"
+                          (click)="setPricingMode('SUBSCRIPTION', $event)"
+                        >
+                          Subscription
+                        </button>
+                        <button
+                          class="segmented__btn"
+                          type="button"
+                          role="tab"
+                          [class.active]="productForm.controls.pricingMode.value === 'ONE_TIME'"
+                          [attr.aria-selected]="productForm.controls.pricingMode.value === 'ONE_TIME'"
+                          (click)="setPricingMode('ONE_TIME', $event)"
+                        >
+                          One-time package
+                        </button>
+                      </div>
+
+                      <div class="shop-admin-pricingHint" [class.shop-admin-pricingHint--oneTime]="isOneTimePricing">
+                        <strong>{{ pricingModeHintTitle }}</strong>
+                        <p>{{ pricingModeHintDescription }}</p>
+                      </div>
+
+                      <div class="plans-grid" formArrayName="pricingPlans">
+                        <article
+                          class="plan-card shop-admin-planCard"
+                          *ngFor="let plan of pricingPlansArray.controls; let i = index"
+                          [formGroupName]="i"
+                        >
+                          <div class="plan-card__surface">
+                            <div class="shop-admin-planEditor">
+                              <label class="shop-admin-field">
+                                <span>Option label</span>
+                                <input class="shop-admin-planField shop-admin-planField--title" formControlName="label" maxlength="120" placeholder="Starter package" />
+                              </label>
+                              <label class="shop-admin-field">
+                                <span>Option code</span>
+                                <input class="shop-admin-planField shop-admin-planField--code" formControlName="code" maxlength="32" placeholder="STARTER_PACK" />
+                              </label>
+                              <label class="shop-admin-field">
+                                <span>Price (minor)</span>
+                                <input class="shop-admin-planField shop-admin-planField--price" formControlName="grossAmountMinor" type="number" min="0" step="1" placeholder="4999" />
+                              </label>
+                              <label class="shop-admin-field">
+                                <span>Currency</span>
+                                <div
+                                  class="mr-select-wrap shop-admin-inlineSelect"
+                                  [class.menu-open]="isInlineSelectOpen(planCurrencySelectKey(i))"
+                                  (click)="$event.stopPropagation()"
+                                >
+                                  <button
+                                    class="mr-select shop-admin-planField"
+                                    type="button"
+                                    (click)="toggleInlineSelect(planCurrencySelectKey(i), $event)"
+                                    [attr.aria-expanded]="isInlineSelectOpen(planCurrencySelectKey(i))"
+                                    aria-haspopup="listbox"
+                                    aria-label="Select currency"
+                                  >
+                                    <span class="mr-select__label">{{ planCurrencyLabel(i) }}</span>
+                                    <span class="mr-select__caret" aria-hidden="true"></span>
+                                  </button>
+                                  <div class="mr-select__menu" role="listbox" *ngIf="isInlineSelectOpen(planCurrencySelectKey(i))">
+                                    <button
+                                      class="mr-select__item"
+                                      type="button"
+                                      *ngFor="let currency of pricingCurrencies"
+                                      [class.active]="plan.controls['currency'].value === currency.code"
+                                      (click)="setPlanCurrency(i, currency.code, $event)"
+                                    >
+                                      {{ currency.code }} - {{ currency.label }}
+                                    </button>
+                                  </div>
+                                </div>
+                              </label>
+                              <label class="shop-admin-field shop-admin-planEditor__wide">
+                                <span>Option teaser (optional)</span>
+                                <input class="shop-admin-planField" formControlName="teaser" maxlength="220" placeholder="Best value pack" />
+                              </label>
+                            </div>
+
+                            <div class="shop-admin-planEffects" formArrayName="effects">
+                              <div class="shop-admin-planEffects__head">
+                                <strong>Purchase effects</strong>
+                              </div>
+                              <div
+                                class="shop-admin-planEffectRow"
+                                *ngFor="let effect of planEffects(i).controls; let effectIndex = index"
+                                [formGroupName]="effectIndex"
+                              >
+                                <label class="shop-admin-field">
+                                  <span>Type</span>
+                                  <div
+                                    class="mr-select-wrap shop-admin-inlineSelect"
+                                    [class.menu-open]="isInlineSelectOpen(planEffectTypeSelectKey(i, effectIndex))"
+                                    (click)="$event.stopPropagation()"
+                                  >
+                                    <button
+                                      class="mr-select shop-admin-planField"
+                                      type="button"
+                                      [disabled]="isEffectTypeLocked()"
+                                      (click)="toggleInlineSelect(planEffectTypeSelectKey(i, effectIndex), $event)"
+                                      [attr.aria-expanded]="isInlineSelectOpen(planEffectTypeSelectKey(i, effectIndex))"
+                                      aria-haspopup="listbox"
+                                      aria-label="Select effect type"
+                                    >
+                                      <span class="mr-select__label">{{ planEffectTypeLabel(i, effectIndex) }}</span>
+                                      <span class="mr-select__caret" aria-hidden="true"></span>
+                                    </button>
+                                    <div class="mr-select__menu" role="listbox" *ngIf="isInlineSelectOpen(planEffectTypeSelectKey(i, effectIndex))">
+                                      <button
+                                        class="mr-select__item"
+                                        type="button"
+                                        *ngFor="let effectType of effectTypeOptionsForMode()"
+                                        [class.active]="effect.controls['type'].value === effectType"
+                                        (click)="setPlanEffectType(i, effectIndex, effectType, $event)"
+                                      >
+                                        {{ optionEffectTypeLabel(effectType) }}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </label>
+                                <label class="shop-admin-field">
+                                  <span>{{ effectValueLabel(effect.controls['type'].value) }}</span>
+                                  <input
+                                    class="shop-admin-planField"
+                                    formControlName="value"
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    [placeholder]="effectValuePlaceholder(effect.controls['type'].value)"
+                                  />
+                                </label>
+                                <label class="shop-admin-field">
+                                  <span>Effect code</span>
+                                  <div
+                                    class="mr-select-wrap shop-admin-inlineSelect"
+                                    [class.menu-open]="isInlineSelectOpen(planEffectCodeSelectKey(i, effectIndex))"
+                                    (click)="$event.stopPropagation()"
+                                  >
+                                    <button
+                                      class="mr-select shop-admin-planField shop-admin-planField--code"
+                                      type="button"
+                                      (click)="toggleInlineSelect(planEffectCodeSelectKey(i, effectIndex), $event)"
+                                      [attr.aria-expanded]="isInlineSelectOpen(planEffectCodeSelectKey(i, effectIndex))"
+                                      aria-haspopup="listbox"
+                                      aria-label="Select effect code"
+                                    >
+                                      <span class="mr-select__label">{{ planEffectCodeLabel(i, effectIndex) }}</span>
+                                      <span class="mr-select__caret" aria-hidden="true"></span>
+                                    </button>
+                                    <div class="mr-select__menu" role="listbox" *ngIf="isInlineSelectOpen(planEffectCodeSelectKey(i, effectIndex))">
+                                      <button
+                                        class="mr-select__item"
+                                        type="button"
+                                        *ngFor="let option of effectCodeOptions(effect.controls['type'].value, effect.controls['code'].value)"
+                                        [class.active]="effect.controls['code'].value === option.code"
+                                        (click)="setPlanEffectCode(i, effectIndex, option.code, $event)"
+                                      >
+                                        {{ effectOptionLabel(option) }}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </label>
+                                <button
+                                  class="icon-btn danger shop-admin-planEffectRemoveBtn"
+                                  type="button"
+                                  (click)="removePlanEffect(i, effectIndex)"
+                                  aria-label="Remove effect"
+                                >
+                                  <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                                </button>
+                              </div>
+                              <p class="shop-admin-planValidation" *ngIf="planModeError(i) as planError">
+                                <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                                <span>{{ planError }}</span>
+                              </p>
+                              <div class="shop-admin-planEffectAddRow" *ngIf="isOneTimePricing; else subscriptionEffectAddTpl">
+                                <button class="shop-admin-addInline shop-admin-addInline--small" type="button" (click)="addPlanEffect(i, 'DURATION_DAYS')">
+                                  Add duration effect
+                                </button>
+                                <button class="shop-admin-addInline shop-admin-addInline--small" type="button" (click)="addPlanEffect(i, 'RESOURCE_GRANT')">
+                                  Add resource grant
+                                </button>
+                              </div>
+                              <ng-template #subscriptionEffectAddTpl>
+                                <button class="shop-admin-addInline shop-admin-addInline--small" type="button" (click)="addPlanEffect(i, 'DURATION_DAYS')">
+                                  Add duration effect
+                                </button>
+                              </ng-template>
+                            </div>
+
+                            <div class="shop-admin-planActions">
+                              <button class="shop-admin-planRemoveBtn" type="button" (click)="removePlan(i)" aria-label="Remove plan">
+                                <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                                Remove option
+                              </button>
+                            </div>
+                          </div>
+                        </article>
+                      </div>
+
+                      <button class="shop-admin-addInline" type="button" (click)="addPlan()">Add purchase option</button>
+                    </article>
+
+                    <article class="feature-panel">
+                      <div class="panel-head">
+                        <h4>Product advantages</h4>
+                      </div>
+
+                      <div class="benefit-grid" formArrayName="advantages">
+                        <article class="benefit-card shop-admin-benefitCard" *ngFor="let advantage of advantagesArray.controls; let i = index" [formGroupName]="i">
+                          <div class="shop-admin-benefitEditor">
+                            <label class="shop-admin-field">
+                              <span>Icon</span>
+                              <div class="shop-admin-iconFieldRow">
+                                <input class="shop-admin-miniField shop-admin-miniField--icon" formControlName="icon" maxlength="64" placeholder="fa-layer-group" />
+                                <span class="shop-admin-iconPreviewBox" aria-hidden="true">
+                                  <i [ngClass]="iconPreviewClasses(advantage.controls['icon'].value, advantageFallbackIcon(i))"></i>
+                                </span>
+                              </div>
+                            </label>
+
+                            <label class="shop-admin-field">
+                              <span>Title</span>
+                              <input class="shop-admin-miniField" formControlName="title" maxlength="120" placeholder="Advantage title" />
+                            </label>
+
+                            <div class="shop-admin-bulletEditor">
+                              <div class="shop-admin-bulletRow" *ngFor="let bullet of $any(advantage.controls['bullets']).controls; let bulletIndex = index">
+                                <input class="shop-admin-miniField" [formControl]="bullet" maxlength="240" placeholder="Advantage bullet" />
+                                <button class="icon-btn danger shop-admin-bulletRemoveBtn" type="button" (click)="removeAdvantageBullet(i, bulletIndex)" aria-label="Remove bullet">
+                                  <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="shop-admin-benefitAddRow">
+                            <button class="shop-admin-addInline shop-admin-addInline--small" type="button" (click)="addAdvantageBullet(i)">Add bullet</button>
+                          </div>
+
+                          <div class="shop-admin-planActions">
+                            <button class="shop-admin-planRemoveBtn shop-admin-planRemoveBtn--subtle" type="button" (click)="removeAdvantage(i)" aria-label="Remove advantage">
+                              <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                              Remove advantage
+                            </button>
+                          </div>
+                        </article>
+                      </div>
+
+                      <button class="shop-admin-addInline" type="button" (click)="addAdvantage()">Add advantage section</button>
+                    </article>
+                  </section>
+
+                  <aside class="product-side">
+                    <article class="checkout-card">
+                      <div class="shop-admin-statusActions shop-admin-statusActions--top" aria-label="Publication status actions">
+                        <button
+                          class="btn success"
+                          type="button"
+                          *ngIf="productForm.controls.status.value === 'DRAFT'"
+                          [disabled]="savingProduct"
+                          (click)="applyStatusAction('ACTIVE', $event)"
+                        >
+                          Publish
+                        </button>
+                        <button
+                          class="btn secondary"
+                          type="button"
+                          *ngIf="productForm.controls.status.value === 'ACTIVE'"
+                          [disabled]="savingProduct"
+                          (click)="applyStatusAction('DRAFT', $event)"
+                        >
+                          Disable
+                        </button>
+                        <button
+                          class="btn secondary"
+                          type="button"
+                          *ngIf="productForm.controls.status.value === 'TRASHED'"
+                          [disabled]="savingProduct"
+                          (click)="applyStatusAction('DRAFT', $event)"
+                        >
+                          Restore
+                        </button>
+                        <button
+                          class="btn secondary"
+                          type="button"
+                          *ngIf="productForm.controls.status.value !== 'TRASHED'"
+                          [disabled]="savingProduct"
+                          (click)="applyStatusAction('TRASHED', $event)"
+                        >
+                          Move to trash
+                        </button>
+                      </div>
+                      <div class="shop-admin-actionsDivider" aria-hidden="true"></div>
+
+                      <div class="panel-head panel-head--compact">
+                        <h4>{{ currentProductId != null ? 'Product settings' : 'New product' }}</h4>
+                      </div>
+
+                      <div class="checkout-summary">
+                        <div class="shop-admin-sidebarFields">
+                          <div class="shop-admin-metaRow" *ngIf="currentProductCreatedAt || currentProductUpdatedAt">
+                            <label class="shop-admin-field">
+                              <span>Created</span>
+                              <input [value]="formatUpdatedAt(currentProductCreatedAt)" disabled />
+                            </label>
+                            <label class="shop-admin-field">
+                              <span>Updated</span>
+                              <input [value]="formatUpdatedAt(currentProductUpdatedAt)" disabled />
+                            </label>
+                          </div>
+
+                          <label class="shop-admin-field">
+                            <span>Product code</span>
+                            <input formControlName="code" maxlength="64" placeholder="PREMIUM" (blur)="normalizeProductCode()" />
+                          </label>
+
+                          <label class="shop-admin-field">
+                            <span>Slug</span>
+                            <input formControlName="slug" maxlength="120" placeholder="mindrush-premium" (blur)="normalizeProductSlug()" />
+                          </label>
+                        </div>
+
+                        <div class="shop-admin-editorToggles">
+                          <label class="toggle--pill shop-admin-togglePill">
+                            <span class="toggle--pill__label">Checkout</span>
+                            <input type="checkbox" formControlName="checkoutEnabled" />
+                            <span class="toggle--pill__btn">
+                              <span class="toggle--pill__text">Checkout enabled</span>
+                              <span class="toggle--pill__state">
+                                {{ productForm.controls.checkoutEnabled.value ? 'ON' : 'OFF' }}
+                              </span>
+                            </span>
+                          </label>
+                        </div>
+                      </div>
+
+                      <button class="btn primary checkout-card__action" type="submit" [disabled]="savingProduct || productForm.invalid || hasPricingValidationErrors">
+                        {{ savingProduct ? 'Saving...' : (currentProductId != null ? 'Save product' : 'Create product') }}
+                      </button>
+
+                    </article>
+                  </aside>
+                </div>
+              </form>
+            </section>
+          </div>
+        </section>
+      </div>
+    </article>
+  </section>
+</main>

@@ -1,0 +1,1028 @@
+@import './admin-quiz.component.scss';
+
+.admin-shell {
+  overflow: visible;
+}
+
+.product-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+  gap: 16px;
+  align-items: start;
+  min-height: min-content;
+  width: 100%;
+}
+
+.product-main,
+.product-side {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
+  width: 100%;
+}
+
+.product-side {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  z-index: 1;
+}
+
+.hero-card,
+.feature-panel,
+.plans-panel,
+.checkout-card {
+  border-radius: 20px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(30, 48, 84, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.hero-card {
+  display: grid;
+  grid-template-columns: minmax(240px, 340px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  padding: 18px;
+  border: 0;
+  background: linear-gradient(180deg, rgba(20, 36, 66, 0.48), rgba(14, 27, 52, 0.42));
+  box-shadow: none;
+}
+
+.hero-card__media {
+  min-height: 0;
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  max-width: 340px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.hero-card__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  border-radius: 12px;
+}
+
+.hero-card__content {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.hero-card__trustGrid {
+  position: relative;
+  margin-top: 6px;
+  margin-inline: auto;
+  width: min(760px, 100%);
+  border-radius: 14px;
+  border: 1px solid rgba(214, 226, 243, 0.2);
+  background: transparent;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+}
+
+.hero-card__trustGrid::before,
+.hero-card__trustGrid::after {
+  content: none;
+}
+
+.hero-card__trustCell {
+  min-height: 0;
+  padding: 12px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  border-top: 1px solid rgba(214, 226, 243, 0.2);
+  border-left: 1px solid rgba(214, 226, 243, 0.2);
+}
+
+.hero-card__trustCell:nth-child(-n + 2) {
+  border-top: 0;
+}
+
+.hero-card__trustCell:nth-child(2n + 1) {
+  border-left: 0;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.panel-head h4 {
+  margin: 0;
+  color: #fff;
+}
+
+.panel-head span {
+  color: rgba(214, 226, 243, 0.76);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.panel--table .qrow {
+  grid-template-columns: minmax(0, 1fr) max-content;
+  column-gap: 0;
+  padding-right: 6px;
+}
+
+.panel--table .qtable .actions {
+  width: max-content;
+  margin-left: auto;
+  justify-self: end;
+  justify-content: flex-end;
+}
+
+.panel-head--compact {
+  margin-bottom: 12px;
+}
+
+.feature-panel,
+.plans-panel,
+.checkout-card {
+  border: 0;
+  background: rgba(20, 36, 66, 0.34);
+  box-shadow: none;
+}
+
+.plans-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.plan-card {
+  position: relative;
+  display: block;
+  padding: 0;
+  min-height: 0;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  text-align: left;
+}
+
+.plan-card:focus,
+.plan-card:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.plan-card__surface {
+  position: relative;
+  display: block;
+  min-height: 0;
+  padding: 14px;
+  border-radius: 16px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.03);
+  overflow: visible;
+  transition: background 160ms ease;
+}
+
+.benefit-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.benefit-card {
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.018);
+  border: 0;
+  display: grid;
+  justify-items: start;
+  text-align: left;
+  gap: 7px;
+  height: 100%;
+}
+
+.benefit-card__title {
+  margin: 0;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: rgba(228, 238, 255, 0.95);
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.25;
+  text-align: left;
+}
+
+.benefit-card__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  display: inline-grid;
+  place-items: center;
+  color: rgba(191, 216, 255, 0.94);
+  background: rgba(96, 154, 255, 0.2);
+  border: 0;
+  flex: 0 0 auto;
+}
+
+.benefit-card__icon i {
+  font-size: 16px;
+}
+
+.checkout-card {
+  padding: 16px;
+}
+
+.checkout-summary {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 14px;
+  border-radius: 16px;
+  border: none;
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.checkout-summary__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.checkout-summary__row strong {
+  color: #fff;
+}
+
+.checkout-card__action {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 2px;
+}
+
+.checkout-card__action.btn.primary {
+  width: min(100%, 420px);
+  margin-inline: auto;
+  min-height: 44px;
+  border-radius: 13px;
+  border-color: rgba(146, 176, 222, 0.3);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.02)
+  );
+  color: rgba(235, 244, 255, 0.92);
+  font-size: 15px;
+  font-weight: 850;
+  letter-spacing: 0.04px;
+  box-shadow:
+    0 6px 14px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.checkout-card__action.btn.primary:hover:not(:disabled) {
+  border-color: rgba(168, 195, 236, 0.4);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.075),
+    rgba(255, 255, 255, 0.025)
+  );
+  transform: none;
+  filter: none;
+}
+
+.checkout-card__action.btn.primary:disabled {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.empty {
+  border-radius: 18px;
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  padding: 28px 20px;
+  text-align: center;
+  color: rgba(214, 226, 243, 0.82);
+  font-weight: 700;
+}
+
+.btn.ghost {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.shop-admin-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border-radius: 16px;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+  border: 1px solid rgba(255, 120, 120, 0.28);
+  background: rgba(255, 79, 79, 0.1);
+  color: rgba(255, 223, 223, 0.98);
+}
+
+.shop-admin-avatar {
+  overflow: hidden;
+  color: rgba(245, 249, 255, 0.96);
+  font-weight: 900;
+}
+
+.mr-flag--purple {
+  color: rgba(226, 213, 255, 0.96);
+  background: rgba(140, 103, 255, 0.16);
+}
+
+.shop-admin-heroMedia {
+  position: relative;
+}
+
+.shop-admin-heroMedia--empty {
+  border: 1px dashed rgba(140, 172, 228, 0.32);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(186, 208, 248, 0.84);
+  font-size: 12px;
+  font-weight: 800;
+  gap: 10px;
+}
+
+.shop-admin-heroTools {
+  position: absolute;
+  inset: auto 12px 12px 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.shop-admin-uploadBtn,
+.shop-admin-clearBtn,
+.shop-admin-addInline {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(10, 18, 40, 0.66);
+  color: rgba(239, 246, 255, 0.95);
+  font-size: 12px;
+  font-weight: 850;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.shop-admin-addInline {
+  margin-top: 12px;
+}
+
+.shop-admin-addInline--small {
+  margin-top: 4px;
+  min-height: 30px;
+  padding-inline: 10px;
+}
+
+.shop-admin-clearBtn {
+  color: rgba(255, 199, 199, 0.96);
+}
+
+.shop-admin-inline,
+.shop-admin-field input,
+.shop-admin-miniField,
+.shop-admin-planField {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(244, 249, 255, 0.98);
+  outline: none;
+  box-shadow: none;
+}
+
+.shop-admin-inline {
+  border-radius: 14px;
+  padding: 0 16px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.shop-admin-inline--eyebrow {
+  width: fit-content;
+  min-width: 180px;
+  min-height: 34px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 11px;
+  font-weight: 850;
+  color: rgba(123, 176, 255, 0.94);
+}
+
+.shop-admin-inline--title {
+  min-height: 68px;
+  font-size: clamp(24px, 2.5vw, 38px);
+  font-weight: 950;
+}
+
+.shop-admin-inline--subtitle,
+.shop-admin-inline--description,
+.shop-admin-miniField--textarea {
+  min-height: 0;
+  resize: vertical;
+  padding: 12px 14px;
+  font-family: inherit;
+}
+
+.shop-admin-inline--subtitle {
+  min-height: 112px;
+  font-size: clamp(15px, 1.45vw, 18px);
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.shop-admin-inline--description {
+  min-height: 172px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.shop-admin-trustCell,
+.shop-admin-benefitCard,
+.shop-admin-planCard {
+  position: relative;
+}
+
+.shop-admin-cardActions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 6px;
+  z-index: 2;
+}
+
+.shop-admin-cardActions .icon-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: rgba(8, 18, 42, 0.58);
+}
+
+.shop-admin-miniField,
+.shop-admin-planField,
+.shop-admin-field input,
+.shop-admin-field select {
+  min-height: 44px;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.shop-admin-inline:focus,
+.shop-admin-field input:focus,
+.shop-admin-miniField:focus,
+.shop-admin-planField:focus {
+  border-color: rgba(118, 170, 244, 0.52);
+  background: rgba(255, 255, 255, 0.065);
+  box-shadow: 0 0 0 2px rgba(93, 152, 235, 0.22);
+}
+
+.shop-admin-inlineSelect {
+  position: relative;
+  width: 100%;
+}
+
+.shop-admin-inlineSelect .mr-select {
+  width: 100%;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(244, 249, 255, 0.98);
+  box-shadow: none;
+  justify-content: space-between;
+}
+
+.shop-admin-inlineSelect .mr-select:hover:not(:disabled) {
+  border-color: rgba(194, 214, 255, 0.34);
+  filter: brightness(1.02);
+}
+
+.shop-admin-inlineSelect .mr-select:focus-visible {
+  border-color: rgba(118, 170, 244, 0.52);
+  background: rgba(255, 255, 255, 0.065);
+  box-shadow: 0 0 0 2px rgba(93, 152, 235, 0.22);
+}
+
+.shop-admin-inlineSelect .mr-select__label {
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0;
+  color: rgba(244, 249, 255, 0.98);
+}
+
+.shop-admin-inlineSelect .shop-admin-planField--code .mr-select__label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.shop-admin-inlineSelect .mr-select__menu {
+  width: 100%;
+  min-width: 100%;
+  max-width: 100%;
+  border-radius: 12px;
+}
+
+.shop-admin-inlineSelect .mr-select__item {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.shop-admin-miniField--icon,
+.shop-admin-planField--code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.shop-admin-miniField--textarea {
+  min-height: 100px;
+  padding: 12px 14px;
+  line-height: 1.4;
+}
+
+.shop-admin-planField--title {
+  min-height: 52px;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.shop-admin-planField--code {
+  margin-top: 0;
+}
+
+.shop-admin-planField--price {
+  min-height: 46px;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.shop-admin-planField--full {
+  grid-column: 1 / -1;
+}
+
+.shop-admin-planEditor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.shop-admin-pricingMode {
+  margin: 2px 0 12px;
+}
+
+.shop-admin-pricingHint {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(136, 167, 218, 0.26);
+  background: rgba(14, 26, 50, 0.42);
+  display: grid;
+  gap: 4px;
+}
+
+.shop-admin-pricingHint strong {
+  color: rgba(234, 242, 255, 0.94);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.shop-admin-pricingHint p {
+  margin: 0;
+  color: rgba(198, 217, 246, 0.84);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.shop-admin-pricingHint--oneTime {
+  border-color: rgba(98, 206, 178, 0.3);
+}
+
+.shop-admin-planEditor__wide {
+  grid-column: 1 / -1;
+}
+
+.shop-admin-planEffects {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.shop-admin-planEffects__head {
+  font-size: 12px;
+  font-weight: 800;
+  color: rgba(214, 226, 243, 0.82);
+}
+
+.shop-admin-planEffectRow {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(120px, 0.85fr) minmax(180px, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.shop-admin-planEffectRow > * {
+  min-width: 0;
+}
+
+.shop-admin-planEffectRow .shop-admin-field {
+  gap: 6px;
+}
+
+.shop-admin-planEffectRemoveBtn.icon-btn.danger {
+  width: 34px;
+  height: 44px;
+  align-self: end;
+  margin-bottom: 0;
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: rgba(255, 90, 122, 0.9);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: none !important;
+}
+
+.shop-admin-planEffectRemoveBtn.icon-btn.danger:hover:not(:disabled) {
+  background: transparent !important;
+  border-color: transparent !important;
+  filter: brightness(1.08);
+  transform: none !important;
+}
+
+.shop-admin-planValidation {
+  margin: 0;
+  min-height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 158, 99, 0.28);
+  background: rgba(255, 150, 84, 0.08);
+  color: rgba(255, 216, 181, 0.96);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.4;
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+}
+
+.shop-admin-planValidation i {
+  margin-top: 1px;
+}
+
+.shop-admin-planEffectAddRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.shop-admin-planEffectAddRow .shop-admin-addInline {
+  margin-top: 0;
+}
+
+.shop-admin-planActions {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.shop-admin-planRemoveBtn {
+  width: 100%;
+  min-height: 38px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 126, 153, 0.28);
+  background: rgba(255, 86, 124, 0.1);
+  color: rgba(255, 203, 217, 0.96);
+  font-size: 13px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, filter 140ms ease;
+}
+
+.shop-admin-planRemoveBtn:hover {
+  background: rgba(255, 86, 124, 0.16);
+  border-color: rgba(255, 151, 176, 0.38);
+  filter: brightness(1.02);
+}
+
+.shop-admin-benefitTitleWrap,
+.shop-admin-bulletEditor,
+.shop-admin-benefitEditor,
+.shop-admin-sidebarFields,
+.shop-admin-editorToggles,
+.shop-admin-toggleGroup,
+.shop-admin-field {
+  display: grid;
+  gap: 10px;
+}
+
+.shop-admin-benefitCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  height: 100%;
+}
+
+.shop-admin-benefitCard .shop-admin-planActions {
+  margin-top: 8px;
+}
+
+.shop-admin-benefitEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.shop-admin-benefitEditor > .shop-admin-field {
+  gap: 6px;
+}
+
+.shop-admin-bulletEditor {
+  flex: 1 1 auto;
+  align-content: start;
+  min-height: 0;
+}
+
+.shop-admin-benefitAddRow {
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.shop-admin-benefitAddRow .shop-admin-addInline {
+  min-height: 34px;
+  margin-top: 0;
+}
+
+.shop-admin-trustCell {
+  gap: 10px;
+}
+
+.shop-admin-trustActions {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.shop-admin-planRemoveBtn--subtle {
+  min-height: 34px;
+  font-size: 12px;
+}
+
+.shop-admin-bulletRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.shop-admin-bulletRemoveBtn.icon-btn.danger {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: rgba(255, 90, 122, 0.9);
+}
+
+.shop-admin-bulletRemoveBtn.icon-btn.danger:hover:not(:disabled) {
+  background: transparent !important;
+  border-color: transparent !important;
+  filter: brightness(1.08);
+}
+
+.shop-admin-field span,
+.shop-admin-toggleLabel {
+  color: rgba(214, 226, 243, 0.78);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.shop-admin-iconFieldRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 8px;
+  align-items: center;
+}
+
+.shop-admin-iconFieldRow .shop-admin-miniField--icon {
+  min-width: 0;
+}
+
+.shop-admin-iconPreviewBox {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  display: inline-grid;
+  place-items: center;
+  color: rgba(191, 216, 255, 0.96);
+}
+
+.shop-admin-iconPreviewBox i {
+  font-size: 15px;
+}
+
+.shop-admin-toggleGroup .segmented {
+  width: 100%;
+}
+
+.shop-admin-statusActions {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.shop-admin-statusActions--top {
+  width: 100%;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.shop-admin-actionsDivider {
+  height: 1px;
+  margin: 0 0 12px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.shop-admin-statusActions .btn {
+  height: 34px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 11px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12px;
+  background: transparent;
+  box-shadow: none;
+  transition: border-color 140ms ease, color 140ms ease, background-color 140ms ease;
+}
+
+.shop-admin-statusActions .btn:hover:not(:disabled) {
+  transform: none;
+  filter: none;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.shop-admin-statusActions .btn.secondary {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(238, 245, 255, 0.9);
+}
+
+.shop-admin-statusActions .btn.success {
+  border-color: rgba(0, 222, 170, 0.52);
+  color: rgba(127, 255, 221, 0.98);
+}
+
+.shop-admin-togglePill {
+  margin-top: 4px;
+}
+
+.shop-admin-metaRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.shop-admin-metaRow .shop-admin-field input[disabled] {
+  opacity: 0.95;
+  color: rgba(230, 240, 255, 0.9);
+  cursor: default;
+  min-height: 40px;
+  font-size: 11px;
+  font-weight: 650;
+  padding-inline: 8px;
+}
+
+.checkout-card__action + .checkout-card__action {
+  margin-top: 10px;
+}
+
+.shop-admin-benefitCard .benefit-card__list {
+  display: none;
+}
+
+@media (max-width: 1540px) {
+  .hero-card {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-card__media {
+    max-width: min(460px, 100%);
+    justify-self: center;
+  }
+}
+
+@media (max-width: 1180px) {
+  .product-layout,
+  .hero-card {
+    grid-template-columns: 1fr;
+  }
+
+  .product-side {
+    position: static;
+    padding-top: 0;
+  }
+}
+
+@media (max-width: 1100px) {
+  .plans-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 920px) {
+  .shop-admin-planEditor {
+    grid-template-columns: 1fr;
+  }
+
+  .shop-admin-planEffectRow {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .shop-admin-planEffectRemoveBtn.icon-btn.danger {
+    justify-self: end;
+  }
+
+  .benefit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-card__trustGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-card__trustCell {
+    border-left: 0;
+    border-top: 1px solid rgba(214, 226, 243, 0.2);
+  }
+
+  .hero-card__trustCell:first-child {
+    border-top: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .plans-grid,
+  .benefit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .shop-admin-metaRow {
+    grid-template-columns: 1fr;
+  }
+
+  .shop-admin-heroTools {
+    position: static;
+    margin-top: 12px;
+    flex-direction: column;
+  }
+
+  .shop-admin-uploadBtn,
+  .shop-admin-clearBtn,
+  .shop-admin-addInline {
+    width: 100%;
+  }
+}

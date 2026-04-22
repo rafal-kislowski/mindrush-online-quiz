@@ -13,7 +13,8 @@ export const routes: Routes = [
   { path: 'play-solo', loadComponent: () => import('./pages/casual/casual.component').then(m => m.CasualComponent) },
   { path: 'play-ranked', loadComponent: () => import('./pages/placeholder/placeholder.component').then(m => m.PlaceholderComponent), data: { title: 'Ranked' } },
   { path: 'play-random', loadComponent: () => import('./pages/placeholder/placeholder.component').then(m => m.PlaceholderComponent), data: { title: 'Random' } },
-  { path: 'shop', loadComponent: () => import('./pages/placeholder/placeholder.component').then(m => m.PlaceholderComponent), data: { title: 'Shop' } },
+  { path: 'shop', loadComponent: () => import('./pages/shop/shop.component').then(m => m.ShopComponent) },
+  { path: 'shop/:slug', loadComponent: () => import('./pages/shop/shop.component').then(m => m.ShopComponent) },
   { path: 'news', loadComponent: () => import('./pages/placeholder/placeholder.component').then(m => m.PlaceholderComponent), data: { title: 'News' } },
   { path: 'profile', canActivate: [authGuard], loadComponent: () => import('./pages/profile/profile.component').then(m => m.ProfileComponent) },
   { path: 'lobbies', loadComponent: () => import('./pages/lobbies/lobbies.component').then(m => m.LobbiesComponent) },
@@ -23,6 +24,7 @@ export const routes: Routes = [
   { path: 'leaderboards', loadComponent: () => import('./pages/leaderboards/leaderboards.component').then(m => m.LeaderboardsComponent) },
   { path: 'library', canActivate: [authGuard], loadComponent: () => import('./pages/library/library.component').then(m => m.LibraryComponent) },
   { path: 'create-quiz', canActivate: [adminGuard], loadComponent: () => import('./pages/admin/admin-quiz.component').then(m => m.AdminQuizComponent) },
+  { path: 'admin/products', canActivate: [adminGuard], loadComponent: () => import('./pages/admin/admin-shop.component').then(m => m.AdminShopComponent) },
   { path: 'admin/quiz-submissions', canActivate: [adminGuard], loadComponent: () => import('./pages/admin/admin-quiz-submissions.component').then(m => m.AdminQuizSubmissionsComponent) },
   {
     path: 'lobby/:code',
