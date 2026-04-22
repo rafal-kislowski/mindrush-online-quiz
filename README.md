@@ -7,7 +7,8 @@ It combines real-time lobby gameplay, guest and authenticated user flows, quiz m
 ## TL;DR
 - Real-time multiplayer quiz platform with live lobbies and gameplay
 - Guest sessions and authenticated accounts secured with HttpOnly cookie-based auth
-- Quiz creation, moderation, progression, leaderboards, and notifications
+- Quiz creation, moderation, progression, leaderboards, notifications, and achievements
+- In-app shop with admin-managed catalog, cart flow, premium subscriptions, and coins-based boosters
 - CI/CD delivery with Docker, GHCR, GitHub Actions, and VPS deployment
 
 ## Highlights
@@ -15,6 +16,7 @@ It combines real-time lobby gameplay, guest and authenticated user flows, quiz m
 - Guest-first onboarding that lets users enter the product before registration
 - Custom quiz workflow with editing, moderation, and media upload support
 - Profile progression with XP, rank points, achievements, and persistent player stats
+- Shop domain with dual pricing modes (real money + game coins), cart aggregation, order lifecycle, and fulfillment handlers
 - Separate public demo environment with synthetic data, scheduled resets, and reduced integrations
 - Production-style deployment based on immutable Docker images published from CI
 
@@ -22,6 +24,7 @@ It combines real-time lobby gameplay, guest and authenticated user flows, quiz m
 - Real-time multiplayer quiz flow with lobbies, ranked and casual modes, and live state updates
 - Guest sessions for anonymous play and authenticated accounts secured with JWT-based HttpOnly cookies
 - Quiz library, moderation, achievements, notifications, and leaderboard features
+- Shop catalog, single-product checkout, cart checkout, premium extension logic, and coin-based purchases
 - Dockerized delivery pipeline with GitHub Actions, GHCR, and VPS deployment
 
 ## Application Preview
@@ -59,6 +62,20 @@ Main dashboard view presenting the landing experience, game modes, quick actions
       <br />
       <strong>Profile and progression</strong><br />
       Track XP, rank points, player statistics, and achievement progress in the account dashboard.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/images/mindrush-shop-overview.png" alt="Shop catalog overview with segmented filtering and product cards" width="100%" />
+      <br />
+      <strong>Shop catalog overview</strong><br />
+      Browse products by pricing segment, search, sort, and move to detailed checkout views.
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/images/mindrush-single-product.png" alt="Single product checkout and purchase options" width="100%" />
+      <br />
+      <strong>Single product checkout</strong><br />
+      Review trust highlights and plan options, then buy instantly with coins or add fiat plans to cart.
     </td>
   </tr>
 </table>
@@ -552,6 +569,54 @@ Notes:
 - Upload limits and MIME whitelist are controlled by `app.library.policy.media.*` (default max upload `2MB`).
 - Favorite operations are available only for publicly visible quizzes.
 
+## Shop (catalog, cart, checkout)
+The shop module supports both real-money-style checkout simulation and in-game coin purchases with backend-validated fulfillment.
+
+### Shop API (public + authenticated)
+- `GET /api/shop/catalog` -> public product catalog
+- `GET /api/shop/products/{slug}` -> public single product details (trust highlights, advantages, plans)
+- `GET /api/shop/orders` -> authenticated order history
+- `POST /api/shop/orders` -> create one order line (`productSlug`, `planCode`, `quantity`)
+- `POST /api/shop/orders/batch` -> create multiple order lines in one request (cart checkout)
+- `POST /api/shop/orders/{publicId}/simulate-payment` -> simulate `SUCCESS`, `FAILURE`, or `CANCEL`
+
+### Shop behavior and safeguards
+- Catalog supports dual pricing segmentation in UI: `Real money` and `Game coins`.
+- Coin-priced products can be purchased directly from a single product view (`Buy now`), including client confirmation.
+- Fiat-style plans are handled through cart flow with quantity controls and batch checkout simulation.
+- Cart state is persisted in local storage and normalized by `productSlug + planCode` (quantity aggregation for duplicate lines).
+- Quantity validation is enforced on backend (`1..1000`), including overflow-safe multiplication for totals/effects.
+- For coin purchases, balance is validated server-side before payment success is accepted.
+- Fulfillment is idempotent: already fulfilled paid orders are not re-applied.
+
+### Fulfillment model
+- `DURATION_DAYS` effects:
+  - `PREMIUM_ACCESS` -> activates or extends premium
+  - `XP_BOOST`, `RP_BOOST`, `COINS_BOOST` -> extends reward boost expiration windows
+- `RESOURCE_GRANT` effects:
+  - currently `COINS`, `XP`, `RANK_POINTS`
+- Order status lifecycle: `PENDING -> PAID|FAILED|CANCELLED`
+
+### Shop communications
+- Cart checkout sends one consolidated order email (grouped line items with quantities/totals).
+- Premium flow sends dedicated activation/extension email copy (including extension duration when premium was already active).
+- Premium activation/extension also creates in-app notification entries.
+
+### Admin shop management API
+- `GET /api/admin/shop/products` -> list products
+- `GET /api/admin/shop/products/config` -> pricing modes, currencies, and supported effect catalog
+- `GET /api/admin/shop/products/{id}` -> product detail for admin editor
+- `POST /api/admin/shop/products` -> create product
+- `PUT /api/admin/shop/products/{id}` -> update product
+- `PUT /api/admin/shop/products/{id}/status` -> change product status
+
+### Shop configuration
+Key backend properties (see `backend/src/main/resources/application.properties`):
+- `app.shop.payment-provider` (default `SIMULATED`)
+- `app.shop.premium-expiration-check-ms`
+- `app.shop.pricing-currencies[*]`
+- optional PayU sandbox placeholders (`app.shop.payu.*`) for next integration step
+
 ## Admin (quiz management)
 Admin-only quiz endpoints (requires `ADMIN` role):
 - `GET /api/admin/quizzes` -> list quizzes
@@ -714,14 +779,12 @@ cd ..\frontend
 npm test -- --watch=false --browsers=ChromeHeadless
 ```
 
-## Ongoing Development
-MindRush is actively evolving. New features, UX improvements, and infrastructure refinements are added continuously as the application grows.
-
-Current improvement directions:
-- adding an in-app shop for premium features and cosmetic items
-- introducing purchasable profile customization such as avatars and visual account upgrades
-- preparing a sandbox payment integration (for example PayU Sandbox) for future premium and cosmetic purchases
-- continuing to expand the product with new gameplay and platform features
+## Roadmap
+MindRush is actively evolving. Current next-step directions:
+- connect the existing shop order lifecycle to a real sandbox payment gateway (PayU sandbox)
+- expand shop offer with more cosmetic/profile personalization products
+- continue gameplay and social feature iterations (modes, progression UX, retention loops)
+- keep improving observability, operational hardening, and release automation
 
 ## License
 MIT - see `LICENSE`.
