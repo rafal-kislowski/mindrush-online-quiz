@@ -1,8 +1,8 @@
 package pl.mindrush.backend.achievement;
 
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 import pl.mindrush.backend.AppUser;
 import pl.mindrush.backend.AppUserRepository;
 import pl.mindrush.backend.game.GameAnswerRepository;
@@ -226,9 +226,11 @@ public class UserAchievementService {
             unlock.setAchievementKey(definition.key());
             unlock.setUnlockedAt(unlockedAt);
             try {
-                unlockRepository.save(unlock);
+                unlockRepository.saveAndFlush(unlock);
             } catch (DataIntegrityViolationException ignored) {
                 // Another transaction unlocked it first.
+                unlockedAtByKey.putIfAbsent(definition.key(), unlockedAt);
+                continue;
             }
             unlockedAtByKey.putIfAbsent(definition.key(), unlockedAt);
             notificationService.createAchievementUnlockedNotification(
