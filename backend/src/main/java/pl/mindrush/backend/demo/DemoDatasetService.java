@@ -231,6 +231,8 @@ public class DemoDatasetService {
     }
 
     private void clearDatabase() {
+        jdbcTemplate.update("delete from shop_order_effects");
+        jdbcTemplate.update("delete from shop_orders");
         lobbyBanRepository.deleteAllInBatch();
         lobbyParticipantRepository.deleteAllInBatch();
         gameAnswerRepository.deleteAllInBatch();
